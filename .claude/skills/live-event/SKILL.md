@@ -15,9 +15,9 @@ Each platform's provider (`.claude/rules/platforms.md`) maps its own events to `
 1. Types, in `src/common/types/connector.ts`: the `TOKIO_EVENTS` entry (`tokio:event:<name>`), the payload type next to the others, and its row in `TokioEventMap`. Typecheck then asks for:
    - its label in `ALERT_TRIGGER_LABELS` (same file), a `triggers.*` key added to every locale file (`.claude/rules/i18n.md`)
    - its message variables in `ALERT_MESSAGE_VARIABLES` (`src/common/util/alerts.ts`)
-   - its sample in `src/common/util/samples/index.ts`, which the alerts' TTS test and the unit tests use
+   - its sample in `src/common/util/samples/index.ts`, in `SAMPLES` under each platform that sends it, shaped as that platform's mapping sends it (`generateEventSample(type, platform)`), which alerts' and games' tests, Studio and the unit tests use
 
-   Also give it a place in `createTestLive` (same file), the LIVE an overlay's Test button plays one press at a time. Its test fails until each press sends every live event.
+   Also give it a place in `createTestLive` (same file), the LIVE an overlay's Test button plays one press at a time, in each sending platform's press. Its test fails until a press on every platform sends every live event, and each platform's press sends its `PLATFORM_TRIGGERS` row.
 
 2. An internal event, one that doesn't come from the LIVE, goes instead in the `AppEvents` exclusions and in `INTERNAL_EVENTS` (same file; they mirror each other), and in the `exclude` list of `AlertTriggerSchema` (`src/common/schemas/profile.ts`). It then reaches neither overlays nor alerts.
 3. The platforms that send it, each in its own provider: TikTok's `_listen` in `src/main/services/connector/providers/default/index.ts`, Twitch's and YouTube's `common/mapping.ts` in `providers/twitch/` and `providers/youtube/`. TikTok: listen to the `@tokioapp/connector` event (`WebcastEvent.<NAME>`, payloads in its README) in `_listen` of `src/main/services/connector/providers/default/index.ts`, and `this.emit(TOKIO_EVENTS.<NAME>, data)` with only the fields of the payload type. Every provider sets `user.platform`, and namespaces the ids it sends (`twitch:<id>`, `youtube:<id>`). Then add the event to each sending platform's row in `PLATFORM_TRIGGERS` (`src/common/util/platforms.ts`): the trigger pickers, the Home feed's kinds, the stat tiles and the timer rows all follow it, and its test fails for a trigger on no platform. Candidates it already decodes: `subNotify`, `emote`, `roomPin`, `imDelete`, `questionNew`, `goalUpdate`, `pollMessage`, `linkMicBattle` and `linkMicArmies`, `giftBroadcast`, `controlMessage`.
@@ -33,7 +33,7 @@ Each platform's provider (`.claude/rules/platforms.md`) maps its own events to `
 
    See `.claude/rules/timer.md`.
 
-7. A LIVE's record in Coin stats keeps only gifts (the user's call). An event that sends coins goes in `HISTORY_EVENTS` with its recorder in `src/main/services/history/index.ts`, which adds it to the LIVE and to its minute. See `.claude/rules/history.md`.
+7. A LIVE's record in LIVE history keeps what viewers spend, each platform's in its own currency, and gifted subs (the user's calls). An event that carries money or gifted subs goes in `HISTORY_EVENTS` with its recorder in `src/main/services/history/index.ts`, which counts it on the LIVE's platform part, its minute and the viewer's record. See `.claude/rules/history.md`.
 8. Overlays get every live event on their own: `ServerService` broadcasts each one `isLiveEvent` lets through. An event whose payload has a `user` also goes in `FAN_EVENTS` (`src/main/services/fans/index.ts`), so the profile keeps its viewers' fan levels for `tokio:fans`, and in `SUPERFAN` there when it tells whether the viewer is a Super Fan (`.claude/rules/fans.md`).
 9. Tests next to each file you changed: the connector mapping, alerts, the live session, the timer and the history.
 

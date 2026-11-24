@@ -50,11 +50,11 @@ Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok
 </table>
 
 - [Music](https://tokio.ialfaro.com/docs/features/music-requests/): viewers request songs from chat, played on YouTube or Spotify.
-- [Chat translation](https://tokio.ialfaro.com/docs/features/chat-translation/): messages in other languages translated into yours, on Home, in TTS, alerts and overlays.
+- [Chat translation](https://tokio.ialfaro.com/docs/features/chat-translation/): TikTok chat in other languages translated into yours, on Home, in TTS, alerts and overlays.
 - [Live controls](https://tokio.ialfaro.com/docs/features/live-controls/): skip a song, stop TTS, replay an alert or pause everything with a shortcut from any app, or from your phone.
 - [MCP](https://tokio.ialfaro.com/docs/developers/mcp/): AI assistants like Claude Code can set up Tokio and drive it for you.
-- [Coin stats](https://tokio.ialfaro.com/docs/features/coin-stats/): the coins and gifts of every LIVE and who sent them. Overlays can show your top gifters.
-- [Fans](https://tokio.ialfaro.com/docs/features/fans/): the viewers with a fan level, which overlays can show too.
+- [LIVE history](https://tokio.ialfaro.com/docs/features/coin-stats/): every LIVE, what viewers sent on each platform in its own currency, and who sent the most. Overlays can show your top gifters.
+- [Fans](https://tokio.ialfaro.com/docs/features/fans/): your TikTok fan club, and your subscribers and members on Twitch, YouTube and Kick. Overlays can show your TikTok fans.
 - [Profiles](https://tokio.ialfaro.com/docs/features/profiles-and-settings/): separate settings for different streams.
 
 Tokio is in English and Spanish. It follows your system's language, and **Settings → Language** changes it.
@@ -63,7 +63,7 @@ Tokio is in English and Spanish. It follows your system's language, and **Settin
 
 1. [Download Tokio](https://tokio.ialfaro.com/download/) for Windows, macOS or Linux. The [install guide](https://tokio.ialfaro.com/docs/install/) covers the warnings shown the first time it opens.
 2. Get a free API key from [Euler Stream](https://www.eulerstream.com/register) and paste it in **Settings → TikTok LIVE**.
-3. Start your LIVE, enter your `@username` on the **Home** page and connect. To stream on Twitch, YouTube or Kick too, click **Add a platform** on **Home**: Twitch needs you signed in once in **Settings → Twitch**, YouTube takes your channel's `@handle` or a link to the LIVE, and Kick your channel's name or its kick.com link.
+3. Start your LIVE, enter your `@username` on the **Home** page and connect. To stream on Twitch, YouTube or Kick too, add its tab with the **+** on **Home**: Twitch needs you signed in once in **Settings → Twitch**, YouTube takes your channel's `@handle` or a link to the LIVE, and Kick your channel's name or its kick.com link.
 
 [What you need](https://tokio.ialfaro.com/docs/#what-you-need) lists the rest, like a streaming app for the overlays. The [docs](https://tokio.ialfaro.com/docs/) cover every feature, the [chat commands](https://tokio.ialfaro.com/docs/features/chat-commands/) your viewers can type and how to [add an overlay](https://tokio.ialfaro.com/docs/guides/adding-an-overlay/) to your streaming app.
 

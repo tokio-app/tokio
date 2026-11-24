@@ -18,6 +18,8 @@ export interface UserData {
   superfan?: boolean;
   follower?: boolean;
   moderator?: boolean;
+  // A VIP on Twitch or Kick, from their chat badge
+  vip?: boolean;
   fanLevel?: number;
   // The picture of the fan level's badge, a heart that changes every 10
   // levels, without the number
@@ -29,25 +31,38 @@ export interface UserData {
   // Where the viewer is. Missing means TikTok, as everything sent or saved
   // before other platforms.
   platform?: Platform;
+  // How long they've been subscribed (Twitch, Kick) or a member (YouTube), in
+  // months, when their chat badge says so. YouTube's badge says only its
+  // milestone: 1 year is 12.
+  subMonths?: number;
 }
 
-// A fan the active profile keeps, sent to overlays with tokio:fans. No
-// profile picture: TikTok's links expire within days. The badge's don't.
+// A fan the active profile keeps: TikTok's fan club, by level, and the other
+// platforms' subscribers (Twitch, Kick) and members (YouTube). Overlays get
+// TikTok's with tokio:fans. No profile picture: TikTok's links expire within
+// days. The badge's don't.
 export interface Fan {
   userId: string;
   username: string;
   handle: string;
+  // TikTok's; 0 on the other platforms
   fanLevel: number;
   fanBadge: string;
-  // A Super Fan subscriber, as their last chat, gift or Super Fan event said
+  // A Super Fan subscriber, as their last chat, gift or Super Fan event said.
+  // Always true on the other platforms, whose fans are their subscribers.
   superfan: boolean;
+  // Months subscribed or a member, on the other platforms, when known
+  months?: number;
   // When they were last seen in a LIVE, in ms since the epoch
   seenAt: number;
+  // Missing means TikTok
+  platform?: Platform;
 }
 
 // A viewer in tokio:gifters' top 10s, with their coins and gifts in this LIVE
 // (0 when they sent none in it) and in all the profile's LIVEs, this one
-// included
+// included. Only TikTok's gifters, by coins: Bits, Kicks and Super Chats
+// aren't coins, and YouTube's Gifts have no price.
 export interface TopGifter {
   userId: string;
   username: string;
@@ -160,6 +175,14 @@ export interface CheerEvent {
   message: string;
 }
 
+// Kick's KICKs: how many a viewer sent, like Twitch's Bits, with the
+// message they pinned, "" for none
+export interface KicksEvent {
+  user: UserData;
+  kicks: number;
+  message: string;
+}
+
 // Another channel sending its viewers over: the user is its streamer
 export interface RaidEvent {
   user: UserData;
@@ -183,6 +206,9 @@ export interface SuperChatEvent {
   message: string;
   // A Super Sticker's picture, "" for a Super Chat
   sticker: string;
+  // In US dollars at the day's exchange rates; null or missing when the
+  // amount can't be read or the rates haven't loaded
+  usd?: number | null;
 }
 
 export interface Gift {
@@ -219,6 +245,7 @@ export enum TOKIO_EVENTS {
   RAID = "tokio:event:raid",
   REDEEM = "tokio:event:redeem",
   SUPER_CHAT = "tokio:event:superchat",
+  KICKS = "tokio:event:kicks",
 
   // EXTERNAL - MUSIC
   MUSIC_CHANGE = "tokio:event:music:change",
@@ -258,6 +285,7 @@ export interface TokioEventMap {
   [TOKIO_EVENTS.RAID]: RaidEvent;
   [TOKIO_EVENTS.REDEEM]: RedeemEvent;
   [TOKIO_EVENTS.SUPER_CHAT]: SuperChatEvent;
+  [TOKIO_EVENTS.KICKS]: KicksEvent;
 
   // EXTERNAL - MUSIC
   [TOKIO_EVENTS.MUSIC_CHANGE]: MusicInfo[];
@@ -308,6 +336,7 @@ export const ALERT_TRIGGER_LABELS: Record<AlertTrigger, MessageKey> = {
   [TOKIO_EVENTS.RAID]: "triggers.raid",
   [TOKIO_EVENTS.REDEEM]: "triggers.redeem",
   [TOKIO_EVENTS.SUPER_CHAT]: "triggers.superChat",
+  [TOKIO_EVENTS.KICKS]: "triggers.kicks",
   [TOKIO_EVENTS.MUSIC_CHANGE]: "triggers.musicChange",
 };
 

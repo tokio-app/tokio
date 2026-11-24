@@ -5,8 +5,12 @@ import {
   capitalize,
   DateFilter,
   dateRange,
+  historyPlatforms,
   keepSelection,
+  liveValue,
   periodText,
+  readout,
+  statsTabs,
 } from "./helper";
 
 // Local times, so the days read the same in any time zone
@@ -119,30 +123,119 @@ describe("periodText", () => {
 });
 
 describe("allTime", () => {
+  const kick = { amount: 40, gifts: 2, giftSubs: 3 };
   const lives = [
+    // An older LIVE, saved without its platforms: TikTok's
     liveSummary(day(30, 20), { coins: 100, gifts: 10, endedAt: day(30, 22) }),
-    liveSummary(day(29, 20), { coins: 25, gifts: 5, endedAt: day(29, 21) }),
+    liveSummary(day(29, 20), {
+      coins: 25,
+      gifts: 5,
+      platforms: { tiktok: { amount: 25, gifts: 3, giftSubs: 0 }, kick },
+      endedAt: day(29, 21),
+    }),
   ];
 
-  it("adds up every LIVE's coins, gifts and length", () => {
+  it("adds up each platform's part of every LIVE, and their length", () => {
     expect(allTime(lives)).toEqual({
-      coins: 125,
-      gifts: 15,
+      parts: {
+        tiktok: { amount: 125, gifts: 13, giftSubs: 0 },
+        kick,
+      },
       length: 3 * HOUR,
     });
   });
 
-  it("takes the time in the dates, and the coins of the LIVEs all in them", () => {
+  it("takes the time in the dates, and the parts of the LIVEs all in them", () => {
     // From 8:30 PM on the 29th: half an hour of one LIVE, all of the other
     expect(allTime(lives, { from: day(29, 20, 30) })).toEqual({
-      coins: 100,
-      gifts: 10,
+      parts: { tiktok: { amount: 100, gifts: 10, giftSubs: 0 } },
       length: 2 * HOUR + HOUR / 2,
     });
   });
 
-  it("is all zeros without LIVEs", () => {
-    expect(allTime([])).toEqual({ coins: 0, gifts: 0, length: 0 });
+  it("is empty without LIVEs", () => {
+    expect(allTime([])).toEqual({ parts: {}, length: 0 });
+  });
+});
+
+describe("historyPlatforms and statsTabs", () => {
+  const part = { amount: 1, gifts: 1, giftSubs: 0 };
+
+  it("gives the platforms the LIVEs were on in Home's order, an older one as TikTok's", () => {
+    const platforms = historyPlatforms([
+      liveSummary(2, { platforms: { kick: part, twitch: part } }),
+      liveSummary(1, { coins: 5 }),
+    ]);
+
+    expect(platforms).toEqual(["tiktok", "twitch", "kick"]);
+    expect(statsTabs(platforms)).toEqual(["tiktok", "twitch", "kick", "all"]);
+  });
+
+  it("gives one platform its tab alone, and TikTok's without LIVEs", () => {
+    const youtube = [liveSummary(1, { platforms: { youtube: part } })];
+
+    expect(statsTabs(historyPlatforms(youtube))).toEqual(["youtube"]);
+    expect(historyPlatforms([])).toEqual(["tiktok"]);
+  });
+});
+
+describe("liveValue", () => {
+  it("gives a LIVE's money on its platform's tab, 0 off it, and its gifts on All", () => {
+    const live = liveSummary(1, {
+      gifts: 7,
+      platforms: { twitch: { amount: 2500, gifts: 0, giftSubs: 4 } },
+    });
+
+    expect(liveValue(live, "twitch")).toBe(2500);
+    expect(liveValue(live, "kick")).toBe(0);
+    expect(liveValue(live, "all")).toBe(7);
+  });
+});
+
+describe("readout", () => {
+  const parts = {
+    tiktok: { amount: 900, gifts: 30, giftSubs: 0 },
+    twitch: { amount: 2500, gifts: 0, giftSubs: 4 },
+    youtube: { amount: 57.4, gifts: 2, giftSubs: 1 },
+    kick: { amount: 300, gifts: 5, giftSubs: 2 },
+  };
+
+  it("gives a platform its money, then its gifts and gifted subs where it sends them", () => {
+    expect(readout("tiktok", [], parts)).toEqual([
+      { label: "coinStats.stats.coins", value: 900, currency: "coins" },
+      { label: "coinStats.stats.gifts", value: 30 },
+    ]);
+    expect(readout("twitch", [], parts)).toEqual([
+      { label: "coinStats.stats.bits", value: 2500, currency: "bits" },
+      { label: "coinStats.stats.giftSubs", value: 4 },
+    ]);
+    expect(readout("youtube", [], parts)).toEqual([
+      { label: "coinStats.stats.superChats", value: 57.4, currency: "usd" },
+      { label: "coinStats.stats.gifts", value: 2 },
+      { label: "coinStats.stats.giftSubs", value: 1 },
+    ]);
+    // Kicks, never gifts
+    expect(readout("kick", [], {})).toEqual([
+      { label: "coinStats.stats.kicks", value: 0, currency: "kicks" },
+      { label: "coinStats.stats.giftSubs", value: 0 },
+    ]);
+  });
+
+  it("gives All each currency on its own, every gift and every gifted sub", () => {
+    expect(
+      readout("all", ["tiktok", "twitch", "youtube", "kick"], parts),
+    ).toEqual([
+      { label: "coinStats.stats.coins", value: 900, currency: "coins" },
+      { label: "coinStats.stats.bits", value: 2500, currency: "bits" },
+      { label: "coinStats.stats.superChats", value: 57.4, currency: "usd" },
+      { label: "coinStats.stats.kicks", value: 300, currency: "kicks" },
+      { label: "coinStats.stats.gifts", value: 37 },
+      { label: "coinStats.stats.giftSubs", value: 7 },
+    ]);
+    // TikTok sends no gifted subs
+    expect(readout("all", ["tiktok"], parts).at(-1)?.label).toBe(
+      "coinStats.stats.gifts",
+    );
   });
 });
 

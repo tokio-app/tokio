@@ -20,6 +20,7 @@ import { LiveService } from "@/services/live";
 import { MusicService } from "@/services/music";
 import { OverlayService } from "@/services/overlay";
 import { PathManagerService } from "@/services/path";
+import { RatesService } from "@/services/rates";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
 import { StudioService } from "@/services/studio";
@@ -73,6 +74,7 @@ export interface AppServices {
   readonly trayService: TrayService;
   readonly translationService: TranslationService;
   readonly controlsService: ControlsService;
+  readonly ratesService: RatesService;
 }
 
 export interface AppHandlerVariables extends AppServices {

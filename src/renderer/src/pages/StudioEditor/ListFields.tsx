@@ -4,6 +4,7 @@ import {
   STUDIO_MAX_LIST_GAP,
   STUDIO_MAX_LIST_ROWS,
   StudioElementOf,
+  StudioListSource,
 } from "@/common/schemas";
 import {
   Check,
@@ -13,15 +14,30 @@ import {
   NumberInput,
   Select,
 } from "@/components";
-import { useOptions, useT } from "@/ui/i18n";
+import {
+  AlertTrigger,
+  Platform,
+  PLATFORMS,
+  TOKIO_EVENTS,
+} from "@/common/types";
+import { PLATFORM_LABELS, triggersFor } from "@/common/util";
+import { usePlatforms } from "@/context/platforms";
+import { useT } from "@/ui/i18n";
+import { listSourceName } from "./helper";
 import styles from "./studioeditor.module.css";
 
-const SOURCES = STUDIO_LIST_SOURCES.map((value) => ({
-  value,
-  label: `studio.list.sources.${value}` as const,
-}));
-
 type List = StudioElementOf<"list">;
+
+// The event a source lists, when only some platforms send it
+const NEEDS: Partial<Record<StudioListSource, AlertTrigger>> = {
+  giftsubs: TOKIO_EVENTS.GIFT_SUB,
+  followers: TOKIO_EVENTS.FOLLOW,
+  gifts: TOKIO_EVENTS.GIFT,
+};
+
+// Twitch, YouTube and Kick: the platforms a gifted subs top can rank
+const giftsSubs = (platform: Platform) =>
+  triggersFor([platform]).includes(TOKIO_EVENTS.GIFT_SUB);
 
 type Props = {
   element: List;
@@ -29,13 +45,48 @@ type Props = {
 };
 
 /**
- * A list's source and how many rows it shows, its text and the values' color
- * (top gifters' coins, gifts' counts), and its pictures.
+ * A list's source (and whose top gifters, with another platform than
+ * TikTok) and how many rows it
+ * shows, its text and the values' color (top gifters' coins, gifts' counts),
+ * and its pictures.
  */
 export function ListFields({ element, onChange }: Props) {
   const t = useT();
-  const sources = useOptions(SOURCES);
-  const valued = element.source === "gifters" || element.source === "gifts";
+  const platforms = usePlatforms();
+  const sent = triggersFor(platforms);
+  // Gifted subs, followers and gifts from the platforms that send them, a
+  // saved one staying, and the top gifters named by the list's platform's
+  // money: Top Bits this LIVE
+  const sources = STUDIO_LIST_SOURCES.filter((value) => {
+    const needs = NEEDS[value];
+    return !needs || sent.includes(needs) || value === element.source;
+  }).map((value) => ({
+    value,
+    label: t(listSourceName({ source: value, platform: element.platform })),
+  }));
+  const top = element.source === "gifters" || element.source === "giftsubs";
+  const valued = top || element.source === "gifts";
+  // The profile's platforms the top can rank, and one saved
+  const choices = PLATFORMS.filter(
+    (p) =>
+      (platforms.includes(p) &&
+        (element.source !== "giftsubs" || giftsSubs(p))) ||
+      p === element.platform,
+  );
+  // Only once there's a choice, or the saved one isn't the profile's
+  const pickPlatform =
+    top && (choices.length > 1 || !platforms.includes(element.platform));
+  // Gifted subs start on a platform that gifts them
+  const setSource = (source: StudioListSource) =>
+    onChange({
+      ...element,
+      source,
+      platform:
+        source === "giftsubs" && !giftsSubs(element.platform)
+          ? (PLATFORMS.find((p) => platforms.includes(p) && giftsSubs(p)) ??
+            element.platform)
+          : element.platform,
+    });
 
   return (
     <>
@@ -44,9 +95,23 @@ export function ListFields({ element, onChange }: Props) {
           aria-label={t("studio.list.source")}
           options={sources}
           value={element.source}
-          onChange={(source) => onChange({ ...element, source })}
+          onChange={setSource}
         />
       </Field>
+      {pickPlatform && (
+        <Field label={t("studio.list.platform")}>
+          <Select
+            aria-label={t("studio.list.platform")}
+            // Each ranks its gifters in its own currency
+            options={choices.map((value) => ({
+              value,
+              label: PLATFORM_LABELS[value],
+            }))}
+            value={element.platform}
+            onChange={(platform) => onChange({ ...element, platform })}
+          />
+        </Field>
+      )}
       <div className={styles.pair}>
         <Field label={t("studio.list.rows")}>
           <NumberInput

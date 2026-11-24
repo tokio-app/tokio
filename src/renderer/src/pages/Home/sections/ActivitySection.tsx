@@ -5,17 +5,17 @@ import {
   ChatTranslation,
   MusicInfo,
 } from "@/common/types";
-import { PLATFORM_LABELS, platformOf } from "@/common/util";
+import { GIFT_CURRENCY, PLATFORM_LABELS, platformOf } from "@/common/util";
 import { languageName } from "@/helper/voices";
 import { Avatar, Btn } from "@/components";
-import { cx } from "@/helper";
-import { coinsLabel } from "@/helper/gifts";
+import { cx, PLATFORM_ICONS } from "@/helper";
+import { amountLabel } from "@/helper/gifts";
 import { rich, useLanguage, useT } from "@/ui/i18n";
 import { memo } from "react";
 import { FiSettings } from "react-icons/fi";
 import { MdTranslate } from "react-icons/md";
 import styles from "../home.module.css";
-import { joinedText, PLATFORM_ICONS, songParts } from "../helper";
+import { joinedText, songParts } from "../helper";
 
 interface Props {
   connected: boolean;
@@ -163,6 +163,7 @@ function Action({
       );
     case "sub":
     case "cheer":
+    case "kicks":
     case "redeem":
       return (
         <>
@@ -173,7 +174,9 @@ function Action({
                 : t("home.activity.sub")
               : item.type === "cheer"
                 ? t("home.activity.cheer", { count: item.bits })
-                : t("home.activity.redeem", { reward: item.reward }),
+                : item.type === "kicks"
+                  ? t("home.activity.kicks", { count: item.kicks })
+                  : t("home.activity.redeem", { reward: item.reward }),
             { name },
           )}
           {/* What the viewer wrote, as a chat's message */}
@@ -213,6 +216,8 @@ const Event = memo(function Event({
     );
   }
   if (item.type === "chat") return <ChatRow {...item} mark={mark} />;
+  // A gift's price is in its sender's platform's currency
+  const currency = GIFT_CURRENCY[platformOf(item.user)];
   return (
     <li className={styles.event}>
       <Avatar name={item.user.name} picture={item.user.picture} />
@@ -221,9 +226,9 @@ const Event = memo(function Event({
       </div>
       {/* At the row's end, after the body's trailing space. A gift without
           a price, like YouTube's, shows none. */}
-      {item.type === "gift" && item.gift.coins > 0 && (
+      {item.type === "gift" && item.gift.coins > 0 && currency && (
         <span className={styles.coins}>
-          {coinsLabel(item.gift.coins, language)}
+          {amountLabel(item.gift.coins, currency, language)}
         </span>
       )}
     </li>

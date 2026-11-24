@@ -14,7 +14,9 @@ import { describe, expect, it, vi } from "vitest";
 import home from "./home";
 
 const stats = { likes: 3, viewers: 2, views: 10 };
-const noStats = { likes: 0, viewers: 0, views: 0 };
+// What CONNECTED says: the saved stats, and each platform's viewers
+const replied = { ...stats, platformViewers: { tiktok: 2 } };
+const noStats = { likes: 0, viewers: 0, views: 0, platformViewers: {} };
 const noTotals = { followers: 0, shares: 0, gifts: 0, coins: 0 };
 const fail = (): never => {
   throw new Error("broken");
@@ -42,6 +44,7 @@ describe("home events", () => {
         isReconnecting: vi.fn(() => false),
         isWaiting: () => false,
         status: vi.fn((): Partial<Record<Platform, PlatformStatus>> => ({})),
+        viewers: () => ({ tiktok: 2 }),
         channel: vi.fn((_platform: Platform) => ""),
         username: "",
       };
@@ -86,7 +89,7 @@ describe("home events", () => {
           reconnecting: false,
           waiting: false,
           platforms: {},
-          stats,
+          stats: replied,
         },
       ]);
       expect(h.notices).toEqual([
@@ -151,7 +154,7 @@ describe("home events", () => {
           reconnecting: false,
           waiting: false,
           platforms: {},
-          stats,
+          stats: replied,
         },
       ]);
       expect(h.notices).toEqual([
@@ -394,6 +397,7 @@ describe("home events", () => {
         isReconnecting: () => false,
         isWaiting: () => false,
         status: () => ({ ...status }),
+        viewers: () => ({ tiktok: 2 }),
         channel: (_platform: Platform) => "",
         username: "",
       };
@@ -549,13 +553,33 @@ describe("home events", () => {
         getProfileData: async () => profile,
       };
       const timerService = { setPlatforms: vi.fn((_p: Platform[]) => {}) };
+      // TikTok out of reach: nothing to refresh, and no notice
+      const connectorService = {
+        status: () => on,
+        fetchGifts: vi.fn(async () => ({ success: false, data: [] })),
+      };
       const h = createHandler({
-        connectorService: { status: () => on },
+        connectorService,
         storeManagerService,
         timerService,
       });
-      return { h, storeManagerService, timerService };
+      return { h, storeManagerService, timerService, connectorService };
     };
+
+    it("asks TikTok for its gifts once TikTok is added, never without it", async () => {
+      const { h, connectorService } = setup();
+
+      await h.invoke(home, APP_EVENTS.SET_PLATFORMS, { platforms: ["kick"] });
+      expect(connectorService.fetchGifts).not.toHaveBeenCalled();
+
+      await h.invoke(home, APP_EVENTS.SET_PLATFORMS, {
+        platforms: ["kick", "tiktok"],
+      });
+      await vi.waitFor(() =>
+        expect(connectorService.fetchGifts).toHaveBeenCalledOnce(),
+      );
+      expect(h.notices).toEqual([]);
+    });
 
     it("saves the known ones in Home's order, with no notice", async () => {
       const { h, storeManagerService, timerService } = setup();
@@ -639,6 +663,7 @@ describe("home events", () => {
           isReconnecting: () => false,
           isWaiting: () => false,
           status: () => ({ twitch: "connected" }),
+          viewers: () => ({ twitch: 1 }),
         },
         liveService: { getSession: () => ({ startedAt: 1000 }) },
         storeManagerService: { getLiveStats: () => stats },
@@ -690,6 +715,7 @@ describe("home events", () => {
         isReconnecting: () => reconnecting,
         isWaiting: () => waiting,
         status: () => ({}),
+        viewers: () => ({ tiktok: 2 }),
       },
       liveService: { getSession: () => ({ startedAt }) },
       storeManagerService: { getLiveStats: () => stats },
@@ -707,7 +733,7 @@ describe("home events", () => {
           reconnecting: false,
           waiting: false,
           platforms: {},
-          stats,
+          stats: replied,
         },
       ]);
     });
@@ -724,7 +750,7 @@ describe("home events", () => {
           reconnecting: false,
           waiting: false,
           platforms: {},
-          stats,
+          stats: replied,
         },
       ]);
     });
@@ -741,7 +767,7 @@ describe("home events", () => {
           reconnecting: true,
           waiting: false,
           platforms: {},
-          stats,
+          stats: replied,
         },
       ]);
     });
@@ -758,7 +784,7 @@ describe("home events", () => {
           reconnecting: false,
           waiting: true,
           platforms: {},
-          stats,
+          stats: replied,
         },
       ]);
     });
@@ -806,24 +832,32 @@ describe("home events", () => {
   });
 
   describe("GET_LIVE_GIFTERS", () => {
-    it("replies with this LIVE's top gifters without a notice", async () => {
+    it("replies with each platform's top gifters in this LIVE without a notice", async () => {
       const gifter = {
         userId: "1",
         username: "Leo",
         handle: "leo",
         picture: "",
-        live: { coins: 1000, gifts: 1 },
-        allTime: { coins: 5000, gifts: 9 },
+        coins: 1000,
+        gifts: 1,
+        giftSubs: 0,
         giftedAt: 1000,
       };
+      const subber = { ...gifter, userId: "kick:2", platform: "kick" as const };
       const h = createHandler({
-        historyService: { top: () => ({ live: [gifter], allTime: [] }) },
+        historyService: {
+          topByPlatform: () => ({ tiktok: [gifter] }),
+          topSubGifters: () => ({ kick: [subber] }),
+        },
       });
 
       await h.invoke(home, APP_EVENTS.GET_LIVE_GIFTERS);
 
       expect(h.replies(APP_EVENTS_RESPONSE.LIVE_GIFTERS)).toEqual([
-        { data: [gifter] },
+        {
+          byPlatform: { tiktok: [gifter] },
+          subsByPlatform: { kick: [subber] },
+        },
       ]);
       expect(h.notices).toEqual([]);
     });
@@ -849,7 +883,10 @@ describe("home events", () => {
   });
 
   it.each([
-    [APP_EVENTS.GET_LIVE_GIFTERS, { historyService: { top: () => fail() } }],
+    [
+      APP_EVENTS.GET_LIVE_GIFTERS,
+      { historyService: { topByPlatform: () => fail() } },
+    ],
     [APP_EVENTS.GET_SONGS, { musicService: { songs: () => fail() } }],
   ] as const)(
     "sends no reply and no notice when %s fails",
@@ -879,6 +916,7 @@ describe("home events", () => {
       raid: true,
       redeem: true,
       superchat: true,
+      kicks: true,
     };
 
     it("saves the feed and replies with the events it still shows", async () => {

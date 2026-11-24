@@ -92,6 +92,18 @@ const textOf = (text?: Text) =>
     )
     .join("");
 
+// The member badge's tooltip says its milestone, "Member (2 months)" or
+// "Member (1 year)", in English (hl=en); "New member" says none: 0
+function memberMonths(badges: Badge["liveChatAuthorBadgeRenderer"][]) {
+  for (const badge of badges) {
+    if (!badge?.customThumbnail) continue;
+    const [, count, unit] =
+      badge.tooltip?.match(/\((\d+) (month|year)s?\)/) ?? [];
+    if (count) return Number(count) * (unit === "year" ? 12 : 1);
+  }
+  return 0;
+}
+
 function youtubeUser(author: Author): UserData {
   const handle = (author.authorName?.simpleText ?? "").trim().replace(/^@/, "");
   const badges = (author.authorBadges ?? []).map(
@@ -111,6 +123,8 @@ function youtubeUser(author: Author): UserData {
     superfan: badges.some((b) => b?.customThumbnail),
     platform: "youtube",
   };
+  const months = memberMonths(badges);
+  if (months > 0) user.subMonths = months;
   const picture = largest(author.authorPhoto?.thumbnails);
   if (picture) user.profilePictures = [picture];
   if (author.authorExternalChannelId) {

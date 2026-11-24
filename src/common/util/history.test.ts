@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allInRange, inRange, viewerMatcher } from "./history";
+import { allInRange, inRange, platformParts, viewerMatcher } from "./history";
 
 // A LIVE from 8:00 to 10:00, in minutes
 const live = { startedAt: 8 * 60, endedAt: 10 * 60 };
@@ -45,5 +45,17 @@ describe("viewerMatcher", () => {
   it("ignores a leading @", () => {
     expect(viewerMatcher("@kai.r")(kai)).toBe(true);
     expect(viewerMatcher("k@i")(kai)).toBe(false);
+  });
+});
+
+describe("platformParts", () => {
+  it("gives each platform's part, and an older LIVE's to TikTok", () => {
+    const kick = { amount: 50, gifts: 2, giftSubs: 1 };
+    expect(
+      platformParts({ coins: 0, gifts: 2, platforms: { kick, twitch: kick } }),
+    ).toEqual({ kick, twitch: kick });
+    expect(platformParts({ coins: 30, gifts: 4, platforms: {} })).toEqual({
+      tiktok: { amount: 30, gifts: 4, giftSubs: 0 },
+    });
   });
 });

@@ -300,11 +300,14 @@ describe("games events", () => {
       await h.invoke(games, APP_EVENTS.TEST_GAME_ACTION, {
         ...request,
         edition: "java",
+        platform: "twitch",
       });
 
       expect(test).toHaveBeenCalledWith({
         edition: "java",
         trigger: request.trigger,
+        // Its sample's platform
+        platform: "twitch",
         steps: request.steps,
       });
       expect(h.replies(APP_EVENTS_RESPONSE.TEST_GAME_ACTION)).toEqual([

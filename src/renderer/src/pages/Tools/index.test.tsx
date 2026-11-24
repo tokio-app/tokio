@@ -26,7 +26,9 @@ const CLOCK: TestOverlay = { id: "4f9c2a", name: "Clock" };
 const timer = (recipe?: (data: TimerData) => void) =>
   send(APP_EVENTS_RESPONSE.TIMER, timerReply(recipe));
 const lives = (...data: ReturnType<typeof liveSummary>[]) =>
-  send(APP_EVENTS_RESPONSE.LIVES, { data: { lives: data, gifters: [] } });
+  send(APP_EVENTS_RESPONSE.LIVES, {
+    data: { lives: data, gifters: [], subGifters: [] },
+  });
 const fans = (...data: Fan[]) => send(APP_EVENTS_RESPONSE.FANS, { data });
 const testOverlays = (...data: TestOverlay[]) =>
   send(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS, { success: true, data });
@@ -46,7 +48,7 @@ describe("Tools", () => {
     const names = [
       "Countdown",
       "Overlay Studio",
-      "Coin stats",
+      "LIVE history",
       "Fans",
       "Test overlays",
     ];
@@ -82,7 +84,7 @@ describe("Tools", () => {
       /^CountdownA countdown viewers add time to\.$/,
     );
     expect(row("Fans")).toHaveTextContent(
-      /^FansViewers with a fan level, highest first\.$/,
+      /^FansYour TikTok fan club, and your subscribers and members on other platforms\.$/,
     );
   });
 
@@ -100,28 +102,25 @@ describe("Tools", () => {
     expect(row("Countdown")).toHaveAccessibleDescription(
       "A countdown viewers add time to. 01:00:00 Ready",
     );
-    // The newest LIVE's
-    expect(row("Coin stats")).toHaveAccessibleDescription(
-      "The coins and gifts of every LIVE, and who sent them. 1,234 coins on Oct 31, 2026",
+    expect(row("LIVE history")).toHaveAccessibleDescription(
+      "Every LIVE, what viewers sent on each platform and who sent the most. 2 LIVEs",
     );
     expect(row("Fans")).toHaveAccessibleDescription(
-      "Viewers with a fan level, highest first. 2 fans",
+      "Your TikTok fan club, and your subscribers and members on other platforms. 2 fans",
     );
     expect(row("Test overlays")).toHaveAccessibleDescription(
       "Send test events to an overlay you're building. 1 test overlay",
     );
   });
 
-  it("counts one coin, one fan, and no test overlays", async () => {
+  it("counts one LIVE, one fan, and no test overlays", async () => {
     await renderApp("/tools");
 
     await lives(liveSummary(OCT_31, { coins: 1 }));
     await fans(fan("Jules", 32));
     await testOverlays();
 
-    expect(
-      within(row("Coin stats")).getByText("coin on Oct 31, 2026"),
-    ).toBeVisible();
+    expect(within(row("LIVE history")).getByText("LIVE")).toBeVisible();
     expect(within(row("Fans")).getByText("fan")).toBeVisible();
     expect(within(row("Test overlays")).getByText("0")).toBeVisible();
     expect(
@@ -150,13 +149,13 @@ describe("Tools", () => {
     expect(within(row("Overlay Studio")).getByText("overlay")).toBeVisible();
   });
 
-  it("says when there are no LIVEs yet, with no number", async () => {
+  it("counts no LIVEs before the first ends", async () => {
     await renderApp("/tools");
 
     await lives();
 
-    expect(row("Coin stats")).toHaveAccessibleDescription(
-      "The coins and gifts of every LIVE, and who sent them. No LIVEs yet",
+    expect(row("LIVE history")).toHaveAccessibleDescription(
+      "Every LIVE, what viewers sent on each platform and who sent the most. 0 LIVEs",
     );
   });
 
@@ -191,7 +190,7 @@ describe("Tools", () => {
       t.state = { status: "running", remaining: 10_000 };
     });
     expect(row("Countdown").className).toMatch(/tool_live/);
-    expect(row("Coin stats").className).not.toMatch(/tool_live/);
+    expect(row("LIVE history").className).not.toMatch(/tool_live/);
   });
 
   it("shows the starting time while idle", async () => {
@@ -217,13 +216,13 @@ describe("Tools", () => {
     expect(sent(APP_EVENTS.GET_FANS)).toHaveLength(2);
 
     await lives();
-    expect(within(row("Coin stats")).getByText("No LIVEs yet")).toBeVisible();
+    expect(within(row("LIVE history")).getByText("0")).toBeVisible();
   });
 
   it.each([
     ["Countdown", "/tools/timer"],
     ["Overlay Studio", "/tools/studio"],
-    ["Coin stats", "/tools/coin-stats"],
+    ["LIVE history", "/tools/coin-stats"],
     ["Fans", "/tools/fans"],
     ["Test overlays", "/tools/test-overlays"],
   ])("opens %s", async (name, path) => {

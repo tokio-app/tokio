@@ -11,6 +11,7 @@ import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
 import { writeFileAtomic } from "@/helper/fs";
 import { sendGamesOverlay } from "@/helper/games";
+import { refreshTikTokGifts, usesTikTok } from "@/helper/gifts";
 import { language, setLanguage, t } from "@/helper/i18n";
 import Logger, { localTime } from "@/logger";
 import { StoreManagerService } from "@/services/store";
@@ -224,6 +225,9 @@ const switchProfile = async (
   }
   // A switch, so every backlog stops: clones keep the action ids
   services.gamesService.setGames(profile.games, true);
+  // TikTok's gifts, the first time a profile with TikTok is picked. Switches
+  // wait on each other, so this one doesn't wait for it.
+  if (usesTikTok(profile.platforms)) void refreshTikTokGifts(services);
 
   e.reply(APP_EVENTS_RESPONSE.GET_PROFILE, {
     success: true,

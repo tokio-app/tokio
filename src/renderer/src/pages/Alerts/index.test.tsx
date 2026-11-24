@@ -465,15 +465,18 @@ describe("Alerts", () => {
 
     await user.click(other.getByRole("combobox"));
     await user.click(inList(container, "Gift")!);
-    fireEvent.change(other.getByRole("spinbutton", { name: "Coins" }), {
-      target: { value: "50" },
-    });
+    fireEvent.change(
+      other.getByRole("spinbutton", { name: "Worth at least" }),
+      {
+        target: { value: "50" },
+      },
+    );
 
     // Each row keeps its own: the chat's keyword, the gift's coins
     expect(opened.getByPlaceholderText("Any message")).toHaveValue("hello");
-    expect(opened.getAllByRole("spinbutton", { name: "Coins" })).toHaveLength(
-      1,
-    );
+    expect(
+      opened.getAllByRole("spinbutton", { name: "Worth at least" }),
+    ).toHaveLength(1);
     expect(dialogs()[0]).toHaveAccessibleName("Chat or Gift alert");
     await wait(300);
     expect(saves().at(-1)?.items[0]).toMatchObject({
@@ -923,9 +926,33 @@ describe("Alerts", () => {
       id: "alert-2",
       tts: message,
       trigger: TOKIO_EVENTS.FOLLOW,
+      platform: "tiktok",
       volume: 50,
       request: sent(APP_EVENTS.TEST_ALERT)[0].request + 1,
     });
+  });
+
+  it("tests a message with a sample of the platform its trigger comes from", async () => {
+    const tts = { sound: null, tts: speech("Welcome") };
+    const { user } = await load(
+      [
+        alert("alert-1", tts),
+        alert("alert-2", {
+          ...tts,
+          trigger: { ...trigger(TOKIO_EVENTS.FOLLOW), platform: "tiktok" },
+        }),
+      ],
+      (p) => {
+        p.platforms = ["kick", "twitch"];
+      },
+    );
+
+    // Kick has no follows: Twitch's, else the row's own
+    await user.click(rows()[0].getByRole("button", { name: "Play" }));
+    await user.click(rows()[1].getByRole("button", { name: "Play" }));
+    expect(
+      sent(APP_EVENTS.TEST_ALERT).map((r) => ("tts" in r ? r.platform : null)),
+    ).toEqual(["twitch", "tiktok"]);
   });
 
   describe("media", () => {
@@ -1339,11 +1366,14 @@ describe("Alerts", () => {
         alert("alert-1", { trigger: trigger(TOKIO_EVENTS.GIFT) }),
       ]);
       const opened = await edit(user, 0);
-      expect(opened.getByText(/The whole streak's coins/)).toBeInTheDocument();
+      expect(opened.getByText(/The whole streak's price/)).toBeInTheDocument();
 
-      fireEvent.change(opened.getByRole("spinbutton", { name: "Coins" }), {
-        target: { value: "100" },
-      });
+      fireEvent.change(
+        opened.getByRole("spinbutton", { name: "Worth at least" }),
+        {
+          target: { value: "100" },
+        },
+      );
       await user.click(opened.getByRole("checkbox", { name: "Moderators" }));
       await user.click(opened.getByRole("checkbox", { name: "Super Fans" }));
       await user.click(opened.getByRole("checkbox", { name: "Super Fans" }));
@@ -1392,6 +1422,49 @@ describe("Alerts", () => {
         opened.queryByRole("group", { name: "Worth at least" }),
       ).toBeNull();
       expect(opened.getByRole("group", { name: "From" })).toBeInTheDocument();
+    });
+
+    it("takes the minimum in the row's currency, and none on YouTube", async () => {
+      const worth = (patch: Partial<Alert["trigger"]>) => ({
+        trigger: { ...trigger(TOKIO_EVENTS.GIFT), min_coins: 100, ...patch },
+      });
+      const { user } = await load(
+        [
+          alert("alert-1", worth({})),
+          alert(
+            "alert-2",
+            worth({ type: TOKIO_EVENTS.KICKS, platform: "kick" }),
+          ),
+          alert("alert-3", worth({ platform: "youtube", min_coins: 0 })),
+        ],
+        (p) => {
+          p.platforms = ["tiktok", "kick", "youtube"];
+        },
+      );
+
+      // Kick sends no gifts: its Kicks are a row of their own
+      expect(summary(0)).toHaveTextContent("worth 100+ coins");
+      expect(summary(1)).toHaveTextContent("Worth 100+ Kicks");
+      const opened = await edit(user, 0);
+      expect(
+        opened.getByRole("group", { name: "Worth at least" }),
+      ).toHaveTextContent(/^Worth at least coinsThe/);
+      await user.keyboard("{Escape}");
+
+      // A Kicks row has no gifts, and its minimum is in Kicks
+      const kick = await edit(user, 1);
+      expect(kick.queryByText("Any gift")).toBeNull();
+      expect(
+        kick.getByRole("group", { name: "Worth at least" }),
+      ).toHaveTextContent(/Kicks/);
+      await user.keyboard("{Escape}");
+
+      // YouTube's Gifts have no price
+      const youtube = await edit(user, 2);
+      expect(youtube.queryByText("Any gift")).toBeNull();
+      expect(
+        youtube.queryByRole("group", { name: "Worth at least" }),
+      ).toBeNull();
     });
 
     it("tests a message next to it, and sets its volume", async () => {

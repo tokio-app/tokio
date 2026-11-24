@@ -21,6 +21,7 @@ import { LiveService } from "@/services/live";
 import { MusicService } from "@/services/music";
 import { OverlayService } from "@/services/overlay";
 import { PathManagerService } from "@/services/path";
+import { RatesService } from "@/services/rates";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
 import { StudioService } from "@/services/studio";
@@ -84,6 +85,7 @@ export class AppHandler implements AppHandlerDeps {
   public readonly trayService: TrayService;
   public readonly translationService: TranslationService;
   public readonly controlsService: ControlsService;
+  public readonly ratesService: RatesService;
   public readonly notifier: Notifier;
 
   constructor(deps: AppHandlerDeps) {

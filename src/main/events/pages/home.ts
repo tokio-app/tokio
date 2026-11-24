@@ -14,11 +14,15 @@ import {
 } from "@/common/util";
 import { connectionState, createStack } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
+import { refreshTikTokGifts, usesTikTok } from "@/helper/gifts";
 import { t } from "@/helper/i18n";
 import { ConnectorFailure } from "@/services/connector/common";
 import { normalizeUsername } from "@tokioapp/connector";
 
 const events = createStack("connector");
+
+// What a failed or ended connection replies
+const NO_STATS = { ...EMPTY_LIVE_STATS, platformViewers: {} };
 
 // A platform the session already has, which a connect leaves as it is
 const isUp = (status?: PlatformStatus) =>
@@ -210,7 +214,7 @@ events.push(
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
         live: false,
-        stats: EMPTY_LIVE_STATS,
+        stats: NO_STATS,
         error,
       }),
   },
@@ -219,11 +223,8 @@ events.push(
 // The profile's platforms, picked on Home. No notice: the toggles show them.
 events.push(
   APP_EVENTS.SET_PLATFORMS,
-  async (
-    { storeManagerService, connectorService, timerService },
-    e,
-    { platforms },
-  ) => {
+  async (services, e, { platforms }) => {
+    const { storeManagerService, connectorService, timerService } = services;
     // Known ones once each, in Home's order. One that's on stays: it's
     // disconnected first.
     const on = connectorService.status();
@@ -239,6 +240,8 @@ events.push(
     });
     // The countdown's overlay lists only what they send
     timerService.setPlatforms(picked);
+    // TikTok's gifts, once TikTok is added
+    if (usesTikTok(picked)) void refreshTikTokGifts(services);
   },
   {
     failure: {
@@ -273,7 +276,7 @@ events.push(
     e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
       success: false,
       live: false,
-      stats: EMPTY_LIVE_STATS,
+      stats: NO_STATS,
     });
   },
   {
@@ -285,7 +288,7 @@ events.push(
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
         live: false,
-        stats: EMPTY_LIVE_STATS,
+        stats: NO_STATS,
         error,
       }),
   },
@@ -302,7 +305,7 @@ events.push(
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
         live: false,
-        stats: EMPTY_LIVE_STATS,
+        stats: NO_STATS,
         error,
       }),
   },
@@ -324,7 +327,8 @@ events.push(
   APP_EVENTS.GET_LIVE_GIFTERS,
   ({ historyService }, e) => {
     e.reply(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
-      data: historyService.top().live,
+      byPlatform: historyService.topByPlatform(),
+      subsByPlatform: historyService.topSubGifters(),
     });
   },
   { notify: false },

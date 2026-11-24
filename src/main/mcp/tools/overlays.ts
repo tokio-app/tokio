@@ -27,6 +27,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import {
+  activeProfile,
   type CallToolResult,
   deepMerge,
   fail,
@@ -222,7 +223,11 @@ export const kinds: Kinds = {
         return fail(`No overlay ${id} is served.`);
       }
       // TEST_OVERLAY's reply only makes an open Overlays page send them
-      const payloads = overlayService.getTestPayloads(id);
+      const profile = await activeProfile(handler);
+      const payloads = overlayService.getTestPayloads(
+        id,
+        profile?.platforms ?? ["tiktok"],
+      );
       const sent = payloads.every((p) => serverService.sendToClient(id, p));
       return ok({
         events: payloads.length,
@@ -249,7 +254,7 @@ export const kinds: Kinds = {
 
   official_overlays: defineKind({
     notes:
-      "The official overlays' catalog, read from GitHub. state: install (not installed), installed (up to date), update, or breaking (a new first version number: ask the streamer before install_overlay with confirmBreaking).",
+      "The official overlays' catalog, read from GitHub. state: install (not installed), installed (up to date), update, or breaking (a new first version number: ask the streamer before install_overlay with confirmBreaking). platforms: where it works (null: every platform). This lists every entry; the app's Official overlays page shows only the ones for the profile's platforms, and the installed ones.",
     list: async ({ overlayService }, { query, limit }) => {
       const res = await overlayService.getCatalog();
       if (!res.success) {
@@ -269,6 +274,7 @@ export const kinds: Kinds = {
           version: e.version,
           description: e.description,
           hasSettings: e.config,
+          platforms: e.platforms ?? null,
           state: catalogState(e, installed),
           installedVersion:
             installed.find((o) => o.id === e.id && !o.external)?.version ??
@@ -283,11 +289,11 @@ export const kinds: Kinds = {
     notes: [
       "Overlay Studio's overlays, shared by every profile. Each is one browser source at its url, a canvas of 1080x1920 px (portrait) or 1920x1080 (landscape); x, y, width and height are px of it from the top left.",
       "items go back to front (the first is the back): groups (kind group, with elements back to front) and elements on their own. Groups don't hold groups. Every id in the overlay, groups' and elements' both, must be unique: pick short new ones. save_item replaces items whole, so send the full list.",
-      "Element kinds: text, media (file: a basename from list media), camera, gift (gift id or null for the one sent), emote, shape, viewer (the viewer who set it off), bar (a goal bar: fills as number, a LIVE number but uptime or a counter's name, comes to goal), list (rows of its source: this LIVE's top gifters, or its newest followers, gifts or chat), overlay (source: an installed overlay's id, an alert's id, the timer or the games overlay).",
+      "Element kinds: text, media (file: a basename from list media), camera, gift (gift id or null for the one sent), emote, shape, viewer (the viewer who set it off), bar (a goal bar: fills as number, a LIVE number but uptime or a counter's name, comes to goal), list (rows of its source: gifters, this LIVE's top gifters on its platform, tiktok by default, twitch, youtube or kick, ranked in that platform's currency (coins, Bits, US dollars or Kicks) and only those who sent some; giftsubs, who gifted the most subs on its platform, twitch, youtube or kick; or its newest followers, gifts or chat), overlay (source: an installed overlay's id, an alert's id, the timer or the games overlay).",
       "Every element can have a shadow (shadow_x and shadow_y 0 make a glow) and a blur. Texts take an outline, letter_spacing and line_height (% of size), italic and caps; texts and shapes a gradient from color into gradient_color at gradient_angle (CSS degrees: 90 runs left to right).",
       "when: always (on screen), event (hidden until its trigger, then shows for seconds with its entrance and exit), animate (on screen, plays its animation on each trigger) or loop (on screen, plays idle forever). A group reacts as one, its elements keep their own when. On Like it reacts every likes_every likes from all viewers.",
       `It also reacts to each of also_triggers (up to 4 more), and waits delay seconds (0 to 10) before it plays. A trigger of type ${GOAL_TRIGGER} reacts once per LIVE when number (a LIVE number but uptime, or a counter's name) reaches goal. counters (up to 10) count a trigger during the LIVE, a gift by its gifts and a Like by its likes, and texts show each as {name}: a name of word characters, not empty, taken or a LIVE number's.`,
-      `Texts can say ${STUDIO_NUMBERS.map((n) => `{${n}}`).join(" ")} (the LIVE's numbers) and, while they react, their trigger's variables: ${TRIGGER_VARIABLES}. Trigger values and fields are the alert kind's (describe alert).`,
+      `Texts can say ${STUDIO_NUMBERS.map((n) => `{${n}}`).join(" ")} (the LIVE's numbers; each currency is its platform's, never added up: {coins} TikTok's coins, {kicks} Kick's Kicks, {bits} Twitch's Bits, {superchats} YouTube's Super Chats in US dollars, a dash until the exchange rates load; {giftsubs} counts the subs gifted on Twitch, YouTube and Kick) and, while they react, their trigger's variables: ${TRIGGER_VARIABLES}. Trigger values and fields are the alert kind's (describe alert), min_coins's units included.`,
       "test plays every reacting element and group once on stream, with samples.",
       "To change single items, use edit_studio_overlay instead of resending items.",
       "preview_studio_overlay returns a picture of the overlay.",

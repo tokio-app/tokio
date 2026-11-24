@@ -544,6 +544,24 @@ describe("alerts events", () => {
       ]);
     });
 
+    it("speaks a sample from the trigger's platform", async () => {
+      const { h, alertsService } = setup();
+
+      await h.invoke(alerts, APP_EVENTS.TEST_ALERT, {
+        tts: speech,
+        trigger: TOKIO_EVENTS.CHAT,
+        platform: "kick",
+        volume: 70,
+        id: "alert-2",
+        request: 3,
+      });
+
+      expect(alertsService.speak.mock.calls[0][1]).toMatchObject({
+        user: { platform: "kick", userId: expect.stringMatching(/^kick:/) },
+        comment: { lang: "" },
+      });
+    });
+
     it("speaks an Emote alert with a chat sample", async () => {
       const { h, alertsService } = setup();
 

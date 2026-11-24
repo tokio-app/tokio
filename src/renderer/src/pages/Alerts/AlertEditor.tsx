@@ -14,7 +14,9 @@ import {
   formatAdded,
   getAlertOverlayURL,
   mediaKind,
-  takesRoles,
+  roleName,
+  rowRoles,
+  rowStreaks,
   triggersOf,
 } from "@/common/util";
 import {
@@ -26,10 +28,10 @@ import {
   Field,
   Input,
   MediaThumbnail,
+  MinimumField,
   Modal,
   NumberInput,
   PlayButton,
-  ROLE_NAMES,
   useVideoURL,
   Slider,
   Tabs,
@@ -46,6 +48,7 @@ import thumbs from "@/components/MediaPicker/mediapicker.module.css";
 import { cx } from "@/helper/cx";
 import { releaseOnUnmount } from "@/helper/media";
 import { AlertTestRequest } from "@/hooks";
+import { usePlatforms } from "@/context/platforms";
 import { rich, useLanguage, useOptions, useT } from "@/ui/i18n";
 import {
   ReactNode,
@@ -120,7 +123,8 @@ export function AlertEditor({
   const t = useT();
   const language = useLanguage();
   const [tab, setTab] = useState<Tab>("trigger");
-  const test = alertTest(alert);
+  const platforms = usePlatforms();
+  const test = alertTest(alert, platforms);
   const tabs = useOptions(TABS);
 
   return (
@@ -195,6 +199,8 @@ const newTrigger = () =>
 function TriggerTab({ alert, gifts, emotes, onChange }: TriggerTabProps) {
   const t = useT();
   const triggers = useOptions(TRIGGER_OPTIONS);
+  const platforms = usePlatforms();
+  const language = useLanguage();
   const rows = triggersOf(alert);
 
   // Row 0 is the alert's trigger, the others its also_triggers
@@ -215,6 +221,17 @@ function TriggerTab({ alert, gifts, emotes, onChange }: TriggerTabProps) {
     const filter = FILTER_LABELS[trigger.type];
     const { roles } = trigger;
     const change = (changed: Trigger) => setRow(index, changed);
+    // YouTube's gift rows have nothing to filter
+    const filtered =
+      filter &&
+      (trigger.type !== TOKIO_EVENTS.GIFT ||
+        rowStreaks(trigger, platforms) ||
+        trigger.gifts.length > 0);
+    // The roles the row's platforms say, and one saved before, to clear
+    const offered = rowRoles(trigger, platforms);
+    const roleChoices = VIEWER_ROLES.filter(
+      (role) => offered.includes(role) || roles.includes(role),
+    );
 
     return {
       main: (
@@ -227,7 +244,7 @@ function TriggerTab({ alert, gifts, emotes, onChange }: TriggerTabProps) {
       ),
       more: (
         <>
-          {filter && (
+          {filtered && (
             <Field label={t(filter)}>
               <TriggerFilter
                 trigger={trigger}
@@ -238,42 +255,15 @@ function TriggerTab({ alert, gifts, emotes, onChange }: TriggerTabProps) {
             </Field>
           )}
 
-          {/* Picked gifts are the alert's choice already */}
-          {trigger.type === TOKIO_EVENTS.GIFT && trigger.gifts.length === 0 && (
-            <Field label={t("alerts.editor.minCoins")}>
-              <span className={styles.inline}>
-                {rich(t("alerts.editor.minCoinsInput"), {
-                  input: (
-                    <NumberInput
-                      integer
-                      min={0}
-                      className={styles.number}
-                      aria-label={t("common.coins")}
-                      value={trigger.min_coins}
-                      onChange={(min_coins) =>
-                        change({ ...trigger, min_coins })
-                      }
-                    />
-                  ),
-                })}
-              </span>
-              <p className={styles.note}>
-                {t(
-                  trigger.every_gift
-                    ? "alerts.editor.everyGiftNote"
-                    : "alerts.editor.streakNote",
-                )}
-              </p>
-            </Field>
-          )}
+          <MinimumField trigger={trigger} onChange={change} />
 
-          {takesRoles(trigger.type) && (
+          {roleChoices.length > 0 && (
             <Field label={t("alerts.editor.from")}>
               <div className={styles.roles}>
-                {VIEWER_ROLES.map((role) => (
+                {roleChoices.map((role) => (
                   <Check
                     key={role}
-                    label={t(ROLE_NAMES[role])}
+                    label={roleName(role, trigger, platforms, language)}
                     checked={roles.includes(role)}
                     onChange={(e) =>
                       change({

@@ -1,4 +1,4 @@
-import type { LiveSummary } from "../types";
+import type { Gifter, HistoryTotals, LiveSummary, Platform } from "../types";
 
 // From `from` (included) to `to` (left out), in ms
 export type DateRange = { from?: number; to?: number };
@@ -16,6 +16,20 @@ export const allInRange = (
   { startedAt, endedAt }: Span,
   { from = -Infinity, to = Infinity }: DateRange,
 ) => startedAt >= from && endedAt <= to;
+
+// Each platform the LIVE was on, with its part. One saved before Tokio kept
+// them was TikTok's alone.
+export const platformParts = (
+  live: Pick<LiveSummary, "coins" | "gifts" | "platforms">,
+): Partial<Record<Platform, HistoryTotals>> =>
+  Object.keys(live.platforms).length > 0
+    ? live.platforms
+    : { tiktok: { amount: live.coins, gifts: live.gifts, giftSubs: 0 } };
+
+// A top of gifted subs' order: the most first, ties to whoever got there
+// first
+export const bySubs = (a: Gifter, b: Gifter) =>
+  b.giftSubs - a.giftSubs || a.giftedAt - b.giftedAt;
 
 type Viewer = { username: string; handle: string };
 

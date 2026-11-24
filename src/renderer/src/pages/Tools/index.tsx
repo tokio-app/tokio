@@ -1,6 +1,6 @@
-import { APP_EVENTS, APP_EVENTS_RESPONSE, LiveSummary } from "@/common/types";
+import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { Page, Section } from "@/components";
-import { cx, formatDate, formatDuration, formatStat } from "@/helper";
+import { cx, formatDuration, formatStat } from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import {
   timeLeft,
@@ -15,14 +15,13 @@ import { ReactNode, useEffect, useId, useState } from "react";
 import styles from "./tools.module.css";
 
 /**
- * The tools, one row each, with what each holds now: the time left, how
- * many studio overlays there are, the newest LIVE's coins, and how many fans
- * and test overlays there are.
+ * The tools, one row each, with what each holds now: the time left, and
+ * how many studio overlays, LIVEs, fans and test overlays there are.
  */
 export function Tools() {
   const t = useT();
   const language = useLanguage();
-  const [lives, setLives] = useState<LiveSummary[]>();
+  const [lives, setLives] = useState<number>();
   const [fans, setFans] = useState<number>();
   const [testOverlays, setTestOverlays] = useState<number>();
   const [studio, setStudio] = useState<number>();
@@ -38,7 +37,7 @@ export function Tools() {
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.LIVES, (res) => {
-    if (res) setLives(res.data.lives);
+    if (res) setLives(res.data.lives.length);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.FANS, (res) => {
@@ -56,8 +55,6 @@ export function Tools() {
     window.api.emit(APP_EVENTS.GET_FANS);
   });
 
-  const newest = lives?.[0];
-
   return (
     <Page>
       <Section title={t("nav.tools")}>
@@ -74,15 +71,9 @@ export function Tools() {
             to="/tools/coin-stats"
             name={t("coinStats.title")}
             description={t("coinStats.description")}
-            value={newest && formatStat(newest.coins, language).full}
+            value={lives !== undefined && formatStat(lives, language).full}
             label={
-              lives &&
-              (newest
-                ? t("tools.list.coins", {
-                    count: newest.coins,
-                    date: formatDate(newest.startedAt, language, "short"),
-                  })
-                : t("tools.list.noLives"))
+              lives !== undefined && t("tools.list.lives", { count: lives })
             }
           />
           <ToolRow

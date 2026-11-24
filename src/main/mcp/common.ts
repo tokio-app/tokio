@@ -20,6 +20,10 @@ export type { CallToolResult };
 /** What a trigger's platform means, for the alert and game action kinds. */
 export const PLATFORM_NOTE = `trigger.platform (${PLATFORMS.join(" or ")}) takes only that platform's events; left out, any platform's. What each one sends: ${PLATFORMS.map((p) => `${p}: ${PLATFORM_TRIGGERS[p].join(", ")}`).join("; ")}. On redeem, keyword is the reward's title (empty for any).`;
 
+// The permissions field, the same on the tts and music sections
+export const permissionsNote = (who: string, refused: string) =>
+  `permissions: ${who}. The base fields are TikTok's: all lets everyone; otherwise followers, superfans, moderators, or a minimum level (level.enabled, level.value). platforms holds Twitch's, YouTube's and Kick's own rules, each { all, superfans (their subscribers or members), moderators, vips (Twitch's and Kick's VIPs) }, and one left out lets everyone. The lists apply on every platform: with list.enabled, handles in list.black ${refused} and a non-empty list.white alone decides.`;
+
 // How long a write waits for the window's FLUSH_SETTINGS answer
 export const FLUSH_MS = 1000;
 

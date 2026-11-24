@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import defaults, { type FetchInit } from "../config";
-import { guestToken, lookup, parseInput, realtime } from "./api";
+import { guestToken, lookup, parseInput, realtime, slugOf } from "./api";
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status });
@@ -45,11 +45,16 @@ describe("Kick's API", () => {
       channelId: 10,
       chatroomId: 20,
       viewers: 1234,
+      userId: 11,
     });
     const [url, init] = fetch.mock.calls[0];
     expect(url).toBe("https://kick.com/api/v2/channels/streamer");
     expect(init.headers?.["user-agent"]).toBe("Tokio/9.9.9");
     expect(init.headers?.["user-agent"]).not.toMatch(/Mozilla|Chrome/);
+  });
+
+  it("writes a username as its channel's slug", () => {
+    expect(slugOf("Sharkbait_34")).toBe("sharkbait-34");
   });
 
   it("ships an honest user agent", () => {

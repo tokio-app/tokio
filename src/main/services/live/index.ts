@@ -5,12 +5,22 @@ import {
   ActivityUser,
   LiveSession,
   LiveTotals,
+  Platform,
+  PlatformLive,
   TOKIO_EVENTS,
   TokioEventMap,
   UserData,
 } from "@/common/types";
-import { defaultStoreData } from "@/common/util";
+import {
+  defaultStoreData,
+  GIFT_CURRENCY,
+  isPlatform,
+  platformOf,
+} from "@/common/util";
+import { parseAmount } from "@/helper/amount";
 import { GiftStreaks } from "@/helper/streaks";
+import Logger from "@/logger";
+import type { RatesService } from "../rates";
 import { Service } from "../shared";
 
 // The feed keeps this many of the latest events
@@ -39,11 +49,23 @@ export const ACTIVITY_EVENTS = [
   TOKIO_EVENTS.RAID,
   TOKIO_EVENTS.REDEEM,
   TOKIO_EVENTS.SUPER_CHAT,
+  TOKIO_EVENTS.KICKS,
 ] as const;
 
 type ActivityEvent = (typeof ACTIVITY_EVENTS)[number];
 
 // What each event does to the session, true when it changes it
+// Converts amounts by currency to US dollars
+type Rates = Pick<RatesService, "toUsd">;
+
+// Until setRates, only dollars convert, so nothing fetches rates
+const dollarsOnly: Rates = {
+  toUsd: (amounts) =>
+    Object.keys(amounts).some((code) => code !== "USD")
+      ? null
+      : (amounts.USD ?? 0),
+};
+
 type Recorders = {
   [K in ActivityEvent]: (data: TokioEventMap[K]) => boolean;
 };
@@ -53,7 +75,23 @@ const noTotals = (): LiveTotals => ({
   shares: 0,
   gifts: 0,
   coins: 0,
+  kicks: 0,
+  bits: 0,
+  superChats: 0,
+  giftSubs: 0,
 });
+
+// Keeps a minute's highest count. Minutes without a reading repeat the last
+// one, or `before` while there's none.
+function keepMinute(
+  values: number[],
+  minute: number,
+  count: number,
+  before: number,
+) {
+  while (values.length < minute) values.push(values.at(-1) ?? before);
+  values[minute] = Math.max(values[minute] ?? 0, count);
+}
 
 const activityUser = ({
   handle,
@@ -86,6 +124,13 @@ export class LiveService extends Service {
   private _feed: ActivityFeed = { ...defaultStoreData.settings.activityFeed };
   // Each minute's highest viewer count since the LIVE started
   private _viewers: number[] = [];
+  // Each platform's own totals and viewers
+  private _platforms: Partial<Record<Platform, PlatformLive>> = {};
+  // The Super Chats' amounts by currency code, added up in dollars on read
+  private _superChats: Record<string, number> = {};
+  // Super Chat amounts already warned about, once each
+  private _unread = new Set<string>();
+  private _rates: Rates = dollarsOnly;
 
   private readonly _recorders: Recorders = {
     [TOKIO_EVENTS.CHAT]: ({ user, comment }) =>
@@ -102,8 +147,10 @@ export class LiveService extends Service {
       const { added, total } = this._streaks.add(event);
       const { user, gift } = event;
       const unit = Math.max(0, gift.coins);
-      this._totals.gifts += added;
-      this._totals.coins += unit * added;
+      // YouTube's Gifts have no price
+      const currency = GIFT_CURRENCY[platformOf(user)];
+      this._count(user, "gifts", added);
+      if (currency) this._count(user, currency, unit * added);
       const listed =
         gift.repeatEnd &&
         this._add({
@@ -119,12 +166,12 @@ export class LiveService extends Service {
       return added > 0 || listed;
     },
     [TOKIO_EVENTS.FOLLOW]: ({ user }) => {
-      this._totals.followers++;
+      this._count(user, "followers", 1);
       this._add({ type: "follow", user: activityUser(user) });
       return true;
     },
     [TOKIO_EVENTS.SHARE]: ({ user }) => {
-      this._totals.shares++;
+      this._count(user, "shares", 1);
       this._add({ type: "share", user: activityUser(user) });
       return true;
     },
@@ -138,15 +185,34 @@ export class LiveService extends Service {
         months,
         text: message,
       }),
-    [TOKIO_EVENTS.GIFT_SUB]: ({ user, count }) =>
-      this._add({ type: "giftsub", user: activityUser(user), count }),
-    [TOKIO_EVENTS.CHEER]: ({ user, bits, message }) =>
+    // True even when the feed hides gifted subs, since they count
+    [TOKIO_EVENTS.GIFT_SUB]: ({ user, count }) => {
+      this._count(user, "giftSubs", Math.max(0, count));
+      this._add({ type: "giftsub", user: activityUser(user), count });
+      return true;
+    },
+    // True even when the feed hides cheers, since the Bits count
+    [TOKIO_EVENTS.CHEER]: ({ user, bits, message }) => {
+      this._count(user, "bits", Math.max(0, bits));
       this._add({
         type: "cheer",
         user: activityUser(user),
         bits,
         text: message,
-      }),
+      });
+      return true;
+    },
+    // True even when the feed hides Kicks, since they count
+    [TOKIO_EVENTS.KICKS]: ({ user, kicks, message }) => {
+      this._count(user, "kicks", Math.max(0, kicks));
+      this._add({
+        type: "kicks",
+        user: activityUser(user),
+        kicks,
+        text: message,
+      });
+      return true;
+    },
     [TOKIO_EVENTS.RAID]: ({ user, viewers }) =>
       this._add({ type: "raid", user: activityUser(user), viewers }),
     [TOKIO_EVENTS.REDEEM]: ({ user, reward, input }) =>
@@ -156,15 +222,19 @@ export class LiveService extends Service {
         reward: reward.title,
         text: input,
       }),
-    // Not in the coins: its amount is in the viewer's currency
-    [TOKIO_EVENTS.SUPER_CHAT]: ({ user, amount, message, sticker }) =>
+    // Its amount is added up apart, in its currency, and read in dollars
+    [TOKIO_EVENTS.SUPER_CHAT]: ({ user, amount, message, sticker }) => {
+      this._count(user, "superChats", 1);
+      this._addAmount(amount);
       this._add({
         type: "superchat",
         user: activityUser(user),
         amount,
         text: message,
         sticker,
-      }),
+      });
+      return true;
+    },
   };
 
   /** Starts a LIVE, clearing the last one's totals and feed. */
@@ -173,7 +243,14 @@ export class LiveService extends Service {
     this._totals = noTotals();
     this._activity = [];
     this._viewers = [];
+    this._platforms = {};
+    this._superChats = {};
     this._streaks.clear();
+  }
+
+  /** Sets what converts the Super Chats to dollars. */
+  public setRates(rates: Rates) {
+    this._rates = rates;
   }
 
   /** Ends the LIVE. Its feed stays until the next one starts. */
@@ -199,10 +276,15 @@ export class LiveService extends Service {
   }
 
   /**
-   * Keeps the minute's highest viewer count. True when the count starts a
-   * minute after the first one, so Home's chart gets the minute that ended.
+   * Keeps the minute's highest viewer count, everyone's and each platform's.
+   * True when the count starts a minute after the first one, so Home's chart
+   * gets the minute that ended.
    */
-  public recordViewers(count: number, now = Date.now()): boolean {
+  public recordViewers(
+    count: number,
+    platforms: Partial<Record<Platform, number>>,
+    now = Date.now(),
+  ): boolean {
     if (this._startedAt === null) return false;
     const viewers = this._viewers;
     // A clock set back stays in the minute it reached
@@ -212,14 +294,15 @@ export class LiveService extends Service {
       Math.floor((now - this._startedAt) / MINUTE),
     );
     if (minute >= VIEWER_MINUTES) return false;
-    if (minute === viewers.length - 1) {
-      viewers[minute] = Math.max(viewers[minute], count);
-      return false;
+    const starts = minute >= viewers.length;
+    keepMinute(viewers, minute, count, count);
+    // A platform without a count, not up yet or gone, has 0 viewers
+    const counted = Object.keys({ ...this._platforms, ...platforms });
+    for (const platform of counted.filter(isPlatform)) {
+      const own = this._of(platform).viewers;
+      keepMinute(own, minute, platforms[platform] ?? 0, 0);
     }
-    // Minutes without a reading repeat the last one
-    while (viewers.length < minute) viewers.push(viewers.at(-1) ?? count);
-    viewers.push(count);
-    return viewers.length > 1;
+    return starts && viewers.length > 1;
   }
 
   /** A copy, so later events don't change what was sent. */
@@ -229,7 +312,34 @@ export class LiveService extends Service {
       totals: { ...this._totals },
       activity: [...this._activity],
       viewers: [...this._viewers],
+      platforms: structuredClone(this._platforms),
+      usd: this._rates.toUsd(this._superChats),
     };
+  }
+
+  // Missing means TikTok, as on users
+  private _of(platform: Platform = "tiktok"): PlatformLive {
+    return (this._platforms[platform] ??= { totals: noTotals(), viewers: [] });
+  }
+
+  // Counts toward the LIVE's totals and the viewer's platform's
+  private _count(user: UserData, total: keyof LiveTotals, n: number) {
+    this._totals[total] += n;
+    this._of(user.platform).totals[total] += n;
+  }
+
+  private _addAmount(text: string) {
+    const amount = parseAmount(text);
+    if (amount) {
+      this._superChats[amount.currency] =
+        (this._superChats[amount.currency] ?? 0) + amount.value;
+    } else if (!this._unread.has(text)) {
+      this._unread.add(text);
+      Logger.warn(
+        `<Live> Couldn't read the Super Chat amount ${JSON.stringify(text)}, left out of the total`,
+        this._logFile,
+      );
+    }
   }
 
   // False when the feed hides it

@@ -29,8 +29,14 @@ const saturday = liveSummary(SATURDAY, {
   gifts: 40,
 });
 
-const lives = (list: LiveSummary[], gifters: Gifter[] = []) =>
-  send(APP_EVENTS_RESPONSE.LIVES, { data: { lives: list, gifters } });
+const lives = (
+  list: LiveSummary[],
+  gifters: Gifter[] = [],
+  subGifters: Gifter[] = [],
+) =>
+  send(APP_EVENTS_RESPONSE.LIVES, {
+    data: { lives: list, gifters, subGifters },
+  });
 
 const record = (live: LiveSummary, gifters: Gifter[]) =>
   send(APP_EVENTS_RESPONSE.LIVE, {
@@ -51,8 +57,23 @@ const selected = () =>
     .getAttribute("aria-label");
 // The summary's title, after the page's
 const heading = () => screen.getAllByRole("heading", { level: 2 })[1];
-// The value shown above a stat's label
-const stat = (label: string) => screen.getByText(label).previousElementSibling;
+// The value shown above a stat's label, not the currency switch's tab
+const stat = (label: string) =>
+  screen.getByText(label, { ignore: "[role=tab]" }).previousElementSibling;
+// A LIVE's bar, scaled to the best LIVE
+const bar = (name: RegExp) =>
+  option(name).querySelector<HTMLElement>("[style]")?.style.width;
+const kicker = (name: string, kicks: number, gifts = 1): Gifter => ({
+  ...gifter(name, kicks, gifts),
+  userId: `kick:${name}`,
+  platform: "kick",
+});
+// The gifters' switch between the money's top and gifted subs'
+const ranks = () => screen.queryByRole("tablist", { name: "Rank by" });
+const rank = (name: string) =>
+  within(screen.getByRole("tablist", { name: "Rank by" })).getByRole("tab", {
+    name,
+  });
 const gifterRows = (name: string) =>
   within(screen.getByRole("list", { name }))
     .getAllByRole("listitem")
@@ -67,7 +88,7 @@ const dates = async (
   await user.click(screen.getByRole("option", { name: choice }));
 };
 
-describe("Coin stats", () => {
+describe("LIVE history", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -76,7 +97,7 @@ describe("Coin stats", () => {
     renderWithProviders(<CoinStats />);
 
     expect(
-      screen.getByRole("heading", { name: "Coin stats" }),
+      screen.getByRole("heading", { name: "LIVE history" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Back to Tools" }),
@@ -90,7 +111,7 @@ describe("Coin stats", () => {
     await lives([saturday, friday]);
 
     expect(screen.getAllByRole("heading", { level: 2 })[0]).toHaveTextContent(
-      "Coin stats",
+      "LIVE history",
     );
     expect(list()).toBeInTheDocument();
   });
@@ -242,7 +263,7 @@ describe("Coin stats", () => {
     await send(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,
       from: since,
-      totals: { coins: 900, gifts: 70 },
+      totals: { coins: 900, gifts: 70, platforms: {} },
     });
 
     expect(stat("Coins")).toHaveTextContent("900");
@@ -374,7 +395,7 @@ describe("Coin stats", () => {
     await record(friday, [gifter("Ana", 5200, 52), gifter("Kai", 1, 1)]);
 
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
-    expect(gifterRows("Gifters")).toEqual([
+    expect(gifterRows("Top gifters")).toEqual([
       "1AAna@ana5,200 coins52 gifts",
       "2KKai@kai1 coin1 gift",
     ]);
@@ -503,6 +524,220 @@ describe("Coin stats", () => {
     ).toBeDisabled();
   });
 
+  it("counts a history of Kick's LIVEs alone in Kicks, with no tabs", async () => {
+    const { user } = renderWithProviders(<CoinStats />);
+
+    // Kicks, like Bits, are never gifts
+    await lives([
+      liveSummary(SATURDAY, {
+        gifts: 0,
+        platforms: { kick: { amount: 300, gifts: 0, giftSubs: 2 } },
+      }),
+    ]);
+    await record(saturday, [{ ...kicker("Bea", 300, 0), giftSubs: 2 }]);
+
+    expect(
+      screen.queryByRole("tablist", { name: "Platform" }),
+    ).not.toBeInTheDocument();
+    expect(options()).toEqual([
+      "All time, 300 Kicks",
+      expect.stringMatching(/^Saturday.*, 300 Kicks$/),
+    ]);
+    expect(stat("Kicks")).toHaveTextContent("300");
+    expect(screen.queryByText("Gifts")).not.toBeInTheDocument();
+    expect(stat("Gifted subs")).toHaveTextContent("2");
+    expect(screen.queryByText("Coins")).not.toBeInTheDocument();
+    // Each top in its own unit
+    expect(gifterRows("Top Kicks")).toEqual(["1BBea@bea300 Kicks"]);
+    await user.click(rank("Gifted subs"));
+    expect(gifterRows("Top gifted subs")).toEqual(["1BBea@bea2 gifted subs"]);
+  });
+
+  it("gives each platform in the history its tab, in its currency, then All", async () => {
+    const { user } = renderWithProviders(<CoinStats />);
+    const part = (amount: number, gifts: number, giftSubs: number) => ({
+      amount,
+      gifts,
+      giftSubs,
+    });
+    // Saturday's was saved before Tokio kept each platform's part: TikTok's
+    const both = {
+      ...friday,
+      gifts: 1205,
+      platforms: {
+        tiktok: part(12_400, 1203, 0),
+        twitch: part(2500, 0, 4),
+        youtube: part(57.4, 2, 1),
+      },
+    };
+    const di: Gifter = {
+      ...gifter("Di", 2500, 0),
+      userId: "twitch:di",
+      platform: "twitch",
+      giftSubs: 4,
+    };
+    const yui: Gifter = {
+      ...gifter("Yui", 57.4, 2),
+      userId: "youtube:yui",
+      platform: "youtube",
+      giftSubs: 1,
+    };
+    await lives([saturday, both], [gifter("Ana", 5200), di, yui], [di, yui]);
+    await record(saturday, [gifter("Kai", 600, 40)]);
+
+    const tabs = screen.getByRole("tablist", { name: "Platform" });
+    const tab = (name: string) => within(tabs).getByRole("tab", { name });
+    expect(
+      within(tabs)
+        .getAllByRole("tab")
+        .map((t) => t.textContent),
+    ).toEqual(["TikTok", "Twitch", "YouTube", "All"]);
+    expect(tab("TikTok")).toHaveAttribute("aria-selected", "true");
+    expect(options()[0]).toBe("All time, 13,000 coins");
+    // TikTok has no gifted subs to rank
+    expect(ranks()).not.toBeInTheDocument();
+
+    // Only the LIVEs on Twitch, in Bits. Saturday's wasn't, so its totals.
+    await user.click(tab("Twitch"));
+    // On a platform's tab, its money with no word after it
+    expect(option(/^All time/)).toHaveTextContent(/^All time2.5K$/);
+    expect(options()).toEqual([
+      "All time, 2,500 Bits",
+      expect.stringMatching(/^Friday.*, 2,500 Bits$/),
+    ]);
+    expect(selected()).toMatch(/^All time/);
+    expect(screen.getByText("1 LIVE")).toBeInTheDocument();
+    expect(stat("Bits")).toHaveAttribute("title", "2,500");
+    expect(stat("Gifted subs")).toHaveTextContent("4");
+    // Twitch has no gifts
+    expect(screen.queryByText("Gifts")).not.toBeInTheDocument();
+    // Bits and gifted subs each have their top
+    expect(rank("Bits")).toHaveAttribute("aria-selected", "true");
+    expect(gifterRows("Top Bits")).toEqual(["1DDi@di2,500 Bits"]);
+    await user.click(rank("Gifted subs"));
+    expect(gifterRows("Top gifted subs")).toEqual(["1DDi@di4 gifted subs"]);
+
+    // A LIVE's gifters on the tab's platform alone, the pick kept
+    await user.click(option(/^Friday/));
+    await record(both, [gifter("Ana", 12_400, 1203), di, yui]);
+    expect(gifterRows("Top gifted subs")).toEqual(["1DDi@di4 gifted subs"]);
+    await user.click(rank("Bits"));
+    expect(gifterRows("Top Bits")).toEqual([expect.stringMatching(/^1DDi/)]);
+    await user.click(rank("Gifted subs"));
+
+    // Another tab opens on its money
+    await user.click(tab("YouTube"));
+    expect(rank("Super Chats")).toHaveAttribute("aria-selected", "true");
+    expect(selected()).toMatch(/^Friday/);
+    expect(stat("Super Chats")).toHaveTextContent("$57.40");
+    expect(stat("Gifts")).toHaveTextContent("2");
+    expect(stat("Gifted subs")).toHaveTextContent("1");
+    expect(gifterRows("Top Super Chats")).toEqual(["1YYui@yui$57.402 gifts"]);
+
+    // Every currency on its own, the LIVEs by their gifts, and no ranking
+    await user.click(tab("All"));
+    expect(options()).toEqual([
+      "All time, 1,245 gifts",
+      expect.stringMatching(/^Saturday.*, 40 gifts$/),
+      expect.stringMatching(/^Friday.*, 1,205 gifts$/),
+    ]);
+    expect(bar(/^Friday/)).toBe("100%");
+    // The totals row says its number is gifts, not money
+    expect(option(/^All time/)).toHaveTextContent("All time1.2K gifts");
+    expect(stat("Coins")).toHaveAttribute("title", "12,400");
+    expect(stat("Bits")).toHaveAttribute("title", "2,500");
+    expect(stat("Super Chats")).toHaveTextContent("$57.40");
+    expect(stat("Gifts")).toHaveAttribute("title", "1,205");
+    expect(stat("Gifted subs")).toHaveTextContent("5");
+    expect(
+      screen.getByText("Pick a platform to see who sent the most."),
+    ).toBeInTheDocument();
+    expect(ranks()).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Search" }),
+    ).not.toBeInTheDocument();
+
+    // Saturday was TikTok's alone
+    await user.click(option(/^Saturday/));
+    expect(stat("Coins")).toHaveTextContent("600");
+    expect(screen.queryByText("Bits")).not.toBeInTheDocument();
+  });
+
+  it("takes each platform's totals for the dates from main", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 31, 21));
+    const since = new Date(2026, 9, 30, 21).getTime();
+    const { user } = renderWithProviders(<CoinStats />);
+    const kick = { amount: 80, gifts: 4, giftSubs: 1 };
+    await lives([
+      { ...saturday, platforms: { kick } },
+      { ...friday, platforms: { kick } },
+    ]);
+
+    await dates(user, "Last 24 hours");
+    await send(APP_EVENTS_RESPONSE.GIFTERS, {
+      success: true,
+      from: since,
+      totals: {
+        coins: 0,
+        gifts: 9,
+        platforms: { kick: { amount: 120, gifts: 9, giftSubs: 3 } },
+      },
+    });
+
+    expect(options()[0]).toBe("Last 24 hours, 120 Kicks");
+    expect(stat("Kicks")).toHaveTextContent("120");
+    expect(stat("Gifted subs")).toHaveTextContent("3");
+  });
+
+  it("ranks gifted subs apart, in the dates and in a search", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 31, 21));
+    const since = new Date(2026, 9, 30, 21).getTime();
+    const { user } = renderWithProviders(<CoinStats />);
+    const kick = { amount: 0, gifts: 0, giftSubs: 0 };
+    await lives([{ ...saturday, platforms: { kick } }]);
+    await user.click(option(/^All time/));
+
+    // Each top says what it ranks when no one is on it
+    expect(screen.getByText("No one sent Kicks.")).toBeInTheDocument();
+    await user.click(rank("Gifted subs"));
+    expect(screen.getByText("No one gifted subs.")).toBeInTheDocument();
+
+    await dates(user, "Last 24 hours");
+    const bea = { ...kicker("Bea", 0, 0), giftSubs: 3 };
+    await send(APP_EVENTS_RESPONSE.GIFTERS, {
+      success: true,
+      from: since,
+      data: [],
+      subGifters: [{ ...bea, rank: 1 }],
+    });
+    expect(gifterRows("Top gifted subs")).toEqual(["1BBea@bea3 gifted subs"]);
+    await user.click(rank("Kicks"));
+    expect(screen.getByText("No Kicks on these dates.")).toBeInTheDocument();
+    await user.click(rank("Gifted subs"));
+
+    // A search looks in the list shown, places kept
+    await user.click(screen.getByRole("button", { name: "Search" }));
+    await user.type(screen.getByPlaceholderText("Name or @handle"), "be");
+    await waitFor(() =>
+      expect(sent(APP_EVENTS.GET_GIFTERS)).toContainEqual({
+        from: since,
+        query: "be",
+      }),
+    );
+    await send(APP_EVENTS_RESPONSE.GIFTERS, {
+      success: true,
+      from: since,
+      query: "be",
+      data: [],
+      subGifters: [{ ...bea, rank: 2 }],
+    });
+    expect(gifterRows("Top gifted subs")).toEqual(["2BBea@bea3 gifted subs"]);
+    await user.click(rank("Kicks"));
+    expect(screen.getByText("No gifters match “be”.")).toBeInTheDocument();
+  });
+
   it("says what fills an empty history", async () => {
     renderWithProviders(<CoinStats />);
 
@@ -516,7 +751,7 @@ describe("Coin stats", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "No gifts yet. Viewers who send gifts show up here, the most coins first.",
+        "No gifts yet. Viewers who send gifts show up here, the biggest gifters first.",
       ),
     ).toBeInTheDocument();
     expect(sent(APP_EVENTS.GET_LIVE)).toEqual([]);
@@ -565,7 +800,7 @@ describe("Coin stats", () => {
     await send(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,
       from: since,
-      totals: { coins: 900, gifts: 70 },
+      totals: { coins: 900, gifts: 70, platforms: {} },
       data: [{ ...gifter("Ana", 300, 30), rank: 1 }],
     });
     expect(stat("Coins")).toHaveTextContent("900");

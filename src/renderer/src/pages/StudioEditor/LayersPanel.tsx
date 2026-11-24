@@ -7,8 +7,10 @@ import {
   StudioGroup,
   StudioItem,
 } from "@/common/schemas";
-import { CustomGift } from "@/common/types";
+import { CustomGift, TOKIO_EVENTS } from "@/common/types";
+import { triggersFor } from "@/common/util";
 import { Btn } from "@/components";
+import { usePlatforms } from "@/context/platforms";
 import { cx } from "@/helper/cx";
 import { useMenu } from "@/hooks";
 import { useT } from "@/ui/i18n";
@@ -131,6 +133,9 @@ export function LayersPanel({
   const t = useT();
   const menu = useMenu();
   const caption = useId();
+  // A gift's picture needs a platform that sends gifts: TikTok or YouTube
+  const sendsGifts = triggersFor(usePlatforms()).includes(TOKIO_EVENTS.GIFT);
+  const kinds = STUDIO_KINDS.filter((kind) => kind !== "gift" || sendsGifts);
   const list = useRef<HTMLUListElement>(null);
   // The row being dragged, whether it's a group's, and the row it's over
   const [drag, setDrag] = useState<{
@@ -580,7 +585,7 @@ export function LayersPanel({
                       ? t("studio.editor.addTo", { group: groupName(target) })
                       : t("studio.editor.addElement")}
                   </span>
-                  {STUDIO_KINDS.map((kind) => (
+                  {kinds.map((kind) => (
                     <button
                       key={kind}
                       type="button"

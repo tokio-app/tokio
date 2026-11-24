@@ -105,6 +105,25 @@ describe("parseCatalog", () => {
     expect(dropped).toEqual(["remote", "mcp"]);
   });
 
+  it("reads the platforms each one works on, dropping unknown ones", () => {
+    const { overlays, dropped } = parseCatalog({
+      schema: 1,
+      overlays: [
+        entry({ platforms: ["tiktok", "youtube"] }),
+        { ...entry({ id: "chat" }), platforms: ["kick", "someday"] },
+        // Catalogs from before the field: every platform
+        entry({ id: "old" }),
+      ],
+    });
+
+    expect(dropped).toEqual([]);
+    expect(overlays.map((o) => o.platforms)).toEqual([
+      ["tiktok", "youtube"],
+      ["kick"],
+      undefined,
+    ]);
+  });
+
   it("drops previews from anywhere else", () => {
     const { overlays } = parseCatalog({
       schema: 1,

@@ -4,7 +4,6 @@ import {
   APP_EVENTS_RESPONSE,
   FEEDBACK_CODES,
 } from "@/common/types";
-import { MAX_FANS } from "@/services/fans";
 import { createHandler } from "@test/handler";
 import { describe, expect, it, vi } from "vitest";
 import tools from "./tools";
@@ -20,7 +19,7 @@ const saveError = {
 
 describe("tools events", () => {
   describe("GET_FANS", () => {
-    it("replies every fan the profile keeps", async () => {
+    it("replies every platform's fans the profile keeps", async () => {
       const fan = {
         userId: "7",
         username: "Ana",
@@ -30,13 +29,21 @@ describe("tools events", () => {
         superfan: false,
         seenAt: 1,
       };
-      const list = vi.fn(() => [fan]);
-      const h = createHandler({ fansService: { list } });
+      const sub = {
+        ...fan,
+        userId: "twitch:8",
+        fanLevel: 0,
+        superfan: true,
+        months: 3,
+        platform: "twitch" as const,
+      };
+      const h = createHandler({ fansService: { all: () => [fan, sub] } });
 
       await h.invoke(tools, APP_EVENTS.GET_FANS);
 
-      expect(list).toHaveBeenCalledWith(MAX_FANS);
-      expect(h.replies(APP_EVENTS_RESPONSE.FANS)).toEqual([{ data: [fan] }]);
+      expect(h.replies(APP_EVENTS_RESPONSE.FANS)).toEqual([
+        { data: [fan, sub] },
+      ]);
       expect(h.notices).toEqual([]);
     });
   });
@@ -203,11 +210,17 @@ describe("tools events", () => {
       "replies success: %s from the service with the id",
       async (success) => {
         const sendTestEvents = vi.fn(() => ({ success }));
-        const h = createHandler({ overlayService: { sendTestEvents } });
+        const h = createHandler({
+          overlayService: { sendTestEvents },
+          storeManagerService: {
+            getProfileData: async () => ({ platforms: ["youtube"] }),
+          },
+        });
 
         await h.invoke(tools, APP_EVENTS.SEND_TEST_EVENTS, { id: "a1" });
 
-        expect(sendTestEvents).toHaveBeenCalledWith("a1");
+        // The profile's platforms' events
+        expect(sendTestEvents).toHaveBeenCalledWith("a1", ["youtube"]);
         expect(h.replies(APP_EVENTS_RESPONSE.SEND_TEST_EVENTS)).toEqual([
           { id: "a1", success },
         ]);
@@ -222,6 +235,7 @@ describe("tools events", () => {
             throw new Error("server off");
           },
         },
+        storeManagerService: { getProfileData: async () => null },
       });
 
       await h.invoke(tools, APP_EVENTS.SEND_TEST_EVENTS, { id: "a1" });

@@ -15,10 +15,11 @@ import {
 } from "@/common/schemas";
 import { CustomGift, EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
 import {
+  idPlatform,
   mediaKind,
   reactsToEvents,
-  STUDIO_NUMBERS,
   studioEventVariables,
+  studioNumbersFor,
 } from "@/common/util";
 import {
   Btn,
@@ -35,6 +36,7 @@ import {
   SelectOption,
   VariableList,
 } from "@/components";
+import { usePlatforms } from "@/context/platforms";
 import { useVariables } from "@/hooks";
 import { useOptions, useT } from "@/ui/i18n";
 import { ReactNode, useRef } from "react";
@@ -179,10 +181,14 @@ export function ElementSettings({
   // On an event, a video without loop stays until it ends, not for seconds
   const untilEnd = video && element.kind === "media" && !element.loop;
 
-  const eventVariables = useVariables(studioEventVariables(element));
+  const platforms = usePlatforms();
+  const eventVariables = useVariables(studioEventVariables(element, platforms));
   // A counter goes in any text, as the LIVE numbers do
   const liveVariables = [
-    ...new Set([...STUDIO_NUMBERS, ...counters.flatMap((c) => c.name || [])]),
+    ...new Set([
+      ...studioNumbersFor(platforms),
+      ...counters.flatMap((c) => c.name || []),
+    ]),
   ];
 
   let own: ReactNode = null;
@@ -374,7 +380,13 @@ export function ElementSettings({
           <RadioGroup
             name={`studio-gift-${element.id}`}
             value={element.gift === null ? "sent" : "picked"}
-            options={giftPictures}
+            // TikTok's catalog, with TikTok or to change a gift picked before
+            options={giftPictures.filter(
+              (o) =>
+                o.value !== "picked" ||
+                platforms.includes("tiktok") ||
+                element.gift !== null,
+            )}
             onChange={(picture) =>
               onChange(
                 picture === "sent"
@@ -393,7 +405,13 @@ export function ElementSettings({
         </Field>
       );
       break;
-    case "emote":
+    case "emote": {
+      // The profile's platforms' emotes, and the one picked
+      const shown = emotes.filter(
+        (e) =>
+          platforms.includes(idPlatform(e.value)) ||
+          e.value === element.emote?.id,
+      );
       own = (
         <Field label={t("studio.fields.emote")}>
           <RadioGroup
@@ -401,7 +419,7 @@ export function ElementSettings({
             value={element.emote === null ? "sent" : "picked"}
             options={emotePictures}
             onChange={(picture) => {
-              const first = emotes[0];
+              const first = shown[0];
               if (picture === "sent") {
                 onChange(onSent({ ...element, emote: null }, EMOTE_TRIGGER));
               } else if (first) {
@@ -412,16 +430,16 @@ export function ElementSettings({
               }
             }}
           />
-          {emotes.length === 0 ? (
+          {shown.length === 0 ? (
             // Nothing to pick until viewers use emotes in chat
             <p className={styles.note}>{t("studio.fields.noEmotes")}</p>
           ) : element.emote === null ? null : (
             <Select
               placeholder={t("studio.fields.pickEmote")}
-              options={emotes}
+              options={shown}
               value={element.emote?.id}
               onChange={(id) => {
-                const emote = emotes.find((e) => e.value === id);
+                const emote = shown.find((e) => e.value === id);
                 if (emote) {
                   onChange({ ...element, emote: { id, image: emote.img } });
                 }
@@ -431,6 +449,7 @@ export function ElementSettings({
         </Field>
       );
       break;
+    }
     case "shape":
       own = (
         <>

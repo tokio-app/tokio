@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PLATFORMS, type Platform } from "../types/connector";
 import {
   ALERTS_PATH,
   GAMES_PATH,
@@ -43,6 +44,17 @@ export const CatalogOverlaySchema = z.object({
   size: z.number().int().positive(),
   sha256: z.string().regex(/^[0-9a-f]{64}$/i),
   preview: z.string().nullable(),
+  // The platforms it works on. Missing means every platform, as in catalogs
+  // published before it. A platform this Tokio doesn't know is left out, so
+  // the entry still parses.
+  platforms: z
+    .array(z.string())
+    .transform((list) =>
+      list.filter((p): p is Platform =>
+        (PLATFORMS as readonly string[]).includes(p),
+      ),
+    )
+    .optional(),
 });
 
 export type CatalogOverlay = z.infer<typeof CatalogOverlaySchema>;

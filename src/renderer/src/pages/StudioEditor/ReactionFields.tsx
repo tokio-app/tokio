@@ -22,6 +22,7 @@ import { triggersOf } from "@/common/util";
 import {
   EmoteOption,
   Field,
+  MinimumField,
   NumberInput,
   RadioGroup,
   Select,
@@ -31,6 +32,7 @@ import {
   TriggerRow,
   TriggerSelect,
 } from "@/components";
+import { usePlatforms } from "@/context/platforms";
 import { rich, useOptions, useT } from "@/ui/i18n";
 import { ReactNode } from "react";
 import { goalNumbers, retype } from "./helper";
@@ -129,7 +131,11 @@ export function ReactionFields<R extends Reaction>({
   const rows = triggersOf(value);
   // likes_every is one for all the Like rows, shown with the first
   const likesRow = rows.findIndex((r) => r.type === TOKIO_EVENTS.LIKE);
-  const numbers = goalNumbers(counters);
+  const numbers = goalNumbers(
+    counters,
+    usePlatforms(),
+    rows.flatMap((r) => (r.type === GOAL_TRIGGER ? [r.number] : [])),
+  );
 
   const setRow = (index: number, changed: StudioTrigger) =>
     onChange(
@@ -146,6 +152,8 @@ export function ReactionFields<R extends Reaction>({
   const row = (index: number, label: string): TriggerRow => {
     const trigger = rows[index];
     let filter: ReactNode;
+    // Under the row: its minimum, as an alert's has
+    let more: ReactNode;
     if (trigger.type === GOAL_TRIGGER) {
       filter = (
         <span className={styles.likes}>
@@ -201,6 +209,12 @@ export function ReactionFields<R extends Reaction>({
           onChange={(changed) => setRow(index, changed)}
         />
       );
+      more = (
+        <MinimumField
+          trigger={trigger}
+          onChange={(changed) => setRow(index, changed)}
+        />
+      );
     }
     const main = (
       <>
@@ -214,7 +228,7 @@ export function ReactionFields<R extends Reaction>({
         {filter}
       </>
     );
-    return { main };
+    return { main, more };
   };
 
   const triggerFields = (

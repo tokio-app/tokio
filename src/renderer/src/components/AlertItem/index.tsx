@@ -1,5 +1,5 @@
 import { listOf, MessageKey, Params, translate } from "@/common/i18n";
-import { Alert, ALERT_TRIGGERS, Trigger, ViewerRole } from "@/common/schemas";
+import { Alert, ALERT_TRIGGERS, Trigger } from "@/common/schemas";
 import {
   ALERT_TRIGGER_LABELS,
   CustomGift,
@@ -12,10 +12,16 @@ import {
   formatAdded,
   getAlertOverlayURL,
   giftNames,
+  idPlatform,
   PLATFORM_LABELS,
+  roleName,
+  rowPlatforms,
+  rowStreaks,
+  samplePlatform,
   takesRoles,
   triggersOf,
 } from "@/common/util";
+import { usePlatforms } from "@/context/platforms";
 import { cx } from "@/helper/cx";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useLanguage, useOptions, useT } from "@/ui/i18n";
@@ -28,7 +34,9 @@ import { MediaThumbnail } from "../MediaPicker";
 import { PlayButton, TestState, testProps } from "../PlayButton";
 import { SoundLength } from "../SoundPicker/SoundLength";
 import styles from "./alertitem.module.css";
+import { minUnit, type MinUnit } from "./MinimumField";
 
+export { MinimumField, minUnit } from "./MinimumField";
 export { TriggerRows, type TriggerRow } from "./TriggerRows";
 export { TriggerSelect } from "./TriggerSelect";
 
@@ -46,11 +54,34 @@ const GIFT_PLAYS: { value: "streak" | "gift"; label: MessageKey }[] = [
 ];
 
 // As the summary names them, keys translated where they show
-export const ROLE_NAMES: Record<ViewerRole, MessageKey> = {
-  follower: "roles.follower",
-  moderator: "roles.moderator",
-  superfan: "roles.superfan",
+const WORTH: Record<MinUnit, MessageKey> = {
+  coins: "components.alertItem.worth",
+  kicks: "components.alertItem.worthKicks",
+  bits: "components.alertItem.worthBits",
+  usd: "components.alertItem.worthUsd",
+  subs: "components.alertItem.giftSubsAtLeast",
 };
+
+// "worth 100+ Bits", "worth $5+", "5+ gifted subs". A minimum is whole, so
+// its dollars have no cents.
+const worthText = (
+  unit: MinUnit,
+  min: number,
+  language: string,
+  t: (key: MessageKey, params?: Params) => string,
+) =>
+  t(
+    WORTH[unit],
+    unit === "usd"
+      ? {
+          amount: new Intl.NumberFormat(language, {
+            style: "currency",
+            currency: "USD",
+            trailingZeroDisplay: "stripIfInteger",
+          }).format(min),
+        }
+      : { count: min },
+  );
 
 type FilterProps = {
   trigger: Trigger;
@@ -69,36 +100,54 @@ export function TriggerFilter({
 }: FilterProps) {
   const t = useT();
   const plays = useOptions(GIFT_PLAYS);
+  const platforms = usePlatforms();
+  const streaks = rowStreaks(trigger, platforms);
+  // TikTok's catalog, for rows its gifts can set off. Picks stay to clear.
+  const catalog = streaks || trigger.gifts.length > 0;
   switch (trigger.type) {
     case TOKIO_EVENTS.GIFT:
+      // YouTube's gifts have neither
+      if (!catalog && !streaks) return null;
       return (
         <div className={styles.stack}>
-          <GiftMultiSelect
-            placeholder={t("common.anyGift")}
-            gifts={gifts}
-            value={trigger.gifts}
-            onChange={(ids) => onChange({ ...trigger, gifts: ids })}
-          />
-          <Select
-            className={styles.fill}
-            aria-label={t("components.alertItem.whenItPlays")}
-            options={plays}
-            value={trigger.every_gift ? "gift" : "streak"}
-            onChange={(play) =>
-              onChange({ ...trigger, every_gift: play === "gift" })
-            }
-          />
+          {catalog && (
+            <GiftMultiSelect
+              placeholder={t("common.anyGift")}
+              gifts={gifts}
+              value={trigger.gifts}
+              onChange={(ids) => onChange({ ...trigger, gifts: ids })}
+            />
+          )}
+          {streaks && (
+            <Select
+              className={styles.fill}
+              aria-label={t("components.alertItem.whenItPlays")}
+              options={plays}
+              value={trigger.every_gift ? "gift" : "streak"}
+              onChange={(play) =>
+                onChange({ ...trigger, every_gift: play === "gift" })
+              }
+            />
+          )}
         </div>
       );
-    case EMOTE_TRIGGER:
+    case EMOTE_TRIGGER: {
+      // The row's platforms' emotes. Picks stay to clear.
+      const covered = rowPlatforms(trigger, platforms);
+      const shown = emotes.filter(
+        (emote) =>
+          covered.includes(idPlatform(emote.value)) ||
+          trigger.emotes.includes(emote.value),
+      );
       return (
         <EmoteMultiSelect
           placeholder={t("components.alertItem.anyEmote")}
-          emotes={emotes}
+          emotes={shown}
           value={trigger.emotes}
           onChange={(ids) => onChange({ ...trigger, emotes: ids })}
         />
       );
+    }
     case TOKIO_EVENTS.CHAT:
       return (
         <Input
@@ -209,10 +258,12 @@ function rowSummary(
   emotes: EmoteOption[],
   language: string,
   pictured: boolean,
+  platforms: readonly Platform[],
 ): string {
   const t = (key: MessageKey, params?: Params) =>
     translate(language, key, params);
   const parts: string[] = [];
+  const unit = minUnit(trigger, platforms);
   switch (trigger.type) {
     case TOKIO_EVENTS.GIFT:
       if (!pictured) {
@@ -224,16 +275,25 @@ function rowSummary(
                 t("components.alertItem.someGifts")),
         );
       }
-      parts.push(
-        trigger.every_gift
-          ? t("components.alertItem.everyGift")
-          : t("components.alertItem.streakEnds"),
-      );
-      // Only any gift has a worth to reach
-      if (trigger.gifts.length === 0 && trigger.min_coins > 0) {
+      // YouTube's gifts come one at a time
+      if (rowStreaks(trigger, platforms)) {
         parts.push(
-          t("components.alertItem.worth", { count: trigger.min_coins }),
+          trigger.every_gift
+            ? t("components.alertItem.everyGift")
+            : t("components.alertItem.streakEnds"),
         );
+      }
+      // Only any gift has a worth to reach
+      if (trigger.gifts.length === 0 && trigger.min_coins > 0 && unit) {
+        parts.push(worthText(unit, trigger.min_coins, language, t));
+      }
+      break;
+    case TOKIO_EVENTS.CHEER:
+    case TOKIO_EVENTS.KICKS:
+    case TOKIO_EVENTS.SUPER_CHAT:
+    case TOKIO_EVENTS.GIFT_SUB:
+      if (trigger.min_coins > 0 && unit) {
+        parts.push(worthText(unit, trigger.min_coins, language, t));
       }
       break;
     case EMOTE_TRIGGER:
@@ -276,7 +336,7 @@ function rowSummary(
   if (takesRoles(trigger.type) && trigger.roles.length > 0) {
     const roles = listOf(
       language,
-      trigger.roles.map((role) => t(ROLE_NAMES[role])),
+      trigger.roles.map((role) => roleName(role, trigger, platforms, language)),
       { type: "or" },
     );
     parts.push(t("components.alertItem.fromRoles", { roles }));
@@ -288,6 +348,7 @@ function rowSummary(
  * What narrows the triggers, in the language: each trigger's conditions, as
  * a clause of their own (ROWS between them). Empty when nothing does.
  * Pictured leaves out the gifts and emotes of a trigger whose pictures show.
+ * The profile's platforms name a minimum's unit on rows for any platform.
  */
 export function triggerSummary(
   triggers: Trigger[],
@@ -295,6 +356,7 @@ export function triggerSummary(
   emotes: EmoteOption[],
   language: string,
   pictured = false,
+  platforms: readonly Platform[] = ["tiktok"],
 ): string {
   const rows = triggers
     .map((trigger) =>
@@ -304,6 +366,7 @@ export function triggerSummary(
         emotes,
         language,
         pictured && pictureList(trigger, gifts, emotes).some(Boolean),
+        platforms,
       ),
     )
     .filter(Boolean);
@@ -312,7 +375,7 @@ export function triggerSummary(
 
 /**
  * A trigger's event as rows name it, with its platform when it has one:
- * "Follow on Twitch".
+ * "Follow on Twitch", "Kicks on Kick".
  */
 export function eventName(
   { type, platform }: { type: Trigger["type"]; platform?: Platform },
@@ -340,11 +403,20 @@ export function triggerLabel(
   return listOf(language, [...new Set(names)], { type: "or" });
 }
 
-/** The test of what the alert plays and shows, null when it has nothing. */
-export function alertTest(alert: Alert): AlertTestRequest | null {
-  const { id, volume, sound, tts } = alert;
+/**
+ * The test of what the alert plays and shows, null when it has nothing. A
+ * message is filled with a sample from the platform its trigger comes from.
+ */
+export function alertTest(
+  alert: Alert,
+  platforms: readonly Platform[],
+): AlertTestRequest | null {
+  const { id, volume, sound, tts, trigger } = alert;
   const media = alert.media ?? undefined;
-  if (tts) return { id, tts, trigger: alert.trigger.type, volume, media };
+  if (tts) {
+    const platform = samplePlatform(trigger, platforms);
+    return { id, tts, trigger: trigger.type, platform, volume, media };
+  }
   if (sound) {
     const { file, start } = sound;
     return { id, file, volume, media, start, end: sound.end ?? undefined };
@@ -387,7 +459,15 @@ export function AlertItem({
   const { sound, tts, media } = alert;
   const triggers = triggersOf(alert);
   const pictures = triggerPictures(triggers, gifts, emotes);
-  const detail = triggerSummary(triggers, gifts, emotes, language, !!pictures);
+  const platforms = usePlatforms();
+  const detail = triggerSummary(
+    triggers,
+    gifts,
+    emotes,
+    language,
+    !!pictures,
+    platforms,
+  );
   // What the pictures show, for screen readers and on hover
   const names = pictures
     ? triggers
@@ -398,7 +478,7 @@ export function AlertItem({
         )
         .join(ROWS) || undefined
     : undefined;
-  const test = alertTest(alert);
+  const test = alertTest(alert, platforms);
 
   return (
     <div className={cx(styles.row, !alert.enabled && styles.off)}>

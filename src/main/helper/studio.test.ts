@@ -5,10 +5,11 @@ import {
   TriggerSchema,
 } from "@/common/schemas";
 import {
+  Gifter,
+  Platform,
   STUDIO_MESSAGE,
   StudioMessage,
   TOKIO_EVENTS,
-  TopGifter,
 } from "@/common/types";
 import { formatStat } from "@/common/util";
 import { setLanguage } from "@/helper/i18n";
@@ -54,7 +55,17 @@ const overlay = (
 
 const session = (startedAt: number | null) => ({
   startedAt,
-  totals: { followers: 4, shares: 2, gifts: 9, coins: 1500 },
+  totals: {
+    followers: 4,
+    shares: 2,
+    gifts: 9,
+    coins: 1500,
+    kicks: 250,
+    bits: 700,
+    superChats: 3,
+    giftSubs: 6,
+  },
+  usd: 42.5,
   activity: [],
 });
 
@@ -64,10 +75,18 @@ const setup = (
     startedAt = 1,
     studio = new StudioService(),
     gifters = [],
+    kickGifters,
+    youtubeGifters,
+    subGifters = {},
   }: {
     startedAt?: number | null;
     studio?: StudioService;
-    gifters?: TopGifter[];
+    // TikTok's, and Kick's or YouTube's when they have any
+    gifters?: Gifter[];
+    kickGifters?: Gifter[];
+    youtubeGifters?: Gifter[];
+    // Each platform's top sub gifters
+    subGifters?: Partial<Record<Platform, Gifter[]>>;
   } = {},
 ) => {
   const sendToClient = vi.fn((_id: string, _data: unknown) => true);
@@ -75,6 +94,7 @@ const setup = (
     storeManagerService: {
       getStudio: () => overlays,
       getLiveStats: () => ({ likes: 12_840, viewers: 30, views: 0 }),
+      getProfileData: async () => ({ platforms: ["tiktok"] }),
     },
     liveService: { getSession: () => session(startedAt) },
     overlayService: {
@@ -89,7 +109,14 @@ const setup = (
     },
     serverService: { sendToClient, cameraKey: "k3y" },
     studioService: studio,
-    historyService: { top: () => ({ live: gifters, allTime: [] }) },
+    historyService: {
+      topByPlatform: () => ({
+        tiktok: gifters,
+        kick: kickGifters,
+        youtube: youtubeGifters,
+      }),
+      topSubGifters: () => subGifters,
+    },
     pathManagerService: { files: { logs: { overlays: "overlays.log" } } },
   });
   const views = () =>
@@ -226,8 +253,24 @@ describe("sendStudioOverlays", () => {
       followers: 0,
       shares: 0,
       coins: 0,
+      kicks: 0,
+      bits: 0,
+      superchats: 0,
       gifts: 0,
+      giftsubs: 0,
       uptime: 0,
+    });
+  });
+
+  it("reads each platform's currency apart while LIVE", async () => {
+    const { handler } = setup([]);
+
+    expect(liveNumbers(handler, 1)).toMatchObject({
+      coins: 1500,
+      kicks: 250,
+      bits: 700,
+      superchats: 42.5,
+      giftsubs: 6,
     });
   });
 
@@ -310,13 +353,14 @@ describe("sendStudioOverlays", () => {
   });
 
   it("fills a list with this LIVE's top gifters, coins in the app's language", async () => {
-    const gifter = (username: string, coins: number): TopGifter => ({
+    const gifter = (username: string, coins: number): Gifter => ({
       userId: username,
       username,
       handle: username.toLowerCase(),
       picture: "",
-      live: { coins, gifts: 1 },
-      allTime: { coins, gifts: 1 },
+      coins,
+      gifts: 1,
+      giftSubs: 0,
       giftedAt: 0,
     });
     const { handler, views } = setup(
@@ -348,6 +392,83 @@ describe("sendStudioOverlays", () => {
         { name: "bo", value: "950" },
       ],
     });
+  });
+
+  it("fills a gifters list with its platform's top gifters, none without any", async () => {
+    const kicker: Gifter = {
+      userId: "k",
+      username: "Kai",
+      handle: "kai",
+      picture: "",
+      coins: 40,
+      gifts: 0,
+      giftSubs: 0,
+      giftedAt: 0,
+      platform: "kick",
+    };
+    const { handler, views } = setup(
+      [
+        overlay(ID, [
+          element("k", { kind: "list", platform: "kick" }),
+          element("y", { kind: "list", platform: "youtube" }),
+          element("t", { kind: "list", platform: "twitch" }),
+        ]),
+      ],
+      {
+        gifters: [{ ...kicker, username: "Ana" }],
+        kickGifters: [kicker],
+        // YouTube's Super Chats are in US dollars
+        youtubeGifters: [{ ...kicker, username: "Yui", coins: 57.4 }],
+      },
+    );
+
+    await sendStudioOverlays(handler);
+
+    const [[, view]] = views();
+    expect(view?.layers[0].elements).toMatchObject([
+      { rows: [{ name: "Kai", value: "40" }] },
+      { rows: [{ name: "Yui", value: "$57.40" }] },
+      { rows: [] },
+    ]);
+  });
+
+  it("tops a platform's money and its gifted subs apart", async () => {
+    const kick = (username: string, coins: number, giftSubs: number) => ({
+      userId: `kick:${username}`,
+      username,
+      handle: username.toLowerCase(),
+      picture: "",
+      coins,
+      gifts: 0,
+      giftSubs,
+      giftedAt: 0,
+      platform: "kick" as const,
+    });
+    const bea = kick("Bea", 300, 2);
+    // Gifted subs alone: on the subs top only
+    const gus = kick("Gus", 0, 7);
+    const { handler, views } = setup(
+      [
+        overlay(ID, [
+          element("k", { kind: "list", platform: "kick" }),
+          element("s", { kind: "list", source: "giftsubs", platform: "kick" }),
+        ]),
+      ],
+      { kickGifters: [bea, gus], subGifters: { kick: [gus, bea] } },
+    );
+
+    await sendStudioOverlays(handler);
+
+    const [[, view]] = views();
+    expect(view?.layers[0].elements).toMatchObject([
+      { rows: [{ name: "Bea", value: "300" }] },
+      {
+        rows: [
+          { name: "Gus", value: "7" },
+          { name: "Bea", value: "2" },
+        ],
+      },
+    ]);
   });
 
   it("fills a list with the LIVE's newest followers, gifts or chat", async () => {

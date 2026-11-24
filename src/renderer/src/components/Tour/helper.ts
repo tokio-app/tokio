@@ -1,4 +1,5 @@
 import type { MessageKey } from "@/common/i18n";
+import { Platform, PLATFORMS } from "@/common/types";
 
 type TourStep = {
   // The piece of the window the step is about: its data-tour attribute
@@ -37,6 +38,52 @@ export const TOUR_STEPS: readonly TourStep[] = [
     text: "components.tour.connect",
   },
 ];
+
+// What each platform's tab needs, in the Connect step
+const CONNECT: Record<Platform, MessageKey> = {
+  tiktok: "components.tour.connectTiktok",
+  twitch: "components.tour.connectTwitch",
+  youtube: "components.tour.connectYoutube",
+  kick: "components.tour.connectKick",
+};
+
+/**
+ * The sentences a step says for the profile's platforms: TikTok LIVE Studio,
+ * the Euler key and Twitch's sign-in only where they apply, and in Connect
+ * what each of the profile's tabs needs, in Home's order.
+ */
+export function tourTexts(
+  step: TourStep,
+  platforms: readonly Platform[],
+): MessageKey[] {
+  const tiktok = platforms.includes("tiktok");
+  const twitch = platforms.includes("twitch");
+  switch (step.text) {
+    case "components.tour.overlays":
+      return [tiktok ? step.text : "components.tour.overlaysObs"];
+    case "components.tour.settings":
+      if (tiktok) {
+        return twitch
+          ? [step.text, "components.tour.settingsTwitchToo"]
+          : [step.text];
+      }
+      return [
+        twitch
+          ? "components.tour.settingsTwitch"
+          : "components.tour.settingsOther",
+      ];
+    case "components.tour.connect":
+      return [
+        step.text,
+        ...PLATFORMS.filter((p) => platforms.includes(p)).map(
+          (p) => CONNECT[p],
+        ),
+        "components.tour.connectEnd",
+      ];
+    default:
+      return [step.text];
+  }
+}
 
 // Around the piece, and between the cut-out and the card
 const PAD = 10;

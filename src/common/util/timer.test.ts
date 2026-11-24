@@ -34,6 +34,7 @@ describe("TimerSettingsSchema's names", () => {
       sub: "",
       gift_sub: "",
       bit: "",
+      kick: "",
       superchat: "",
     });
     // An English name in a Spanish Tokio too
@@ -76,6 +77,18 @@ describe("timerTriggers", () => {
     expect(
       timerTriggers(settings(), "en", ["youtube"]).map((t) => t.label),
     ).toEqual(["New sub", "Gifted sub", "Super Chat"]);
+  });
+
+  it("lists Kicks, and no coins, for a Kick profile, and both with TikTok", () => {
+    expect(
+      timerTriggers(settings(), "en", ["kick"]).map((t) => t.label),
+    ).toContain("1 Kick");
+    expect(
+      timerTriggers(settings(), "en", ["kick"]).map((t) => t.label),
+    ).not.toContain("1 coin");
+    expect(
+      timerTriggers(settings(), "en", ["tiktok", "kick"]).map((t) => t.label),
+    ).toEqual(expect.arrayContaining(["1 coin", "1 Kick"]));
   });
 
   it("uses the streamer's names, and shows the chat keyword viewers need", () => {

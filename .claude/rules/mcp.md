@@ -24,7 +24,7 @@ paths:
 
 ## Reads and writes
 
-- Reads go straight to the services, never through `invoke`. A `GET_PROFILE` reply drops a page's pending save, `GET_GIFTERS` aborts Coin stats' read, `GET_VOICES` is huge, and `GET_SETTINGS` and `GET_VOICE_KEYS` carry decrypted keys.
+- Reads go straight to the services, never through `invoke`. A `GET_PROFILE` reply drops a page's pending save, `GET_GIFTERS` aborts LIVE history's read, `GET_VOICES` is huge, and `GET_SETTINGS` and `GET_VOICE_KEYS` carry decrypted keys.
 - Results are built field by field. Keys come back only as `hasKey`.
 - Writes run the existing handlers through `invoke`, one at a time on the `write()` chain, each after `flushWindow`. The window first sends its pending autosaves (`FLUSH_SETTINGS`, then `flushSettings()`, then `SETTINGS_FLUSHED`), so a page's stale copy can't land after the write, or in another profile.
 - The registry already runs every non-read-only tool, and the generic save, test and remove, on the chain. Area code that calls `write()` again deadlocks.

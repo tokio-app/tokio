@@ -17,8 +17,12 @@ import {
   COUNTED_HAZARDS,
   countedVariables,
   createAction,
+  newRowTrigger,
   createStep,
+  rowVariables,
+  samplePlatform,
 } from "@/common/util";
+import { usePlatforms } from "@/context/platforms";
 import {
   Btn,
   Check,
@@ -91,6 +95,7 @@ export function ActionsSection({
   update,
 }: Props) {
   const t = useT();
+  const platforms = usePlatforms();
   // Asked once here, not by each action
   const translation = useTranslationLanguage();
   // Collapsed, the overlay below gets the room. Only while on the page.
@@ -177,7 +182,7 @@ export function ActionsSection({
           className={styles.add}
           onClick={() =>
             update((s) => {
-              s.actions.push(createAction(tab));
+              s.actions.push(createAction(tab, newRowTrigger(platforms)));
             })
           }
         >
@@ -240,12 +245,19 @@ function ActionItem({
     focused !== -1 && steps[focused] && stepText(steps[focused]) !== null
       ? focused
       : steps.findIndex((step) => stepText(step) !== null);
-  // A gift on every gift runs once for each, it has no count to say.
+  const platforms = usePlatforms();
+  // A gift on every gift runs once for each, it has no count to say, and the
+  // row says only what its platforms fill.
   const variables = shownVariables(
-    trigger.type === TOKIO_EVENTS.GIFT && trigger.every_gift
-      ? countedVariables(trigger.type).filter((name) => name !== "count")
-      : countedVariables(trigger.type),
+    rowVariables(
+      trigger.type === TOKIO_EVENTS.GIFT && trigger.every_gift
+        ? countedVariables(trigger.type).filter((name) => name !== "count")
+        : countedVariables(trigger.type),
+      trigger,
+      platforms,
+    ),
     translation,
+    platforms,
   );
 
   useIpcListener(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, (res) => {
@@ -321,6 +333,7 @@ function ActionItem({
                 id: action.id,
                 edition: action.edition,
                 trigger: trigger.type,
+                platform: samplePlatform(trigger, platforms),
                 steps,
               });
             }}

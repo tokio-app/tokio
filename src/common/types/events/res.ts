@@ -6,7 +6,6 @@ import {
   Platform,
   PlatformStatus,
   TokioPayload,
-  TopGifter,
 } from "../connector";
 import { ControlAction, ControlState } from "../controls";
 import { CustomGift, OverlayConfigRedux } from "../overlay";
@@ -25,6 +24,7 @@ import {
 import { AppNotification, Reply } from "../feedback";
 import { CommandResult, GamesData } from "../games";
 import {
+  Gifter,
   LiveHistory,
   LiveRecord,
   LiveSession,
@@ -341,6 +341,8 @@ export interface AppEventsResponseMap {
       views: number;
       viewers: number;
       likes: number;
+      // Each platform's viewers now, which viewers adds up
+      platformViewers: Partial<Record<Platform, number>>;
     };
   }>;
 
@@ -351,6 +353,8 @@ export interface AppEventsResponseMap {
     data: {
       views: number;
       viewers: number;
+      // Each platform's viewers now, which viewers adds up
+      platformViewers: Partial<Record<Platform, number>>;
     };
   };
   [APP_EVENTS_RESPONSE.LIKES]: {
@@ -360,10 +364,13 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.LIVE_SESSION]: {
     data: LiveSession;
   };
-  // The reply to GET_LIVE_GIFTERS, pushed again as they change: this LIVE's
-  // gifters, the most coins first, [] outside a LIVE
+  // The reply to GET_LIVE_GIFTERS, pushed again as they change: each
+  // platform's top gifters in this LIVE, the most first, none outside a LIVE.
+  // Their numbers are this LIVE's. subsByPlatform ranks who gifted subs, by
+  // their count.
   [APP_EVENTS_RESPONSE.LIVE_GIFTERS]: {
-    data: TopGifter[];
+    byPlatform: Partial<Record<Platform, Gifter[]>>;
+    subsByPlatform: Partial<Record<Platform, Gifter[]>>;
   };
   // The reply to GET_SONGS, pushed again as the request queue changes, as
   // overlays get it
@@ -383,13 +390,15 @@ export interface AppEventsResponseMap {
     data?: LiveRecord;
   }>;
   // The range and query it was asked for, failures included. Dates without a
-  // query get their coins and gifts first, then again with the gifters.
+  // query get their totals first, then again with the gifters: by amount in
+  // data, by gifted subs in subGifters.
   [APP_EVENTS_RESPONSE.GIFTERS]: Reply<{
     from?: number;
     to?: number;
     query?: string;
-    totals?: Pick<LiveSummary, "coins" | "gifts">;
+    totals?: Pick<LiveSummary, "coins" | "gifts" | "platforms">;
     data?: RankedGifter[];
+    subGifters?: RankedGifter[];
   }>;
 
   // OVERLAYS

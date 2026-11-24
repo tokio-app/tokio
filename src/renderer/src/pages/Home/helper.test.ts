@@ -1,13 +1,192 @@
 import { createAlert } from "@/common/util";
+import { gifter, liveSession, liveTotals } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
   alertsStatus,
   chartPoints,
   joinedText,
+  livePlatforms,
+  liveView,
   nearestIndex,
   overlaysStatus,
   songParts,
 } from "./helper";
+
+const totals = (gifts: number, coins: number) => liveTotals({ gifts, coins });
+
+describe("livePlatforms", () => {
+  it("lists the platforms up now or with numbers, in Home's order", () => {
+    const session = liveSession({
+      platforms: { youtube: { totals: totals(1, 0), viewers: [] } },
+    });
+
+    expect(
+      livePlatforms(
+        { kick: "reconnecting", tiktok: "connected", twitch: "connecting" },
+        session,
+      ),
+    ).toEqual(["tiktok", "youtube", "kick"]);
+  });
+});
+
+describe("liveView", () => {
+  const ana = gifter("Ana", 20);
+  const kai = gifter("Kai", 30, 1, { platform: "kick" });
+  const numbers = {
+    session: liveSession({
+      totals: liveTotals({ gifts: 5, coins: 20, kicks: 30 }),
+      viewers: [60],
+      platforms: {
+        tiktok: {
+          totals: liveTotals({ gifts: 2, coins: 20 }),
+          viewers: [40],
+        },
+        kick: { totals: liveTotals({ gifts: 3, kicks: 30 }), viewers: [20] },
+      },
+    }),
+    views: { current: 60, total: 900, platformViewers: { kick: 20 } },
+    likes: 7,
+    gifters: { byPlatform: { tiktok: [ana], kick: [kai] }, subsByPlatform: {} },
+  };
+  const labels = (view: ReturnType<typeof liveView>) =>
+    view.stats.map((stat) => stat.label);
+
+  it("adds up the LIVE's platforms on All, with a tile per currency and no top gifters", () => {
+    const view = liveView("all", ["tiktok", "kick"], numbers);
+
+    expect(view).toMatchObject({
+      viewers: 60,
+      minutes: [60],
+      gifters: null,
+      subGifters: null,
+    });
+    expect(view.stats).toEqual([
+      { label: "home.stats.likes", value: 7 },
+      { label: "home.stats.totalViews", value: 900 },
+      { label: "home.totals.followers", value: 0 },
+      { label: "home.totals.shares", value: 0 },
+      { label: "home.totals.gifts", value: 5 },
+      // Kick sends gifted subs
+      { label: "home.totals.giftSubs", value: 0 },
+      { label: "home.totals.coins", value: 20 },
+      { label: "home.totals.kicks", value: 30 },
+    ]);
+  });
+
+  it("gives a platform its own numbers, stats and top gifters in its currency", () => {
+    expect(liveView("kick", ["tiktok", "kick"], numbers)).toEqual({
+      viewers: 20,
+      minutes: [20],
+      // Kicks, never gifts
+      stats: [
+        { label: "home.totals.giftSubs", value: 0 },
+        { label: "home.totals.kicks", value: 30 },
+      ],
+      gifters: { currency: "kicks", list: [kai] },
+      // Kick gifts subs: their own top
+      subGifters: [],
+    });
+    // TikTok gifts no subs
+    expect(liveView("tiktok", ["tiktok", "kick"], numbers)).toMatchObject({
+      gifters: { currency: "coins", list: [ana] },
+      subGifters: null,
+    });
+  });
+
+  it("gives a platform with nothing yet zeros, and its gifters in dollars", () => {
+    expect(liveView("youtube", ["youtube", "kick"], numbers)).toEqual({
+      viewers: 0,
+      minutes: [],
+      stats: [
+        { label: "home.totals.gifts", value: 0 },
+        { label: "home.totals.giftSubs", value: 0 },
+        { label: "home.totals.superChats", value: 0, money: true },
+      ],
+      gifters: { currency: "usd", list: [] },
+      subGifters: [],
+    });
+  });
+
+  it("tops Twitch's Bits and its gifted subs apart", () => {
+    const yui = gifter("Yui", 500, 0, { platform: "twitch", giftSubs: 3 });
+    // Gifted subs alone: on the subs top, not the Bits one
+    const sam = gifter("Sam", 0, 0, { platform: "twitch", giftSubs: 5 });
+    const view = liveView("twitch", ["tiktok", "twitch"], {
+      ...numbers,
+      session: liveSession({
+        totals: liveTotals({ bits: 500, giftSubs: 3 }),
+        platforms: {
+          twitch: {
+            totals: liveTotals({ bits: 500, giftSubs: 3 }),
+            viewers: [],
+          },
+        },
+      }),
+      gifters: {
+        byPlatform: { twitch: [yui, sam] },
+        subsByPlatform: { twitch: [sam, yui] },
+      },
+    });
+
+    expect(view.stats).toEqual([
+      { label: "home.totals.followers", value: 0 },
+      { label: "home.totals.giftSubs", value: 3 },
+      { label: "home.totals.bits", value: 500 },
+    ]);
+    expect(view.gifters).toEqual({ currency: "bits", list: [yui] });
+    expect(view.subGifters).toEqual([sam, yui]);
+  });
+
+  it("shows Twitch's Bits and YouTube's Super Chats in dollars, null until the rates load", () => {
+    const session = liveSession({
+      totals: liveTotals({ bits: 250, superChats: 2 }),
+      usd: null,
+      platforms: {
+        twitch: { totals: liveTotals({ bits: 250 }), viewers: [] },
+        youtube: { totals: liveTotals({ superChats: 2 }), viewers: [] },
+      },
+    });
+    const view = (tab: "all" | "twitch" | "youtube") =>
+      liveView(tab, ["twitch", "youtube"], { ...numbers, session });
+
+    expect(labels(view("all"))).toEqual([
+      "home.totals.followers",
+      "home.totals.gifts",
+      "home.totals.giftSubs",
+      "home.totals.bits",
+      "home.totals.superChats",
+    ]);
+    expect(view("twitch").stats).toEqual([
+      { label: "home.totals.followers", value: 0 },
+      { label: "home.totals.giftSubs", value: 0 },
+      { label: "home.totals.bits", value: 250 },
+    ]);
+    expect(view("twitch").gifters).toEqual({ currency: "bits", list: [] });
+    expect(view("youtube").stats).toContainEqual({
+      label: "home.totals.superChats",
+      value: null,
+      money: true,
+    });
+  });
+
+  it("shows every tile with all four platforms, never a sum of currencies", () => {
+    const view = liveView("all", ["tiktok", "twitch", "youtube", "kick"], {
+      ...numbers,
+      session: liveSession({
+        totals: liveTotals({ coins: 1, kicks: 2, bits: 3 }),
+        usd: 4.5,
+      }),
+    });
+
+    expect(view.stats.slice(-4)).toEqual([
+      { label: "home.totals.coins", value: 1 },
+      { label: "home.totals.kicks", value: 2 },
+      { label: "home.totals.bits", value: 3 },
+      { label: "home.totals.superChats", value: 4.5, money: true },
+    ]);
+    expect(view.stats).toHaveLength(10);
+  });
+});
 
 describe("chartPoints", () => {
   it("spreads the points across, from 0 on the baseline to the peak on top", () => {

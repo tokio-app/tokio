@@ -1,14 +1,21 @@
 import { Alert } from "@/common/schemas";
-import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
+import { EMOTE_TRIGGER, Platform, TOKIO_EVENTS } from "@/common/types";
+import { PlatformsContext } from "@/context/platforms";
 import { createAlert } from "@/common/util";
 import { intersect } from "@test/dom";
 import { alertClip, alertMedia, gift, voice } from "@test/fixtures";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Params, translate } from "@/common/i18n";
-import { AlertItem, TriggerFilter, triggerLabel, triggerSummary } from ".";
+import {
+  AlertItem,
+  minUnit,
+  TriggerFilter,
+  triggerLabel,
+  triggerSummary,
+} from ".";
 
 const GIFTS = [gift(5655, "Rose"), gift(6064, "GG")];
 const EMOTES = [
@@ -112,6 +119,7 @@ describe("AlertItem", () => {
       id: "alert-1",
       tts: TTS,
       trigger: TOKIO_EVENTS.GIFT,
+      platform: "tiktok",
       volume: 80,
     });
   });
@@ -503,5 +511,177 @@ describe("Redeem and platforms", () => {
     };
 
     expect(triggerLabel(withGift, t, "en")).toBe("Follow on Twitch or Gift");
+  });
+
+  it("names a Kicks row Kicks, any platform's gift still Gift", () => {
+    const kicks = alert({}, { type: TOKIO_EVENTS.KICKS, platform: "kick" });
+    const any = alert({}, { type: TOKIO_EVENTS.GIFT });
+
+    expect(triggerLabel(kicks, t, "en")).toBe("Kicks on Kick");
+    expect(triggerLabel(any, t, "en")).toBe("Gift");
+  });
+});
+
+describe("money rows' minimums", () => {
+  const sum = (type: Alert["trigger"]["type"], min_coins: number) =>
+    triggerSummary([alert({}, { type, min_coins }).trigger], [], [], "en");
+
+  it("takes each event's own unit, and none for events without money", () => {
+    const unit = (type: Alert["trigger"]["type"]) =>
+      minUnit(alert({}, { type }).trigger, ["twitch", "youtube"]);
+
+    expect(unit(TOKIO_EVENTS.CHEER)).toBe("bits");
+    expect(unit(TOKIO_EVENTS.KICKS)).toBe("kicks");
+    expect(unit(TOKIO_EVENTS.SUPER_CHAT)).toBe("usd");
+    expect(unit(TOKIO_EVENTS.GIFT_SUB)).toBe("subs");
+    expect(unit(TOKIO_EVENTS.FOLLOW)).toBeNull();
+  });
+
+  it("sums up each minimum in its unit, and nothing at 0", () => {
+    expect(sum(TOKIO_EVENTS.CHEER, 100)).toBe("Worth 100+ Bits");
+    expect(sum(TOKIO_EVENTS.KICKS, 100)).toBe("Worth 100+ Kicks");
+    expect(sum(TOKIO_EVENTS.SUPER_CHAT, 5)).toBe("Worth $5+");
+    expect(sum(TOKIO_EVENTS.GIFT_SUB, 5)).toBe("5+ gifted subs");
+    expect(sum(TOKIO_EVENTS.CHEER, 0)).toBe("");
+  });
+});
+
+describe("gift rows on each platform", () => {
+  const row = (patch: Partial<Alert["trigger"]> = {}) =>
+    alert({}, { type: TOKIO_EVENTS.GIFT, ...patch }).trigger;
+
+  it("takes the minimum in the row's currency", () => {
+    expect(minUnit(row(), ["tiktok"])).toBe("coins");
+    // Kick sends no gifts, and YouTube's have no price
+    expect(minUnit(row(), ["kick", "youtube"])).toBeNull();
+    expect(minUnit(row(), ["tiktok", "kick"])).toBe("coins");
+    // A row for one platform, whatever the profile has
+    expect(minUnit(row({ platform: "tiktok" }), ["youtube"])).toBe("coins");
+    expect(minUnit(row({ platform: "youtube" }), ["tiktok"])).toBeNull();
+    // A minimum saved where gifts have no price stays to fix
+    expect(minUnit(row({ platform: "youtube", min_coins: 5 }), [])).toBe(
+      "coins",
+    );
+  });
+
+  it("sums up the minimum in it", () => {
+    const sum = (patch: Partial<Alert["trigger"]>, platforms: Platform[]) =>
+      triggerSummary(
+        [row({ min_coins: 100, ...patch })],
+        GIFTS,
+        EMOTES,
+        "en",
+        false,
+        platforms,
+      );
+
+    expect(sum({}, ["tiktok", "kick"])).toBe(
+      "Any gift, when the streak ends, worth 100+ coins",
+    );
+  });
+
+  it("offers TikTok's gifts only on rows they can set off, or with some picked", () => {
+    // Its text: the placeholder, or the gifts picked
+    const picker = (
+      trigger: Alert["trigger"],
+      platforms: Platform[],
+      text = "Any gift",
+    ) => {
+      const { unmount } = render(
+        <PlatformsContext value={platforms}>
+          <TriggerFilter
+            trigger={trigger}
+            gifts={GIFTS}
+            emotes={EMOTES}
+            onChange={vi.fn()}
+          />
+        </PlatformsContext>,
+      );
+      const shown = screen.queryByText(text) !== null;
+      unmount();
+      return shown;
+    };
+
+    expect(picker(row(), ["tiktok", "youtube"])).toBe(true);
+    expect(picker(row(), ["youtube"])).toBe(false);
+    expect(picker(row({ platform: "tiktok" }), ["youtube"])).toBe(true);
+    expect(picker(row({ platform: "youtube" }), ["tiktok", "youtube"])).toBe(
+      false,
+    );
+    expect(
+      picker(row({ platform: "youtube", gifts: [5655] }), ["youtube"], "Rose"),
+    ).toBe(true);
+  });
+});
+
+describe("rows on their platforms", () => {
+  const ALL: Platform[] = ["tiktok", "twitch", "youtube", "kick"];
+  const SAVED = [
+    { value: "7001", label: "Heart", img: "a.png" },
+    { value: "twitch:25", label: "Kappa", img: "b.png" },
+    { value: "kick:9", label: "KEKW", img: "c.png" },
+    { value: "youtube:wave", label: "Wave", img: "d.png" },
+  ];
+  const NAMES = SAVED.map((emote) => emote.label);
+  const filter = (trigger: Alert["trigger"], platforms: Platform[]) =>
+    render(
+      <PlatformsContext value={platforms}>
+        <TriggerFilter
+          trigger={trigger}
+          gifts={GIFTS}
+          emotes={SAVED}
+          onChange={vi.fn()}
+        />
+      </PlatformsContext>,
+    );
+  const emoteRow = (patch: Partial<Alert["trigger"]> = {}) =>
+    alert({}, { type: EMOTE_TRIGGER, ...patch }).trigger;
+  // The emote picker's rows, by name
+  const pickable = async (trigger: Alert["trigger"], platforms: Platform[]) => {
+    const user = userEvent.setup();
+    const view = filter(trigger, platforms);
+    await user.click(within(view.container).getByRole("button"));
+    const names = within(screen.getByRole("dialog"))
+      .queryAllByTitle(/./)
+      .map((el) => el.title)
+      .filter((title) => NAMES.includes(title));
+    view.unmount();
+    return names;
+  };
+
+  it("offers a row only its platforms' emotes, and keeps picked ones", async () => {
+    expect(await pickable(emoteRow({ platform: "twitch" }), ALL)).toEqual([
+      "Kappa",
+    ]);
+    // Picked on another platform, to clear; the picker lists picks first
+    expect(
+      await pickable(emoteRow({ platform: "twitch", emotes: ["kick:9"] }), ALL),
+    ).toEqual(["KEKW", "Kappa"]);
+    // Any platform: the profile's
+    expect(await pickable(emoteRow(), ["tiktok", "kick"])).toEqual([
+      "Heart",
+      "KEKW",
+    ]);
+  });
+
+  it("has no streak choice where gifts come one at a time", () => {
+    const giftRow = (patch: Partial<Alert["trigger"]> = {}) =>
+      alert({}, { type: TOKIO_EVENTS.GIFT, ...patch }).trigger;
+    const plays = (trigger: Alert["trigger"], platforms: Platform[]) => {
+      const view = filter(trigger, platforms);
+      const shown =
+        screen.queryByRole("combobox", { name: "When it plays" }) !== null;
+      view.unmount();
+      return shown;
+    };
+
+    expect(plays(giftRow({ platform: "tiktok" }), ALL)).toBe(true);
+    expect(plays(giftRow(), ["tiktok", "kick"])).toBe(true);
+    // Kick's and YouTube's gifts come one at a time
+    expect(plays(giftRow({ platform: "kick" }), ALL)).toBe(false);
+    expect(plays(giftRow(), ["youtube", "kick"])).toBe(false);
+    // With nothing to pick, nothing at all
+    const view = filter(giftRow({ platform: "youtube" }), ALL);
+    expect(view.container).toBeEmptyDOMElement();
   });
 });

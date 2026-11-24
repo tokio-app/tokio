@@ -1,4 +1,11 @@
-import { Fan, TOKIO_EVENTS, UserData } from "@/common/types";
+import {
+  Fan,
+  Platform,
+  PLATFORMS,
+  TOKIO_EVENTS,
+  UserData,
+} from "@/common/types";
+import { platformOf } from "@/common/util";
 import { isMissing } from "@/helper/fs";
 import Logger from "@/logger";
 import { access } from "node:fs/promises";
@@ -7,8 +14,8 @@ import { z } from "zod";
 import type { JSONManagerService } from "../json";
 import { Service } from "../shared";
 
-// The live events whose viewer can carry a fan level. Room Users' ranks carry
-// no badges.
+// The live events whose viewer can carry a fan level, or a subscriber's or
+// member's badge. Room Users' ranks carry no badges.
 export const FAN_EVENTS = [
   TOKIO_EVENTS.CHAT,
   TOKIO_EVENTS.GIFT,
@@ -18,6 +25,8 @@ export const FAN_EVENTS = [
   TOKIO_EVENTS.SUPER_FAN,
   TOKIO_EVENTS.MEMBER_JOIN,
   TOKIO_EVENTS.SUPER_FAN_JOIN,
+  TOKIO_EVENTS.SUBSCRIBE,
+  TOKIO_EVENTS.SUPER_CHAT,
 ] as const;
 
 export type FanEvent = (typeof FAN_EVENTS)[number];
@@ -32,7 +41,8 @@ const SUPERFAN: Partial<Record<FanEvent, (user: UserData) => boolean>> = {
   [TOKIO_EVENTS.SUPER_FAN_JOIN]: () => true,
 };
 
-// Kept per profile, the ones not seen for the longest dropped first
+// Kept per platform in each profile, the ones not seen for the longest dropped
+// first
 export const MAX_FANS = 5000;
 // What overlays get
 export const SENT_FANS = 100;
@@ -44,8 +54,33 @@ const FanSchema: z.ZodType<Fan> = z.object({
   fanLevel: z.number(),
   fanBadge: z.string().default(""),
   superfan: z.boolean().default(false),
+  // Saved since other platforms' fans counted; TikTok's have none
+  months: z.number().optional(),
   seenAt: z.number(),
+  // One a newer Tokio saved that this one doesn't know reads as TikTok
+  platform: z.enum(PLATFORMS).optional().catch(undefined),
 });
+
+// TikTok's by level, the others by months (unknown last), then the most
+// recently seen, each platform after the one before it in PLATFORMS
+const order = (a: Fan, b: Fan) =>
+  PLATFORMS.indexOf(platformOf(a)) - PLATFORMS.indexOf(platformOf(b)) ||
+  b.fanLevel - a.fanLevel ||
+  (b.months ?? 0) - (a.months ?? 0) ||
+  b.seenAt - a.seenAt;
+
+// The last MAX_FANS of each platform, in the order they came
+function capped(fans: Fan[]): Fan[] {
+  const counts = new Map<Platform, number>();
+  return fans
+    .toReversed()
+    .filter((fan) => {
+      const count = (counts.get(platformOf(fan)) ?? 0) + 1;
+      counts.set(platformOf(fan), count);
+      return count <= MAX_FANS;
+    })
+    .toReversed();
+}
 
 // Least recently seen first
 const FansFileSchema = z.object({ fans: z.array(FanSchema) });
@@ -53,9 +88,10 @@ const FansFileSchema = z.object({ fans: z.array(FanSchema) });
 type Json = Pick<JSONManagerService, "loadFile" | "saveFile">;
 
 /**
- * The fans the active profile has seen in its LIVEs, by TikTok user id. TikTok
- * sends a viewer's fan level only when they do something, so overlays get the
- * ones seen before from here. They're saved in their own file,
+ * The fans the active profile has seen in its LIVEs, by user id: TikTok's fan
+ * club, and the other platforms' subscribers and members. TikTok sends a
+ * viewer's fan level only when they do something, so overlays get the ones
+ * seen before from here. They're saved in their own file,
  * fans/<profile file>, which exports and GET_PROFILE leave out.
  */
 export class FansService extends Service {
@@ -89,7 +125,7 @@ export class FansService extends Service {
     const fans = await this._read(path);
     if (this._loading !== path) return true;
     if (fans) {
-      for (const fan of fans.slice(-MAX_FANS)) this._fans.set(fan.userId, fan);
+      for (const fan of capped(fans)) this._fans.set(fan.userId, fan);
       this._file = path;
     } else {
       Logger.warn(
@@ -101,40 +137,41 @@ export class FansService extends Service {
     return fans !== null;
   }
 
-  /** Keeps a viewer with a fan level, as the event `type` shows them now. */
-  public record(user: UserData, type?: FanEvent) {
-    // A missing badge isn't proof they left the fan club, so 0 changes nothing.
-    const level = user.fanLevel ?? 0;
-    if (this._file === null || !user.userId || level <= 0) return;
-    const said = type ? SUPERFAN[type]?.(user) : undefined;
-    const superfan = said ?? this._fans.get(user.userId)?.superfan ?? false;
+  /**
+   * Keeps a viewer with a fan level, or a subscriber or member on the other
+   * platforms, as the event `type` shows them now. `months` is a sub's.
+   */
+  public record(user: UserData, type?: FanEvent, months?: number) {
+    if (this._file === null || !user.userId) return;
+    const fan = this._fan(user, user.userId, type, months);
+    if (!fan) return;
     // Set again, so it's the most recently seen
-    this._fans.delete(user.userId);
-    this._fans.set(user.userId, {
-      userId: user.userId,
-      username: user.username,
-      handle: user.handle,
-      fanLevel: level,
-      fanBadge: user.fanBadge ?? "",
-      superfan,
-      seenAt: Date.now(),
-    });
-    if (this._fans.size > MAX_FANS) {
-      const [oldest] = this._fans.keys();
-      this._fans.delete(oldest);
-    }
+    this._fans.delete(fan.userId);
+    this._fans.set(fan.userId, fan);
+    if (this._fans.size > MAX_FANS) this._trim(platformOf(fan));
     this._unsaved = true;
     this._emit();
   }
 
   /**
-   * The highest levels first, then the most recently seen. Overlays get the
-   * first SENT_FANS, the Fans page all of them.
+   * TikTok's fans, the highest levels first, then the most recently seen:
+   * what overlays get, the first SENT_FANS. The other platforms' would fill a
+   * fan-level overlay with subs.
    */
   public list(limit = SENT_FANS): Fan[] {
     return [...this._fans.values()]
-      .sort((a, b) => b.fanLevel - a.fanLevel || b.seenAt - a.seenAt)
+      .filter((fan) => platformOf(fan) === "tiktok")
+      .sort(order)
       .slice(0, limit);
+  }
+
+  /**
+   * Every platform's fans, for the Fans page and MCP: TikTok's by level, the
+   * others by months, then the most recently seen. Platforms aren't ranked
+   * against each other, so each comes after the one before it in PLATFORMS.
+   */
+  public all(): Fan[] {
+    return [...this._fans.values()].sort(order);
   }
 
   /**
@@ -159,6 +196,56 @@ export class FansService extends Service {
   /** The listener runs when the fans change, and after each load. */
   public onChange(listener: () => void) {
     this._listeners.push(listener);
+  }
+
+  // What the event says about a viewer, or null when it doesn't show them as a
+  // fan. A missing badge isn't proof they left, so it changes nothing.
+  private _fan(
+    user: UserData,
+    userId: string,
+    type?: FanEvent,
+    months?: number,
+  ): Fan | null {
+    const known = this._fans.get(userId);
+    const platform = platformOf(user);
+    const base = { userId, username: user.username, handle: user.handle };
+    if (platform === "tiktok") {
+      const level = user.fanLevel ?? 0;
+      if (level <= 0) return null;
+      const said = type ? SUPERFAN[type]?.(user) : undefined;
+      return {
+        ...base,
+        fanLevel: level,
+        fanBadge: user.fanBadge ?? "",
+        superfan: said ?? known?.superfan ?? false,
+        seenAt: Date.now(),
+      };
+    }
+    // Their subscriber or member badge, or a sub, says they're one
+    if (!user.superfan && type !== TOKIO_EVENTS.SUBSCRIBE) return null;
+    // YouTube's badge says only its milestone, so a larger number stays
+    const most = Math.max(known?.months ?? 0, user.subMonths ?? 0, months ?? 0);
+    return {
+      ...base,
+      fanLevel: 0,
+      fanBadge: "",
+      superfan: true,
+      ...(most > 0 && { months: most }),
+      seenAt: Date.now(),
+      platform,
+    };
+  }
+
+  // Drops the platform's one not seen for the longest when it has too many
+  private _trim(platform: Platform) {
+    let count = 0;
+    let oldest: string | undefined;
+    for (const fan of this._fans.values()) {
+      if (platformOf(fan) !== platform) continue;
+      count++;
+      oldest ??= fan.userId;
+    }
+    if (count > MAX_FANS && oldest !== undefined) this._fans.delete(oldest);
   }
 
   // The file's fans, [] without one, null when it's there but doesn't load

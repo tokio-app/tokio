@@ -13,11 +13,14 @@ import {
   AlertTrigger,
   ChatEvent,
   EMOTE_TRIGGER,
+  Platform,
   TOKIO_EVENTS,
 } from "../types/connector";
+import { NO_MONEY } from "./format";
 import {
   fillStudioText,
   goalValue,
+  listInUsd,
   listRow,
   newStudioElement,
   newStudioGroup,
@@ -28,12 +31,13 @@ import {
   sentPicture,
   SAMPLE_NUMBERS,
   studioEventVariables,
+  studioNumbersFor,
   studioView,
   StudioViewDeps,
   usesNumbers,
 } from "./studio";
 import { formatStat } from "./format";
-import { generateTikTokEventSample } from "./samples";
+import { generateEventSample } from "./samples";
 
 const ID = "8f14e45f-ceea-4672-9a8e-1b2c3d4e5f60";
 const box = { x: 0, y: 0, width: 100, height: 100 };
@@ -74,6 +78,20 @@ describe("fillStudioText", () => {
     );
   });
 
+  it("shows the Super Chats in dollars, and a dash until the rates load", () => {
+    expect(fill("{coins} {kicks} {bits} {superchats} {giftsubs}", null)).toBe(
+      "4.2K 1.9K 2.5K $86.50 25",
+    );
+    const waiting = fillStudioText("{superchats}", {
+      numbers: { ...SAMPLE_NUMBERS, superchats: null },
+      counters: {},
+      values: null,
+      variables: [],
+      language: "en",
+    });
+    expect(waiting).toBe(NO_MONEY);
+  });
+
   it("fills the event's values, and a comment that says {likes} stays as typed", () => {
     expect(fill("{username}: {comment} ({likes})", chat("{likes}?"))).toBe(
       "Sora: {likes}? (12.8K)",
@@ -103,6 +121,10 @@ describe("goalValue", () => {
     // Own keys only
     expect(goalValue("constructor", SAMPLE_NUMBERS, {})).toBe(0);
     expect(goalValue("gone", SAMPLE_NUMBERS, counters)).toBe(0);
+    // Super Chats before the rates load
+    expect(
+      goalValue("superchats", { ...SAMPLE_NUMBERS, superchats: null }, {}),
+    ).toBe(0);
   });
 });
 
@@ -145,6 +167,34 @@ describe("usesNumbers and studioEventVariables", () => {
         trigger: triggerOf(TOKIO_EVENTS.LIKE),
       }),
     ).toEqual([]);
+  });
+});
+
+describe("studioNumbersFor", () => {
+  it.each([
+    [
+      ["tiktok"],
+      ["likes", "viewers", "followers", "shares", "coins", "gifts", "uptime"],
+    ],
+    [["twitch"], ["viewers", "followers", "bits", "giftsubs", "uptime"]],
+    [["youtube"], ["viewers", "superchats", "gifts", "giftsubs", "uptime"]],
+    [["kick"], ["viewers", "kicks", "giftsubs", "uptime"]],
+  ] as const)("offers on %j only what it fills", (platforms, numbers) => {
+    expect(studioNumbersFor(platforms)).toEqual(numbers);
+  });
+
+  it("offers every number the platforms fill together, in their order", () => {
+    expect(studioNumbersFor(["kick", "tiktok"])).toEqual([
+      "likes",
+      "viewers",
+      "followers",
+      "shares",
+      "coins",
+      "kicks",
+      "gifts",
+      "giftsubs",
+      "uptime",
+    ]);
   });
 });
 
@@ -497,6 +547,21 @@ describe("newStudioElement", () => {
     expect(StudioElementSchema.parse(a)).toEqual(a);
   });
 
+  it("starts on the profile's platforms: their event, and a list their gifters", () => {
+    expect(newStudioElement("text", "portrait")).toMatchObject({
+      trigger: { type: TOKIO_EVENTS.FOLLOW },
+    });
+    expect(newStudioElement("text", "portrait", ["kick"])).toMatchObject({
+      trigger: { type: TOKIO_EVENTS.SUBSCRIBE },
+    });
+    expect(
+      newStudioElement("list", "portrait", ["twitch", "kick"]),
+    ).toMatchObject({ platform: "twitch" });
+    expect(newStudioElement("list", "portrait")).toMatchObject({
+      platform: "tiktok",
+    });
+  });
+
   it("makes a viewer's picture and a gift wait for an event", () => {
     expect(newStudioElement("viewer", "landscape")).toMatchObject({
       when: "event",
@@ -538,7 +603,7 @@ describe("sentPicture", () => {
   });
 
   it("reads the picture of the gift an event sent", () => {
-    const sent = generateTikTokEventSample(TOKIO_EVENTS.GIFT).data;
+    const sent = generateEventSample(TOKIO_EVENTS.GIFT).data;
 
     expect(sentPicture(gift, sent)).toBe(sent.gift.image);
     expect(sentPicture(gift, chat("1"))).toBe("");
@@ -580,18 +645,40 @@ const made = <K extends StudioElement["kind"]>(
 describe("Samples", () => {
   it("makes each trigger's sample once, an emote's from chat", () => {
     const samples = new Samples();
+    const follow = { type: TOKIO_EVENTS.FOLLOW } as const;
 
-    expect(samples.of(TOKIO_EVENTS.FOLLOW)).toBe(
-      samples.of(TOKIO_EVENTS.FOLLOW),
+    expect(samples.of(follow)).toBe(samples.of(follow));
+    expect(samples.of({ type: EMOTE_TRIGGER })).toMatchObject({
+      comment: { emotes: expect.arrayContaining([expect.anything()]) },
+    });
+  });
+
+  it("samples each row on its platform, else the profile's first sending it", () => {
+    const samples = new Samples(["kick", "youtube", "twitch"]);
+    const platformOf = (row: { type: AlertTrigger; platform?: Platform }) => {
+      const sample = samples.of(row);
+      return sample && typeof sample === "object" && "user" in sample
+        ? sample.user.platform
+        : undefined;
+    };
+
+    expect(platformOf({ type: TOKIO_EVENTS.CHAT })).toBe("kick");
+    expect(platformOf({ type: TOKIO_EVENTS.GIFT })).toBe("youtube");
+    expect(platformOf({ type: TOKIO_EVENTS.FOLLOW })).toBe("twitch");
+    expect(platformOf({ type: TOKIO_EVENTS.CHAT, platform: "twitch" })).toBe(
+      "twitch",
     );
-    expect(samples.of(EMOTE_TRIGGER)).toHaveProperty("comment");
+    // Its own and the first row's are kept apart
+    expect(
+      samples.of({ type: TOKIO_EVENTS.CHAT, platform: "twitch" }),
+    ).not.toBe(samples.of({ type: TOKIO_EVENTS.CHAT }));
   });
 
   it("plays a text with its trigger's values and a viewer with its picture", () => {
     const samples = new Samples();
     const text = made("text", { text: "Hi {username}", when: "event" });
     const viewer = made("viewer");
-    const follow = samples.of(TOKIO_EVENTS.FOLLOW);
+    const follow = samples.of({ type: TOKIO_EVENTS.FOLLOW });
     const username =
       typeof follow === "object" && follow && "user" in follow
         ? follow.user.username
@@ -678,6 +765,38 @@ describe("Samples", () => {
     expect(chat.text).not.toBe("");
     expect(chat.value).toBe("");
   });
+
+  it("ranks a gifters list's own platform's gifters, in its currency", () => {
+    const samples = new Samples(["kick", "youtube"]);
+    const rows = (platform: Platform) => {
+      const list = made("list", { source: "gifters", platform });
+      if (list.kind !== "list") throw new Error("made the wrong kind");
+      return sampleDeps(samples, "en", {}).rows(list);
+    };
+
+    expect(
+      rows("youtube")
+        .slice(0, 2)
+        .map((r) => r.value),
+    ).toEqual(["$124.00", "$43.84"]);
+    expect(rows("kick")[0].value).toBe("12.4K");
+    expect(rows("kick")).not.toEqual(rows("youtube"));
+  });
+
+  it("ranks a gifted subs list's sub gifters by their count", () => {
+    const samples = new Samples(["twitch"]);
+    const list = made("list", { source: "giftsubs", platform: "twitch" });
+    if (list.kind !== "list") throw new Error("made the wrong kind");
+
+    const rows = sampleDeps(samples, "en", {}).rows(list);
+
+    expect(rows.slice(0, 3).map((r) => r.value)).toEqual(["25", "9", "5"]);
+    expect(rows[0]).toMatchObject({ text: "", icon: "" });
+    // Not the money list's rows
+    const money = made("list", { source: "gifters", platform: "twitch" });
+    if (money.kind !== "list") throw new Error("made the wrong kind");
+    expect(sampleDeps(samples, "en", {}).rows(money)).not.toEqual(rows);
+  });
 });
 
 describe("listRow", () => {
@@ -687,5 +806,14 @@ describe("listRow", () => {
     expect(listRow(entry, "en").value).toBe("1.2K");
     expect(listRow({ ...entry, icon: "rose.png" }, "en").value).toBe("×1.2K");
     expect(listRow({ ...entry, value: null }, "en").value).toBe("");
+  });
+
+  it("writes US dollars for YouTube's top gifters only", () => {
+    const entry = { picture: "", name: "Ana", text: "", icon: "", value: 57.4 };
+
+    expect(listRow(entry, "en", true).value).toBe("$57.40");
+    expect(listInUsd({ source: "gifters", platform: "youtube" })).toBe(true);
+    expect(listInUsd({ source: "gifters", platform: "twitch" })).toBe(false);
+    expect(listInUsd({ source: "chat", platform: "youtube" })).toBe(false);
   });
 });

@@ -191,8 +191,12 @@ export enum APP_EVENTS {
 }
 
 // What an alert test plays: a library sound, a sound's URL or a message
+// A TTS test's sample comes from the platform (samplePlatform), TikTok's
+// when it's missing
 export type AlertTestSource =
-  { file: string } | { url: string } | { tts: AlertTts; trigger: AlertTrigger };
+  | { file: string }
+  | { url: string }
+  | { tts: AlertTts; trigger: AlertTrigger; platform?: Platform };
 
 export interface AppEventsMap {
   // INIT
@@ -514,6 +518,8 @@ export interface AppEventsMap {
     id: string;
     edition: MinecraftEdition;
     trigger: AlertTrigger;
+    // Where the trigger's sample comes from (samplePlatform)
+    platform?: Platform;
     steps: GameStep[];
   };
   // Lights up the action's row on the games overlay, as a run does

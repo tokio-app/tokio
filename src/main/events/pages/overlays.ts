@@ -303,9 +303,13 @@ events.push(
 
 events.push(
   APP_EVENTS.TEST_OVERLAY,
-  async ({ overlayService }, e, { id }) => {
+  async ({ overlayService, storeManagerService }, e, { id }) => {
+    const profile = await storeManagerService.getProfileData();
     e.reply(APP_EVENTS_RESPONSE.TEST_OVERLAY, {
-      payloads: overlayService.getTestPayloads(id),
+      payloads: overlayService.getTestPayloads(
+        id,
+        profile?.platforms ?? ["tiktok"],
+      ),
       id,
     });
   },

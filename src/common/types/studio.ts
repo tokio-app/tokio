@@ -183,8 +183,15 @@ export type StudioNumbers = {
   viewers: number;
   followers: number;
   shares: number;
+  // TikTok's alone: each platform's currency is counted apart
   coins: number;
+  kicks: number;
+  bits: number;
+  // The Super Chats' US dollars, null until the exchange rates load
+  superchats: number | null;
   gifts: number;
+  // Gifted subs: Twitch's, YouTube's gifted memberships and Kick's
+  giftsubs: number;
   // Seconds since the LIVE started
   uptime: number;
 };

@@ -9,11 +9,13 @@ import {
 import {
   countedVariables,
   createAction,
+  newRowTrigger,
   gameStepsText,
   getMinecraftOverlayURL,
   JAVA_ONLY_HAZARDS,
   JAVA_ONLY_STEPS,
   MINECRAFT_NAMES,
+  samplePlatform,
 } from "@/common/util";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { z } from "zod";
@@ -212,12 +214,16 @@ export const kinds: Kinds = {
     },
     save: async (handler, id, changes) => {
       const changed = guardProfile(handler);
-      const { games } = await profileOf(handler);
+      const { games, platforms } = await profileOf(handler);
       const stored = id === undefined ? undefined : findAction(games, id);
       if (id !== undefined && !stored) return noAction(id);
       const edition = GameActionSchema.shape.edition.safeParse(changes.edition);
       const base =
-        stored ?? createAction(edition.success ? edition.data : "bedrock");
+        stored ??
+        createAction(
+          edition.success ? edition.data : "bedrock",
+          newRowTrigger(platforms),
+        );
       const parsed = GameActionSchema.safeParse(
         deepMerge(base, { ...changes, id: base.id }),
       );
@@ -259,7 +265,8 @@ export const kinds: Kinds = {
     // Runs what's saved, as the Games page's Test does with what it shows
     test: async (handler, id) => {
       if (id === undefined) return fail("Give the game action's id.");
-      const action = findAction((await profileOf(handler)).games, id);
+      const profile = await profileOf(handler);
+      const action = findAction(profile.games, id);
       if (!action) return noAction(id);
       const { error, data } = await invokeOk(
         handler,
@@ -268,6 +275,7 @@ export const kinds: Kinds = {
           id,
           edition: action.edition,
           trigger: action.trigger.type,
+          platform: samplePlatform(action.trigger, profile.platforms),
           steps: action.steps,
         },
         APP_EVENTS_RESPONSE.TEST_GAME_ACTION,

@@ -43,11 +43,12 @@ export const PLATFORM_TRIGGERS: Record<Platform, readonly AlertTrigger[]> = {
     TOKIO_EVENTS.GIFT_SUB,
     TOKIO_EVENTS.SUPER_CHAT,
   ],
-  // Gifts are Kick's Kicks, raids its hosts; its chat feed carries no follows
+  // Kicks are its money, like Twitch's Bits, and raids its hosts; its chat
+  // feed carries no follows
   kick: [
     TOKIO_EVENTS.CHAT,
     EMOTE_TRIGGER,
-    TOKIO_EVENTS.GIFT,
+    TOKIO_EVENTS.KICKS,
     TOKIO_EVENTS.SUBSCRIBE,
     TOKIO_EVENTS.GIFT_SUB,
     TOKIO_EVENTS.RAID,
@@ -72,17 +73,37 @@ export const PLATFORM_INPUT: Record<Platform, "channel" | "account"> = {
   kick: "channel",
 };
 
-// Whether a platform's gifts say what they cost: YouTube's don't, Kicks do
-const GIFT_COINS: Record<Platform, boolean> = {
-  tiktok: true,
-  twitch: false,
-  youtube: false,
-  kick: true,
+// The currencies gifts are priced in
+const GIFT_CURRENCIES = ["coins"] as const;
+export type GiftCurrency = (typeof GIFT_CURRENCIES)[number];
+
+// What each platform's gifts cost in: TikTok's coins. YouTube's Gifts say no
+// price, and Twitch and Kick send none: their Bits and Kicks are events of
+// their own (the user's call).
+export const GIFT_CURRENCY: Record<Platform, GiftCurrency | null> = {
+  tiktok: "coins",
+  twitch: null,
+  youtube: null,
+  kick: null,
 };
 
-// Coins, and gifters ranked by them, need a platform whose gifts have a price
-export const countsCoins = (platforms: readonly Platform[]) =>
-  platforms.some((p) => GIFT_COINS[p]);
+// What viewers spend on each platform, each counted on its own and never
+// added to another (the user's call): TikTok's coins (its gifts' prices),
+// Kick's Kicks, Twitch's Bits (cheers) and YouTube's Super Chats in US
+// dollars
+export type Currency = GiftCurrency | "kicks" | "bits" | "usd";
+export const PLATFORM_CURRENCY: Record<Platform, Currency> = {
+  tiktok: "coins",
+  twitch: "bits",
+  youtube: "usd",
+  kick: "kicks",
+};
+
+// The gift currencies the platforms pay in, in GIFT_CURRENCIES' order
+export const giftCurrencies = (platforms: readonly Platform[]) =>
+  GIFT_CURRENCIES.filter((currency) =>
+    platforms.some((p) => GIFT_CURRENCY[p] === currency),
+  );
 
 export const isPlatform = (value: unknown): value is Platform =>
   (PLATFORMS as readonly unknown[]).includes(value);
@@ -95,6 +116,25 @@ export const platformOf = (user?: Pick<UserData, "platform"> | null) =>
 export const platformsOf = (trigger: AlertTrigger): Platform[] =>
   PLATFORMS.filter((platform) => PLATFORM_TRIGGERS[platform].includes(trigger));
 
+// An id's platform, from its prefix ("twitch:25", "kick:"): the other
+// platforms namespace theirs, TikTok's are bare
+export const idPlatform = (id: string): Platform => {
+  const prefix = id.slice(0, Math.max(0, id.indexOf(":")));
+  return isPlatform(prefix) ? prefix : "tiktok";
+};
+
+/**
+ * The platforms a trigger row covers: its own, else the profile's that send
+ * its event. The emotes, roles and variables it offers follow them.
+ */
+export const rowPlatforms = (
+  row: { type: AlertTrigger; platform?: Platform },
+  profilePlatforms: readonly Platform[],
+): Platform[] =>
+  row.platform
+    ? [row.platform]
+    : platformsOf(row.type).filter((p) => profilePlatforms.includes(p));
+
 /**
  * The triggers any of the platforms sends, in ALERT_TRIGGERS' order, with
  * Music change, which comes from Tokio.
@@ -104,3 +144,13 @@ export const triggersFor = (platforms: readonly Platform[]): AlertTrigger[] =>
     const from = platformsOf(trigger);
     return from.length === 0 || from.some((p) => platforms.includes(p));
   });
+
+/**
+ * The event a new alert, game action or Studio element starts on: Follow
+ * where the profile's platforms send follows, else a subscription, which
+ * YouTube's memberships and Kick's subs are. Never one they can't send.
+ */
+export const newRowTrigger = (platforms: readonly Platform[]): AlertTrigger =>
+  triggersFor(platforms).includes(TOKIO_EVENTS.FOLLOW)
+    ? TOKIO_EVENTS.FOLLOW
+    : TOKIO_EVENTS.SUBSCRIBE;

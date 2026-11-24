@@ -1,5 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { failure, settingsReply } from "@test/fixtures";
+import { failure, profileReply, settingsReply } from "@test/fixtures";
 import { send, sent, sentEvents } from "@test/ipc";
 import { inList, section } from "@test/queries";
 import { renderWithProviders } from "@test/render";
@@ -22,7 +22,7 @@ const connected = (success: boolean) =>
   send(APP_EVENTS_RESPONSE.CONNECTED, {
     success,
     live: success,
-    stats: { views: 0, viewers: 0, likes: 0 },
+    stats: { views: 0, viewers: 0, likes: 0, platformViewers: {} },
   });
 
 async function setup(reply = profiles) {
@@ -37,6 +37,37 @@ describe("Settings", () => {
 
     expect(sent(APP_EVENTS.GET_SETTINGS)).toHaveLength(1);
     expect(sent(APP_EVENTS.IS_CONNECTED)).toHaveLength(1);
+  });
+
+  describe("Platforms", () => {
+    const headings = () =>
+      screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+
+    it("shows TikTok's key and chat translation, not Twitch's sign-in, on a TikTok profile", async () => {
+      await setup();
+
+      expect(headings()).toContain("TikTok LIVE");
+      expect(headings()).toContain("Chat translation");
+      expect(headings()).not.toContain("Twitch");
+    });
+
+    it("follows the active profile's platforms, switches included", async () => {
+      await setup();
+
+      await send(
+        APP_EVENTS_RESPONSE.GET_PROFILE,
+        profileReply((p) => {
+          p.platforms = ["twitch", "kick"];
+        }),
+      );
+      expect(headings()).toContain("Twitch");
+      expect(headings()).not.toContain("TikTok LIVE");
+      expect(headings()).not.toContain("Chat translation");
+
+      await send(APP_EVENTS_RESPONSE.GET_PROFILE, profileReply());
+      expect(headings()).toContain("TikTok LIVE");
+      expect(headings()).not.toContain("Twitch");
+    });
   });
 
   describe("Overlay server", () => {

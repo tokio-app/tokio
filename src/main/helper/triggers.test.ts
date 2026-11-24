@@ -72,6 +72,26 @@ describe("matchesTrigger", () => {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     matchesTrigger(t, type, payload as TokioEventMap[AppEvents], 0, 0);
 
+  it("takes a chat from a VIP on a row from VIPs", () => {
+    const chat = (vip: boolean) => ({
+      user: {
+        username: "Rhea",
+        handle: "rhea_tv",
+        profilePictures: [],
+        platform: "twitch",
+        vip,
+      },
+      comment: { content: "hi", emotes: [], lang: "" },
+    });
+    const row = trigger(TOKIO_EVENTS.CHAT, {
+      platform: "twitch",
+      roles: ["vip"],
+    });
+
+    expect(matches(row, TOKIO_EVENTS.CHAT, chat(true))).toBe(true);
+    expect(matches(row, TOKIO_EVENTS.CHAT, chat(false))).toBe(false);
+  });
+
   it("takes any platform's event without a platform", () => {
     const any = trigger(TOKIO_EVENTS.FOLLOW);
 
@@ -117,5 +137,65 @@ describe("matchesTrigger", () => {
     expect(
       matches(trigger(TOKIO_EVENTS.REDEEM), TOKIO_EVENTS.REDEEM, redeem("Any")),
     ).toBe(true);
+  });
+
+  it("holds each money event to its own minimum: Bits, Kicks, US dollars, subs", () => {
+    const { user } = follow("twitch");
+    const cheer = (bits: number) => ({ user, bits, message: "" });
+    const bits = trigger(TOKIO_EVENTS.CHEER, { min_coins: 100 });
+    expect(matches(bits, TOKIO_EVENTS.CHEER, cheer(100))).toBe(true);
+    expect(matches(bits, TOKIO_EVENTS.CHEER, cheer(99))).toBe(false);
+
+    const sent = (kicks: number) => ({
+      user: follow("kick").user,
+      kicks,
+      message: "",
+    });
+    const kicks = trigger(TOKIO_EVENTS.KICKS, { min_coins: 100 });
+    expect(matches(kicks, TOKIO_EVENTS.KICKS, sent(100))).toBe(true);
+    expect(matches(kicks, TOKIO_EVENTS.KICKS, sent(99))).toBe(false);
+
+    const subs = (count: number) => ({ user, count, tier: "1000" });
+    const five = trigger(TOKIO_EVENTS.GIFT_SUB, { min_coins: 5 });
+    expect(matches(five, TOKIO_EVENTS.GIFT_SUB, subs(5))).toBe(true);
+    expect(matches(five, TOKIO_EVENTS.GIFT_SUB, subs(4))).toBe(false);
+
+    const superChat = (usd?: number | null) => ({
+      user: follow("youtube").user,
+      amount: "MX$100.00",
+      message: "",
+      sticker: "",
+      ...(usd !== undefined && { usd }),
+    });
+    const dollars = trigger(TOKIO_EVENTS.SUPER_CHAT, { min_coins: 5 });
+    expect(matches(dollars, TOKIO_EVENTS.SUPER_CHAT, superChat(5.4))).toBe(
+      true,
+    );
+    expect(matches(dollars, TOKIO_EVENTS.SUPER_CHAT, superChat(4.99))).toBe(
+      false,
+    );
+    // Without dollars, as before the rates load, it still plays
+    expect(matches(dollars, TOKIO_EVENTS.SUPER_CHAT, superChat(null))).toBe(
+      true,
+    );
+    expect(matches(dollars, TOKIO_EVENTS.SUPER_CHAT, superChat())).toBe(true);
+  });
+
+  it("holds a gift to its minimum in its own currency, for any gift only", () => {
+    const worth = (coins: number) => ({
+      ...gift(1),
+      gift: { ...gift(1).gift, coins, repeatEnd: true },
+    });
+    const any = trigger(TOKIO_EVENTS.GIFT, { min_coins: 100 });
+    const picked = trigger(TOKIO_EVENTS.GIFT, {
+      min_coins: 100,
+      gifts: [5655],
+    });
+
+    expect(matchesTrigger(any, TOKIO_EVENTS.GIFT, worth(50), 1, 2)).toBe(true);
+    expect(matchesTrigger(any, TOKIO_EVENTS.GIFT, worth(50), 1, 1)).toBe(false);
+    expect(matchesTrigger(picked, TOKIO_EVENTS.GIFT, worth(1), 1, 1)).toBe(
+      true,
+    );
   });
 });

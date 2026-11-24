@@ -11,12 +11,13 @@ import {
   APP_EVENTS_RESPONSE,
   AppEvents,
   ChatEvent,
-  CustomGift,
   EMOTE_TRIGGER,
   FEEDBACK_CODES,
   GiftEvent,
   MINECRAFT_CONNECT_COMMANDS,
   MINECRAFT_EDITION_NAMES,
+  Platform,
+  PLATFORMS,
   TOKIO_EVENTS,
   TokioEventMap,
   TokioPayload,
@@ -40,6 +41,12 @@ import { globalShortcut, systemPreferences } from "electron";
 import { connectionState, createStack, replyFailure } from "@/helper/events";
 import { AppFailure, REPEAT_NOTICE_MS, saveFailure } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
+import {
+  fetchOverlayGifts,
+  giftsFetched,
+  refreshTikTokGifts,
+  usesTikTok,
+} from "@/helper/gifts";
 import { language, onLanguage, setLanguage, t } from "@/helper/i18n";
 import {
   liveNumbers,
@@ -54,7 +61,6 @@ import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
 import { createMcpRoutes } from "@/mcp";
 import type { AlertAudio } from "@/services/alerts";
-import { ConnectorService } from "@/services/connector";
 import { FAN_EVENTS } from "@/services/fans";
 import { MAX_BACKLOG } from "@/services/games";
 import { HISTORY_EVENTS } from "@/services/history";
@@ -89,20 +95,6 @@ const HISTORY_SAVE_MS = 30_000;
 const UPDATE_NOTICE_MS = 24 * 60 * 60 * 1000;
 
 const events = createStack("system");
-
-// Gifts in the shape overlays use, none when TikTok can't be reached.
-const fetchOverlayGifts = async (
-  conn: ConnectorService,
-): Promise<CustomGift[]> => {
-  const gifts = await conn.fetchGifts();
-  if (!gifts.success) return [];
-  return gifts.data.map((g) => ({
-    value: g.id,
-    label: g.name,
-    img: g.image,
-    coins: g.coins,
-  }));
-};
 
 // Updates are found in the background, so main tells the user about them.
 const initUpdater = async ({
@@ -223,6 +215,7 @@ const registerConnectorEvents = ({
   pathManagerService: paths,
   serverService: server,
   controlsService: controls,
+  ratesService: rates,
   notifier,
 }: AppHandlerVariables) => {
   const dispatchAlert = async <K extends AppEvents>(
@@ -348,12 +341,19 @@ const registerConnectorEvents = ({
 
   // Busy lives send many of these, the UI only needs the latest few a second.
   // A throttled push can come after the window closed on quit.
-  const sendViews = throttle((views: number, viewers: number) => {
-    if (win.isDestroyed()) return;
-    win.webContents.send(APP_EVENTS_RESPONSE.VIEWS, {
-      data: { views, viewers },
-    });
-  }, STATS_THROTTLE_MS);
+  const sendViews = throttle(
+    (
+      views: number,
+      viewers: number,
+      platformViewers: Partial<Record<Platform, number>>,
+    ) => {
+      if (win.isDestroyed()) return;
+      win.webContents.send(APP_EVENTS_RESPONSE.VIEWS, {
+        data: { views, viewers, platformViewers },
+      });
+    },
+    STATS_THROTTLE_MS,
+  );
   const sendLikes = throttle((likes: number) => {
     if (win.isDestroyed()) return;
     win.webContents.send(APP_EVENTS_RESPONSE.LIKES, { likes });
@@ -378,8 +378,10 @@ const registerConnectorEvents = ({
   // Home's chart gets the session again as each minute of viewers ends
   conn.on(TOKIO_EVENTS.ROOM_USER, (d) => {
     store.updateLiveStats({ viewers: d.viewers, views: d.views });
-    sendViews(d.views, d.viewers);
-    if (live.recordViewers(d.viewers)) sendSession();
+    // The room adds up the platforms' viewers; Home also shows each one's
+    const platformViewers = conn.viewers();
+    sendViews(d.views, d.viewers, platformViewers);
+    if (live.recordViewers(d.viewers, platformViewers)) sendSession();
   });
   for (const type of ACTIVITY_EVENTS) {
     conn.on(type, (d) => {
@@ -392,7 +394,11 @@ const registerConnectorEvents = ({
     live.start();
     sendSession.cancel();
     pushSession();
+    // So YouTube's Super Chats show in dollars from the first one
+    if (conn.status().youtube) void rates.refresh();
   });
+  // The Super Chats' dollars once the rates load
+  rates.onChange(() => sendSession());
 
   // What Home and the title bar show, as main holds it
   const pushConnection = () => {
@@ -492,6 +498,9 @@ const registerConnectorEvents = ({
   // A platform up or down while the session goes on with the others. Coming
   // up says nothing: its connect or its reconnect already did.
   conn.onPlatform((platform, change) => {
+    if (platform === "youtube" && change === "up") void rates.refresh();
+    // LIVE history lists the LIVE under it, even if it sends nothing
+    if (change === "up") history.join(platform);
     const params = { platform: PLATFORM_LABELS[platform] };
     // Apart from the session's own, which can come right after
     const options = { key: `${change}:${platform}` };
@@ -883,6 +892,7 @@ const registerStudio = (handler: AppHandlerVariables) => {
     serverService: server,
     liveService: live,
     historyService: history,
+    ratesService: rates,
     notifier,
   } = handler;
 
@@ -942,6 +952,8 @@ const registerStudio = (handler: AppHandlerVariables) => {
   conn.on(TOKIO_EVENTS.ROOM_USER, () => sendNumbers());
   // A list of top gifters follows this LIVE's
   history.onChange(() => sendNumbers());
+  // The Super Chats' dollars
+  rates.onChange(() => sendNumbers());
   conn.on(TOKIO_EVENTS.CONNECTED, () => {
     studio.startLive();
     sendNumbers();
@@ -1037,7 +1049,10 @@ const registerFans = ({
   notifier,
 }: AppHandlerVariables) => {
   for (const type of FAN_EVENTS) {
-    conn.on(type, (d) => fans.record(d.user, type));
+    // A sub's months; the others say theirs on the user, if at all
+    conn.on(type, (d) =>
+      fans.record(d.user, type, "months" in d ? d.months : undefined),
+    );
   }
 
   const message = (): TokioPayload => ({
@@ -1082,22 +1097,31 @@ const registerHistory = ({
   win,
   notifier,
 }: AppHandlerVariables) => {
-  conn.on(TOKIO_EVENTS.CONNECTED, () => history.start(conn.username));
+  conn.on(TOKIO_EVENTS.CONNECTED, () => {
+    history.start(conn.username);
+    // The platform that started it; the others join through onPlatform
+    const status = conn.status();
+    for (const platform of PLATFORMS) {
+      if (status[platform] === "connected") history.join(platform);
+    }
+  });
   for (const type of HISTORY_EVENTS) {
     conn.on(type, (d) => history.record(type, d));
   }
 
-  const message = (top = history.top()): TokioPayload => ({
+  const message = (): TokioPayload => ({
     type: "tokio:gifters",
-    data: top,
+    data: history.top(),
   });
   // The lists are read when the push goes, so they're never old ones. Home's
-  // top gifters go with the overlays', so both show the same list.
+  // tabs get each platform's top gifters with the overlays' push.
   const push = throttle(() => {
-    const top = history.top();
-    server.sendToAll(message(top));
+    server.sendToAll(message());
     if (win.isDestroyed()) return;
-    win.webContents.send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, { data: top.live });
+    win.webContents.send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
+      byPlatform: history.topByPlatform(),
+      subsByPlatform: history.topSubGifters(),
+    });
   }, GIFTERS_PUSH_MS);
   history.onChange(push);
   server.onConnect((id) => server.sendToClient(id, message()));
@@ -1191,6 +1215,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     gamesService,
     studioService,
     translationService,
+    ratesService,
     notifier,
   } = handler;
 
@@ -1217,6 +1242,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       gamesService.setLogFile(files.logs.games);
       studioService.setLogFile(files.logs.overlays);
       translationService.setLogFile(files.logs.translation);
+      ratesService.setLogFile(files.logs.system);
       notifier.setLogFiles(files.logs);
       musicService.setAdBlockFolder(folders.extraFolder);
       alertsService.setSoundsFolder(folders.soundsFolder);
@@ -1288,6 +1314,9 @@ const startApp = async (handler: AppHandlerVariables) => {
   storeManagerService.updateLiveStats(EMPTY_LIVE_STATS);
   if (!wired.has(handler)) {
     wired.add(handler);
+    liveService.setRates(ratesService);
+    connectorService.setRates(ratesService);
+    historyService.setRates(ratesService);
     serverService.initEvents(connectorService, musicService);
     // One router: the phone remote and its API, and MCP
     const control = express.Router();
@@ -1343,29 +1372,13 @@ const startApp = async (handler: AppHandlerVariables) => {
 
   // Before the server starts, so it serves the overlays right away. The
   // gifts saved last time are used when there are any, so startup doesn't
-  // wait for TikTok, and fresh ones replace them once they arrive.
+  // wait for TikTok, and fresh ones replace them once they arrive. A profile
+  // without TikTok never asks TikTok for them.
+  const tiktok = usesTikTok(profile?.platforms ?? ["tiktok"]);
   const cachedGifts = await overlayService.getGifts();
-  if (cachedGifts.length > 0) {
+  if (cachedGifts.length > 0 || !tiktok) {
     await overlayService.load(cachedGifts);
-    void fetchOverlayGifts(connectorService)
-      .then(async (gifts) => {
-        if (gifts.length === 0) return;
-        await overlayService.refreshGifts(gifts);
-        // Gift pictures may have changed. Before this, the games and studio
-        // overlays get the saved ones when they connect.
-        await sendGamesOverlay(handler);
-        await sendStudioOverlays(handler);
-      })
-      .catch((error) => {
-        notifier.report({
-          source: "overlays",
-          error: new AppFailure(
-            FEEDBACK_CODES.GIFTS_FETCH_FAILED,
-            t("main.init.giftsRefreshFailed"),
-            { level: "warning", cause: error },
-          ),
-        });
-      });
+    if (tiktok) void refreshTikTokGifts(handler);
   } else {
     const gifts = await fetchOverlayGifts(connectorService);
     if (gifts.length === 0) {
@@ -1374,6 +1387,8 @@ const startApp = async (handler: AppHandlerVariables) => {
         FEEDBACK_CODES.GIFTS_FETCH_FAILED,
         t("main.init.giftsFetchFailed"),
       );
+    } else {
+      giftsFetched(handler);
     }
     await overlayService.load(gifts);
   }

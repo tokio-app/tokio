@@ -5,6 +5,7 @@ import {
   APP_EVENTS_RESPONSE,
   AppEventsMap,
   FEEDBACK_CODES,
+  Platform,
   TOKIO_EVENTS,
   VoiceEngine,
 } from "@/common/types";
@@ -418,6 +419,8 @@ describe("settings events", () => {
       historySaved = true,
       fansLoaded = true,
       historyLoaded = true,
+      // The switched-to profile's: TikTok asks for its gifts
+      platforms = ["twitch"] as Platform[],
     } = {}) => {
       const profiles = [defaultProfile, streamProfile];
       let active = defaultProfile;
@@ -429,7 +432,9 @@ describe("settings events", () => {
           return profile ? "switched" : "missing";
         }),
         getProfileData: vi.fn(async () =>
-          missing ? null : { name: active.name, timer, ...gamesOf(active) },
+          missing
+            ? null
+            : { name: active.name, timer, platforms, ...gamesOf(active) },
         ),
         getProfiles: () => profiles,
         getSettings: () => ({ activeProfile: active }),
@@ -450,7 +455,10 @@ describe("settings events", () => {
         sendToClient: vi.fn((_id: string, _data: unknown) => true),
       };
       const gamesService = { setGames: vi.fn() };
-      const connectorService = { isConnected: vi.fn(() => connected) };
+      const connectorService = {
+        isConnected: vi.fn(() => connected),
+        fetchGifts: vi.fn(async () => ({ success: false, data: [] })),
+      };
       const h = createHandler({
         storeManagerService,
         connectorService,
@@ -475,6 +483,22 @@ describe("settings events", () => {
         connectorService,
       };
     };
+
+    it("asks TikTok for its gifts on a switch to a profile with TikTok", async () => {
+      const twitch = setup();
+      await twitch.h.invoke(settings, APP_EVENTS.SET_PROFILE, {
+        file: "stream.json",
+      });
+      expect(twitch.connectorService.fetchGifts).not.toHaveBeenCalled();
+
+      const tiktok = setup({ platforms: ["tiktok", "kick"] });
+      await tiktok.h.invoke(settings, APP_EVENTS.SET_PROFILE, {
+        file: "stream.json",
+      });
+      await vi.waitFor(() =>
+        expect(tiktok.connectorService.fetchGifts).toHaveBeenCalledOnce(),
+      );
+    });
 
     it("refuses to switch when a LIVE connects while the old profile saves", async () => {
       const { h, storeManagerService, timerService, connectorService } =
@@ -577,8 +601,8 @@ describe("settings events", () => {
       expect(timerService.load).toHaveBeenCalledExactlyOnceWith(
         timer,
         "stream.json",
-        // The profile's platforms, none in this one
-        undefined,
+        // The profile's platforms
+        ["twitch"],
       );
       expect(fansService.load).toHaveBeenCalledExactlyOnceWith("stream.json");
       expect(log).toEqual([
@@ -586,7 +610,12 @@ describe("settings events", () => {
           APP_EVENTS_RESPONSE.GET_PROFILE,
           {
             success: true,
-            profile: { name: "Stream", timer, ...gamesOf(streamProfile) },
+            profile: {
+              name: "Stream",
+              timer,
+              platforms: ["twitch"],
+              ...gamesOf(streamProfile),
+            },
             profiles: [defaultProfile, streamProfile],
           },
         ],
@@ -671,6 +700,7 @@ describe("settings events", () => {
         .mockResolvedValueOnce({
           name: "Stream",
           timer,
+          platforms: ["twitch"],
           ...gamesOf(streamProfile),
         })
         .mockRejectedValueOnce(new Error("EBUSY"));

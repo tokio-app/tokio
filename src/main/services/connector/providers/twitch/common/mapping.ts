@@ -14,7 +14,8 @@ type Fragment = {
   emote?: { id: string } | null;
 };
 type Message = { text: string; fragments: Fragment[] };
-type Badge = { set_id: string };
+// A subscriber's or founder's info is their months subscribed
+type Badge = { set_id: string; info?: string };
 
 export type ChatMessageEvent = {
   chatter_user_id: string;
@@ -152,6 +153,10 @@ export function toChat(
     emotes = emotes.map((emote) => ({ ...emote, index: 0 }));
   }
   const badges = new Set(e.badges.map((b) => b.set_id));
+  const months = Number(
+    e.badges.find((b) => b.set_id === "subscriber" || b.set_id === "founder")
+      ?.info,
+  );
   return {
     user: {
       ...twitchUser(
@@ -162,6 +167,8 @@ export function toChat(
       // Music's host check reads it
       moderator: badges.has("broadcaster") || badges.has("moderator"),
       superfan: badges.has("subscriber") || badges.has("founder"),
+      vip: badges.has("vip"),
+      ...(months > 0 && { subMonths: months }),
     },
     comment: { content, emotes, lang: "" },
   };

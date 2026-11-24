@@ -4,17 +4,26 @@ import {
   Platform,
   PlatformStatus,
 } from "@/common/types";
-import { liveSession, profileReply, settingsReply } from "@test/fixtures";
+import {
+  gifter,
+  liveSession,
+  liveTotals,
+  profileReply,
+  settingsReply,
+} from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderApp } from "@test/render";
 import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 const page = () => within(screen.getByRole("main"));
-const row = (name: string) =>
-  within(page().getByRole("list", { name: "Platforms" }))
-    .getByText(name, { selector: "span" })
-    .closest("li")!;
+// A platform's tab, whose name can carry its viewers
+const tab = (name: string) =>
+  page().getByRole("tab", { name: new RegExp(`^${name}`) });
+const tabNames = () =>
+  page()
+    .getAllByRole("tab")
+    .map((t) => t.textContent);
 const stat = (label: string) => page().queryByText(label);
 
 const usingPlatforms = (
@@ -44,7 +53,7 @@ const live = (platforms: Partial<Record<Platform, PlatformStatus>>) =>
     success: true,
     live: true,
     platforms,
-    stats: { views: 10, viewers: 2, likes: 3 },
+    stats: { views: 10, viewers: 2, likes: 3, platformViewers: {} },
   });
 
 describe("Home's platforms", () => {
@@ -95,26 +104,50 @@ describe("Home's platforms", () => {
     expect(page().queryByText("Twitch", { selector: "span" })).toBeNull();
   });
 
+  it("gives each platform a tab, the first one open, and All only while LIVE on two", async () => {
+    const { user } = await renderApp();
+    await usingPlatforms(["tiktok", "kick"], { kick: "westcol" });
+
+    expect(tabNames()).toEqual(["TikTok", "Kick"]);
+    expect(tab("TikTok")).toHaveAttribute("aria-selected", "true");
+    expect(page().getByPlaceholderText("@username")).toBeVisible();
+
+    await user.click(tab("Kick"));
+    expect(page().getByPlaceholderText("Channel or kick.com link")).toHaveValue(
+      "westcol",
+    );
+    expect(page().queryByPlaceholderText("@username")).toBeNull();
+
+    // Alone in the LIVE, nothing to add up
+    await live({ tiktok: "connected" });
+    expect(tabNames()).toEqual(["TikTok0", "Kick"]);
+    await live({ tiktok: "connected", kick: "connected" });
+    expect(tabNames()).toEqual(["TikTok0", "Kick0", "All2"]);
+  });
+
   it("keeps a platform that's on, and adds others while live", async () => {
-    await renderApp();
+    const { user } = await renderApp();
     await usingPlatforms(["tiktok", "twitch"]);
 
     await live({ tiktok: "connected" });
 
+    // On, it can't be removed: its tab has no ×
     expect(
-      page().getByRole("button", { name: "Remove TikTok" }),
-    ).toBeDisabled();
+      page().queryByRole("button", { name: "Remove TikTok" }),
+    ).not.toBeInTheDocument();
+    await user.click(tab("Twitch"));
     expect(page().getByRole("button", { name: "Remove Twitch" })).toBeEnabled();
     expect(
       page().getByRole("button", { name: "Add a platform" }),
     ).toBeEnabled();
   });
 
-  it("gives Twitch a row with the account, or a link to sign in", async () => {
-    await renderApp();
+  it("gives Twitch a tab with the account, or a link to sign in", async () => {
+    const { user } = await renderApp();
     await usingPlatforms(["tiktok", "twitch"]);
 
     expect(page().getByPlaceholderText("@username")).toHaveValue("@streamer");
+    await user.click(tab("Twitch"));
     expect(
       page().getByRole("link", { name: "sign in to Twitch" }),
     ).toHaveAttribute("href", "/settings");
@@ -144,9 +177,10 @@ describe("Home's platforms", () => {
     ]);
   });
 
-  it("gives YouTube a row with the saved channel, and connects with it", async () => {
+  it("gives YouTube a tab with the saved channel, and connects with it", async () => {
     const { user } = await renderApp();
     await usingPlatforms(["tiktok", "youtube"], { youtube: "@saved" });
+    await user.click(tab("YouTube"));
     const channel = page().getByPlaceholderText("@channel or LIVE link");
     expect(channel).toHaveValue("@saved");
 
@@ -159,7 +193,7 @@ describe("Home's platforms", () => {
     ]);
   });
 
-  it("connects the ready ones and says what each other one needs", async () => {
+  it("connects the ready ones and opens the first that needs something", async () => {
     const { user } = await renderApp();
     await usingPlatforms(["tiktok", "youtube", "kick"], { kick: "westcol" });
 
@@ -172,16 +206,16 @@ describe("Home's platforms", () => {
         platforms: ["tiktok", "kick"],
       },
     ]);
-    expect(within(row("YouTube")).getByRole("alert")).toHaveTextContent(
+    expect(tab("YouTube")).toHaveAttribute("aria-selected", "true");
+    expect(page().getByRole("alert")).toHaveTextContent(
       "Type the channel first.",
     );
+    const channel = page().getByPlaceholderText("@channel or LIVE link");
+    expect(channel).toHaveFocus();
 
     // It goes once the channel is typed
-    await user.type(
-      page().getByPlaceholderText("@channel or LIVE link"),
-      "@tokio",
-    );
-    expect(within(row("YouTube")).queryByRole("alert")).toBeNull();
+    await user.type(channel, "@tokio");
+    expect(page().queryByRole("alert")).toBeNull();
   });
 
   it("doesn't connect YouTube without a channel, and says so", async () => {
@@ -204,71 +238,279 @@ describe("Home's platforms", () => {
 
     await live({ tiktok: "connected" });
 
-    expect(within(row("TikTok")).getByText("Connected")).toBeVisible();
-    expect(within(row("Twitch")).getByText("Not connected")).toBeVisible();
+    expect(page().getByText("Connected")).toBeVisible();
+    await user.click(page().getByRole("button", { name: "Disconnect TikTok" }));
+    expect(sent(APP_EVENTS.DISCONNECT)).toEqual([{ platform: "tiktok" }]);
 
+    await user.click(tab("Twitch"));
+    expect(page().getByText("Not connected")).toBeVisible();
     await user.click(page().getByRole("button", { name: "Connect Twitch" }));
     expect(sent(APP_EVENTS.CONNECT)).toEqual([
       { username: "@streamer", channels: {}, platforms: ["twitch"] },
     ]);
-    await user.click(page().getByRole("button", { name: "Disconnect TikTok" }));
-    expect(sent(APP_EVENTS.DISCONNECT)).toEqual([{ platform: "tiktok" }]);
 
     await live({ tiktok: "reconnecting", twitch: "connecting" });
-    expect(within(row("TikTok")).getByText("Reconnecting…")).toBeVisible();
-    expect(within(row("Twitch")).getByText("Connecting…")).toBeVisible();
+    expect(page().getByText("Connecting…")).toBeVisible();
+    await user.click(tab("TikTok"));
+    expect(page().getByText("Reconnecting…")).toBeVisible();
 
     await user.click(page().getByRole("button", { name: "Disconnect all" }));
     expect(sent(APP_EVENTS.DISCONNECT)).toHaveLength(2);
     expect(sent(APP_EVENTS.DISCONNECT).at(-1)).toBeUndefined();
   });
 
-  it("shows its state under a platform that's alone too", async () => {
+  it("gives a platform that's alone its tab and state too", async () => {
     await renderApp();
     await usingPlatforms(["tiktok"]);
 
     await live({ tiktok: "connected" });
 
-    expect(within(row("TikTok")).getByText("Connected")).toBeVisible();
+    expect(tabNames()).toEqual(["TikTok0"]);
+    expect(page().getByText("Connected")).toBeVisible();
     expect(page().getByRole("button", { name: "Disconnect" })).toBeVisible();
+    // Its own Disconnect is all there is
+    expect(
+      page().queryByRole("button", { name: "Disconnect all" }),
+    ).not.toBeInTheDocument();
   });
 
   it.each([
-    [["tiktok"], ["Likes", "Total views", "Shares", "Gifts", "Coins"], []],
-    [["twitch"], [], ["Likes", "Total views", "Shares", "Gifts", "Coins"]],
     [
-      ["tiktok", "twitch"],
+      ["tiktok"],
       ["Likes", "Total views", "Shares", "Gifts", "Coins"],
-      [],
+      ["Gifted subs", "Kicks", "Bits", "Super Chats"],
+    ],
+    [
+      ["twitch"],
+      ["Gifted subs", "Bits"],
+      ["Likes", "Total views", "Shares", "Gifts", "Coins", "Super Chats"],
     ],
     [
       ["youtube"],
-      ["Gifts"],
-      ["New followers", "Likes", "Total views", "Shares", "Coins"],
+      ["Gifts", "Gifted subs", "Super Chats"],
+      ["New followers", "Likes", "Total views", "Shares", "Coins", "Bits"],
     ],
     [
       ["kick"],
-      ["Gifts", "Coins"],
-      ["New followers", "Likes", "Total views", "Shares"],
+      ["Gifted subs", "Kicks"],
+      [
+        "New followers",
+        "Likes",
+        "Total views",
+        "Shares",
+        "Gifts",
+        "Coins",
+        "Bits",
+      ],
     ],
   ] as [Platform[], string[], string[]][])(
     "shows the stats %j has",
     async (platforms, shown, hidden) => {
       await renderApp();
       await usingPlatforms(platforms);
-      await live({});
+      await live(Object.fromEntries(platforms.map((p) => [p, "connected"])));
+      // Alone, nothing to add up
+      expect(page().getAllByRole("tab")).toHaveLength(1);
 
       expect(stat("New followers") !== null).toBe(
         !hidden.includes("New followers"),
       );
       for (const label of shown) expect(stat(label)).toBeInTheDocument();
       for (const label of hidden) expect(stat(label)).not.toBeInTheDocument();
-      // Top gifters come with coins
-      expect(page().queryByText("Top gifters") !== null).toBe(
-        shown.includes("Coins"),
-      );
+      // Every platform's tab tops who sent the most in its currency, and
+      // where subs are gifted, who gifted the most apart
+      const tops: Record<Platform, string[]> = {
+        tiktok: ["Top gifters"],
+        twitch: ["Top Bits", "Top gifted subs"],
+        youtube: ["Top Super Chats", "Top gifted subs"],
+        kick: ["Top Kicks", "Top gifted subs"],
+      };
+      for (const title of tops[platforms[0]]) {
+        expect(page().getByRole("heading", { name: title })).toBeVisible();
+      }
     },
   );
+
+  it("shows each platform's numbers in its tab while it's in the LIVE, then All's", async () => {
+    const { user } = await renderApp();
+    // Twitch isn't connected and has no numbers
+    await usingPlatforms(["tiktok", "twitch", "kick"]);
+    await send(APP_EVENTS_RESPONSE.CONNECTED, {
+      success: true,
+      live: true,
+      platforms: { tiktok: "connected", kick: "reconnecting" },
+      stats: {
+        views: 900,
+        viewers: 60,
+        likes: 7,
+        platformViewers: { tiktok: 40, kick: 20 },
+      },
+    });
+    await send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
+      data: liveSession({
+        startedAt: Date.now(),
+        totals: liveTotals({
+          followers: 3,
+          shares: 1,
+          gifts: 5,
+          coins: 20,
+          kicks: 30,
+        }),
+        viewers: [60],
+        platforms: {
+          tiktok: {
+            totals: liveTotals({
+              followers: 3,
+              shares: 1,
+              gifts: 2,
+              coins: 20,
+            }),
+            viewers: [40],
+          },
+          kick: {
+            totals: liveTotals({ gifts: 3, kicks: 30 }),
+            viewers: [20],
+          },
+        },
+      }),
+    });
+    const ana = gifter("Ana", 20);
+    const kai = gifter("Kai", 30, 1, { platform: "kick" });
+    await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
+      byPlatform: { tiktok: [ana], kick: [kai] },
+      subsByPlatform: {},
+    });
+    const value = (label: string) =>
+      page().getByText(label, { selector: "span" }).previousElementSibling;
+    const top = (name: string) =>
+      within(page().getByRole("list", { name }))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent);
+
+    expect(tabNames()).toEqual(["TikTok40", "Twitch", "Kick20", "All60"]);
+    // The first platform's own numbers
+    expect(tab("TikTok")).toHaveAttribute("aria-selected", "true");
+    expect(value("Viewers")).toHaveTextContent("40");
+    expect(value("Gifts")).toHaveTextContent("2");
+    expect(value("Likes")).toHaveTextContent("7");
+    expect(value("Coins")).toHaveTextContent("20");
+    expect(stat("Kicks")).toBeNull();
+    expect(top("Top gifters")).toEqual(["1AAna20 coins"]);
+    // TikTok gifts no subs
+    expect(page().queryByText("Top gifted subs")).toBeNull();
+
+    // Not in the LIVE: its connection alone
+    await user.click(tab("Twitch"));
+    expect(stat("Viewers")).toBeNull();
+
+    await user.click(tab("Kick"));
+    expect(value("Viewers")).toHaveTextContent("20");
+    // Kick's gifts cost Kicks, never coins
+    expect(value("Kicks")).toHaveTextContent("30");
+    expect(stat("Coins")).toBeNull();
+    // Kick sends no follows, likes or shares
+    expect(stat("New followers")).toBeNull();
+    expect(stat("Likes")).toBeNull();
+    // Kicks are Kick's money, not gifts, with gifted subs topped apart
+    expect(top("Top Kicks")).toEqual(["1KKai30 Kicks"]);
+    expect(page().getByText("No gifted subs yet")).toBeVisible();
+
+    // Each currency on its own, and no top gifters, which would mix them
+    await user.click(tab("All"));
+    expect(value("Viewers")).toHaveTextContent("60");
+    expect(value("Gifts")).toHaveTextContent("5");
+    expect(value("New followers")).toHaveTextContent("3");
+    expect(value("Coins")).toHaveTextContent("20");
+    expect(value("Kicks")).toHaveTextContent("30");
+    expect(page().queryByText("Top gifters")).toBeNull();
+    expect(page().queryByText("Top Kicks")).toBeNull();
+  });
+
+  it("shows Twitch's Bits and YouTube's Super Chats in dollars, a dash until the rates load", async () => {
+    const { user } = await renderApp();
+    await usingPlatforms(["twitch", "youtube"]);
+    await live({ twitch: "connected", youtube: "connected" });
+    const session = (usd: number | null) =>
+      send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
+        data: liveSession({
+          startedAt: Date.now(),
+          totals: liveTotals({ bits: 1500, superChats: 3 }),
+          usd,
+          platforms: {
+            twitch: { totals: liveTotals({ bits: 1500 }), viewers: [] },
+            youtube: { totals: liveTotals({ superChats: 3 }), viewers: [] },
+          },
+        }),
+      });
+    const value = (label: string) =>
+      page().getByText(label, { selector: "span" }).previousElementSibling;
+
+    await session(null);
+    await user.click(tab("All"));
+    expect(value("Bits")).toHaveTextContent("1.5K");
+    expect(value("Super Chats")).toHaveTextContent("—");
+    expect(value("Super Chats")).toHaveAttribute(
+      "title",
+      "Exchange rates haven't loaded yet",
+    );
+
+    await session(1234.5);
+    expect(value("Super Chats")).toHaveTextContent("$1.23K");
+    expect(value("Super Chats")).toHaveAttribute("title", "$1,234.50");
+
+    // Each tab's top in its currency, and who gifted the most subs apart
+    const di = gifter("Di", 1500, 0, { platform: "twitch", giftSubs: 2 });
+    const bo = gifter("Bo", 0, 0, { platform: "twitch", giftSubs: 5 });
+    await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
+      byPlatform: {
+        twitch: [di, bo],
+        youtube: [gifter("Yui", 57.4, 0, { platform: "youtube" })],
+      },
+      subsByPlatform: { twitch: [bo, di] },
+    });
+    const top = (name: string) =>
+      within(page().getByRole("list", { name }))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent);
+
+    await user.click(tab("Twitch"));
+    expect(value("Gifted subs")).toHaveTextContent("0");
+    expect(top("Top Bits")).toEqual(["1DDi1,500 Bits"]);
+    expect(top("Top gifted subs")).toEqual([
+      "1BBo5 gifted subs",
+      "2DDi2 gifted subs",
+    ]);
+
+    await user.click(tab("YouTube"));
+    expect(value("Super Chats")).toHaveTextContent("$1.23K");
+    expect(stat("Bits")).toBeNull();
+    expect(top("Top Super Chats")).toEqual(["1YYui$57.40"]);
+    expect(page().getByText("No gifted subs yet")).toBeVisible();
+
+    // None on All, which would rank one currency against another
+    await user.click(tab("All"));
+    expect(page().queryByText("Top Bits")).toBeNull();
+    expect(page().queryByText("Top gifted subs")).toBeNull();
+  });
+
+  it("adds up only the profile's platforms on All", async () => {
+    await renderApp();
+    await usingPlatforms(["tiktok"]);
+    await live({ tiktok: "connected" });
+    // Kick left the profile mid-LIVE, its numbers still in the session
+    await send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
+      data: liveSession({
+        startedAt: Date.now(),
+        platforms: {
+          tiktok: { totals: liveTotals(), viewers: [] },
+          kick: { totals: liveTotals({ kicks: 5 }), viewers: [] },
+        },
+      }),
+    });
+
+    expect(tabNames()).toEqual(["TikTok0"]);
+    expect(stat("Kicks")).toBeNull();
+  });
 
   it("marks each event with its platform when the profile uses several", async () => {
     await renderApp();
@@ -440,6 +682,18 @@ describe("Home's platforms", () => {
       "New subs",
       "Gifted subs",
       "Super Chats",
+    ]);
+
+    await usingPlatforms(["kick"]);
+
+    // Kicks, never gifts
+    expect(await open()).toEqual([
+      "Chats",
+      "New subs",
+      "Gifted subs",
+      "Raids",
+      "Channel points",
+      "Kicks",
     ]);
   });
 });

@@ -4,7 +4,7 @@ import {
   CONTROL_ACTIONS,
   ControlAction,
 } from "@/common/types";
-import { defaultStoreData } from "@/common/util";
+import { defaultProfile, defaultStoreData } from "@/common/util";
 import { Modal, Page } from "@/components";
 import {
   useImmerState,
@@ -37,6 +37,8 @@ export function Settings() {
   const [connected, setConnected] = useState(false);
   // The shortcuts another app holds, from main's last answer
   const [taken, setTaken] = useState<ControlAction[]>([]);
+  // The active profile's platforms: a platform's sections show only with it
+  const [platforms, setPlatforms] = useState(defaultProfile.platforms);
 
   const setServerEnabled = (enabled: boolean) =>
     updateStore((s) => {
@@ -51,6 +53,12 @@ export function Settings() {
 
   useIpcRequest(APP_EVENTS.GET_SETTINGS);
   useIpcRequest(APP_EVENTS.IS_CONNECTED);
+  useIpcRequest(APP_EVENTS.GET_PROFILE);
+
+  // Also answers profile switches
+  useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
+    if (res?.success && res.profile) setPlatforms(res.profile.platforms);
+  });
 
   useIpcListener(APP_EVENTS_RESPONSE.CONNECTED, (res) => {
     if (res) setConnected(res.success);
@@ -128,9 +136,14 @@ export function Settings() {
 
       <Page width="wide" layout="aside">
         {/* First: connecting needs its key */}
-        <ProvidersSection settings={store.settings} />
+        {platforms.includes("tiktok") && (
+          <ProvidersSection settings={store.settings} />
+        )}
 
-        <TwitchSection login={store.settings.accounts.twitch.login} />
+        {/* A signed-in account stays signed in for profiles with Twitch */}
+        {platforms.includes("twitch") && (
+          <TwitchSection login={store.settings.accounts.twitch.login} />
+        )}
 
         <ServerSection
           enabled={store.settings.server.enabled}
@@ -147,15 +160,18 @@ export function Settings() {
           }}
         />
 
-        <TranslationSection
-          language={store.settings.translation.language}
-          onChange={(language) => {
-            updateStore((s) => {
-              s.settings.translation.language = language;
-            });
-            window.api.emit(APP_EVENTS.SET_TRANSLATION, { language });
-          }}
-        />
+        {/* Only TikTok says a message's language */}
+        {platforms.includes("tiktok") && (
+          <TranslationSection
+            language={store.settings.translation.language}
+            onChange={(language) => {
+              updateStore((s) => {
+                s.settings.translation.language = language;
+              });
+              window.api.emit(APP_EVENTS.SET_TRANSLATION, { language });
+            }}
+          />
+        )}
 
         <UpdatesSection
           enabled={store.settings.updates.auto}

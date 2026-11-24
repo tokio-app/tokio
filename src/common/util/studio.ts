@@ -16,9 +16,11 @@ import {
 } from "../schemas/studio";
 import {
   EMOTE_TRIGGER,
+  PLATFORMS,
   TOKIO_EVENTS,
   type AlertTrigger,
   type AppEvents,
+  type Platform,
   type TokioEventMap,
   type UserData,
 } from "../types/connector";
@@ -38,8 +40,20 @@ import {
   messageValues,
   triggersOf,
 } from "./alerts";
-import { formatDuration, formatStat } from "./format";
-import { generateEmoteChatSample, generateTikTokEventSample } from "./samples";
+import { formatDuration, formatMoney, formatStat, NO_MONEY } from "./format";
+import {
+  giftCurrencies,
+  newRowTrigger,
+  PLATFORM_CURRENCY,
+  rowPlatforms,
+  triggersFor,
+} from "./platforms";
+import { rowVariables } from "./rows";
+import {
+  generateEventSample,
+  generateTriggerSample,
+  samplePlatform,
+} from "./samples";
 
 // The live numbers any text can show, as {likes}
 export const STUDIO_NUMBERS: (keyof StudioNumbers)[] = [
@@ -48,9 +62,39 @@ export const STUDIO_NUMBERS: (keyof StudioNumbers)[] = [
   "followers",
   "shares",
   "coins",
+  "kicks",
+  "bits",
+  "superchats",
   "gifts",
+  "giftsubs",
   "uptime",
 ];
+
+/**
+ * The LIVE numbers a profile's platforms fill, as Home's tiles: likes and
+ * shares are TikTok's, each currency its platform's, viewers and uptime
+ * every platform's. The editor offers only these; a text keeps any it has.
+ */
+export function studioNumbersFor(
+  platforms: readonly Platform[],
+): (keyof StudioNumbers)[] {
+  const sent = triggersFor(platforms);
+  const currencies = giftCurrencies(platforms);
+  const fills: Record<keyof StudioNumbers, boolean> = {
+    likes: sent.includes(TOKIO_EVENTS.LIKE),
+    viewers: true,
+    followers: sent.includes(TOKIO_EVENTS.FOLLOW),
+    shares: sent.includes(TOKIO_EVENTS.SHARE),
+    coins: currencies.includes("coins"),
+    kicks: sent.includes(TOKIO_EVENTS.KICKS),
+    bits: sent.includes(TOKIO_EVENTS.CHEER),
+    superchats: sent.includes(TOKIO_EVENTS.SUPER_CHAT),
+    gifts: sent.includes(TOKIO_EVENTS.GIFT),
+    giftsubs: sent.includes(TOKIO_EVENTS.GIFT_SUB),
+    uptime: true,
+  };
+  return STUDIO_NUMBERS.filter((name) => fills[name]);
+}
 
 // Made up, for the editor, which shows samples instead of the LIVE's
 export const SAMPLE_NUMBERS: StudioNumbers = {
@@ -59,7 +103,11 @@ export const SAMPLE_NUMBERS: StudioNumbers = {
   followers: 58,
   shares: 17,
   coins: 4_210,
+  kicks: 1_850,
+  bits: 2_500,
+  superchats: 86.5,
   gifts: 342,
+  giftsubs: 25,
   // 01:23:00
   uptime: 4_980,
 };
@@ -83,13 +131,22 @@ export const reactsToEvents = (item: Pick<StudioElement, "when">) =>
 // The variables a text element gets from its triggers, all of theirs, none
 // while it doesn't react. A goal sends none. The live numbers
 // (STUDIO_NUMBERS) go in any text.
-export const studioEventVariables = (element: StudioElement): string[] =>
+export const studioEventVariables = (
+  element: StudioElement,
+  // The editor's offer: only what each row's platforms fill (rowVariables).
+  // Without them, every one, which the texts are filled with.
+  profilePlatforms?: readonly Platform[],
+): string[] =>
   reactsToEvents(element)
     ? [
         ...new Set(
-          triggersOf(element).flatMap((trigger) =>
-            trigger.type === GOAL_TRIGGER ? [] : countedVariables(trigger.type),
-          ),
+          triggersOf(element).flatMap((trigger) => {
+            if (trigger.type === GOAL_TRIGGER) return [];
+            const all = countedVariables(trigger.type);
+            return profilePlatforms
+              ? rowVariables(all, trigger, profilePlatforms)
+              : all;
+          }),
         ),
       ]
     : [];
@@ -122,7 +179,7 @@ export const goalValue = (
   counters: Record<string, number>,
 ) =>
   name !== "uptime" && isNumber(numbers, name)
-    ? numbers[name]
+    ? (numbers[name] ?? 0)
     : Object.hasOwn(counters, name)
       ? counters[name]
       : 0;
@@ -140,10 +197,10 @@ type FillOptions = {
 
 /**
  * A studio text with its variables filled in one pass, so a viewer's
- * comment that says {likes} stays as typed: the live numbers, compact (1.2K)
- * and the LIVE's length as 01:02:03, then the counters by name, then the
- * event's values. A variable of its triggers this event lacks reads "", and
- * any other stays as written.
+ * comment that says {likes} stays as typed: the live numbers, compact (1.2K),
+ * the Super Chats' dollars and the LIVE's length as 01:02:03, then the
+ * counters by name, then the event's values. A variable of its triggers this
+ * event lacks reads "", and any other stays as written.
  */
 export function fillStudioText(
   template: string,
@@ -152,9 +209,13 @@ export function fillStudioText(
   const sent = values === null ? null : messageValues(values);
   return template.replace(/\{(\w+)\}/g, (match, name: string) => {
     if (isNumber(numbers, name)) {
-      return name === "uptime"
-        ? formatDuration(numbers.uptime * 1000)
-        : formatStat(numbers[name], language).short;
+      if (name === "uptime") return formatDuration(numbers.uptime * 1000);
+      if (name === "superchats") {
+        return numbers.superchats === null
+          ? NO_MONEY
+          : formatMoney(numbers.superchats, language).short;
+      }
+      return formatStat(numbers[name], language).short;
     }
     if (Object.hasOwn(counters, name)) {
       return formatStat(counters[name], language).short;
@@ -451,6 +512,9 @@ const NEW_BOXES: Record<StudioElementKind, { width: number; height: number }> =
 export function newStudioElement(
   kind: StudioElementKind,
   size: StudioSize,
+  // The profile's: what it reacts to and whose gifters a list ranks start
+  // on one of them
+  platforms: readonly Platform[] = ["tiktok"],
 ): StudioElement {
   const box = NEW_BOXES[kind];
   const canvas = STUDIO_SIZES[size];
@@ -460,6 +524,10 @@ export function newStudioElement(
     ...box,
     x: Math.round((canvas.width - box.width) / 2),
     y: Math.round((canvas.height - box.height) / 2),
+    trigger: { type: newRowTrigger(platforms), gifts: [] },
+    ...(kind === "list" && {
+      platform: PLATFORMS.find((p) => platforms.includes(p)) ?? "tiktok",
+    }),
     ...(kind === "viewer" && { when: "event" }),
     ...(kind === "gift" && {
       when: "event",
@@ -499,21 +567,48 @@ type Sample = TokioEventMap[AppEvents];
 
 /**
  * A list's row with its value written in the language, compact as {coins}
- * is: a gift's count as ×12.
+ * is: a gift's count as ×12, and US dollars (YouTube's gifters) as $57.40.
  */
 export const listRow = (
   { value, ...entry }: StudioListEntry,
   language: string,
+  usd = false,
 ): StudioListRow => ({
   ...entry,
   value:
     value === null
       ? ""
-      : `${entry.icon ? "×" : ""}${formatStat(value, language).short}`,
+      : `${entry.icon ? "×" : ""}${(usd ? formatMoney : formatStat)(value, language).short}`,
 });
 
-// A made-up row of the source, the index-th from the top
-function sampleEntry(source: StudioListSource, index: number): StudioListEntry {
+// Whether a list's values are US dollars: YouTube's top gifters
+export const listInUsd = ({
+  source,
+  platform,
+}: Pick<StudioElementOf<"list">, "source" | "platform">) =>
+  source === "gifters" && PLATFORM_CURRENCY[platform] === "usd";
+
+// What a platform's gifters spend, whose senders a gifters list ranks
+const SPENT = {
+  tiktok: TOKIO_EVENTS.GIFT,
+  twitch: TOKIO_EVENTS.CHEER,
+  youtube: TOKIO_EVENTS.SUPER_CHAT,
+  kick: TOKIO_EVENTS.KICKS,
+} as const satisfies Record<Platform, AppEvents>;
+
+// The event each of the other sources lists
+const LISTED = {
+  followers: TOKIO_EVENTS.FOLLOW,
+  gifts: TOKIO_EVENTS.GIFT,
+  chat: TOKIO_EVENTS.CHAT,
+} as const;
+
+// A made-up row of the source from the platform, the index-th from the top
+function sampleEntry(
+  source: StudioListSource,
+  index: number,
+  platform?: Platform,
+): StudioListEntry {
   const row = (
     { profilePictures, username, handle }: UserData,
     fields: Partial<StudioListEntry> = {},
@@ -526,49 +621,76 @@ function sampleEntry(source: StudioListSource, index: number): StudioListEntry {
     ...fields,
   });
   if (source === "gifts") {
-    const { user, gift } = generateTikTokEventSample(TOKIO_EVENTS.GIFT).data;
+    const { user, gift } = generateEventSample(LISTED.gifts, platform).data;
     return row(user, { icon: gift.image, value: gift.comboCount });
   }
   if (source === "chat") {
-    const { user, comment } = generateTikTokEventSample(TOKIO_EVENTS.CHAT).data;
+    const { user, comment } = generateEventSample(LISTED.chat, platform).data;
     return row(user, { text: comment.content });
   }
-  const { user } = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data;
-  // A leaderboard's falling coins: 12.4K, 4.4K, 2.4K…
-  return source === "gifters"
-    ? row(user, { value: Math.round(12_400 / (index + 1) ** 1.5) })
-    : row(user);
+  if (source === "followers") {
+    return row(generateEventSample(LISTED.followers, platform).data.user);
+  }
+  if (source === "giftsubs") {
+    const { user } = generateEventSample(TOKIO_EVENTS.GIFT_SUB, platform).data;
+    // A leaderboard's falling counts: 25, 9, 5…
+    return row(user, {
+      value: Math.max(1, Math.round(25 / (index + 1) ** 1.5)),
+    });
+  }
+  const spends = platform ?? "tiktok";
+  const { user } = generateEventSample(SPENT[spends], spends).data;
+  // A leaderboard's falling amounts: 12.4K, 4.4K, 2.4K…, or $124, $43.84…
+  const value = Math.round(12_400 / (index + 1) ** 1.5);
+  return row(user, {
+    value: PLATFORM_CURRENCY[spends] === "usd" ? value / 100 : value,
+  });
 }
 
 /**
- * Each trigger's sample, made the first time an element asks for it, so its
- * names don't change on every render. Test starts a new one.
+ * Each trigger's sample, on the platform its row would come from among the
+ * profile's, made the first time an element asks for it, so its names don't
+ * change on every render. Test starts a new one.
  */
 export class Samples {
-  private made = new Map<AlertTrigger, Sample>();
-  private lists = new Map<StudioListSource, StudioListEntry[]>();
+  private made = new Map<string, Sample>();
+  private lists = new Map<string, StudioListEntry[]>();
+  private platforms: readonly Platform[];
 
-  of(type: AlertTrigger): Sample {
-    let sample = this.made.get(type);
+  constructor(platforms: readonly Platform[] = ["tiktok"]) {
+    this.platforms = platforms;
+  }
+
+  of(row: { type: AlertTrigger; platform?: Platform }): Sample {
+    const platform = samplePlatform(row, this.platforms);
+    const key = `${row.type} ${platform}`;
+    let sample = this.made.get(key);
     if (!sample) {
-      // An emote comes in a chat message
-      sample =
-        type === EMOTE_TRIGGER
-          ? generateEmoteChatSample()
-          : generateTikTokEventSample(type).data;
-      this.made.set(type, sample);
+      sample = generateTriggerSample(row.type, platform);
+      this.made.set(key, sample);
     }
     return sample;
   }
 
-  /** The most rows a list of the source shows, made up. */
-  list(source: StudioListSource): StudioListEntry[] {
-    let entries = this.lists.get(source);
+  /**
+   * The most rows a list shows, made up: a gifters list's from its
+   * platform, the others' from each of the profile's that sends them.
+   */
+  list({
+    source,
+    platform,
+  }: Pick<StudioElementOf<"list">, "source" | "platform">) {
+    const top = source === "gifters" || source === "giftsubs";
+    const key = top ? `${source} ${platform}` : source;
+    let entries = this.lists.get(key);
     if (!entries) {
+      const from = top
+        ? [platform]
+        : rowPlatforms({ type: LISTED[source] }, this.platforms);
       entries = Array.from({ length: STUDIO_MAX_LIST_ROWS }, (_, i) =>
-        sampleEntry(source, i),
+        sampleEntry(source, i, from[i % from.length]),
       );
-      this.lists.set(source, entries);
+      this.lists.set(key, entries);
     }
     return entries;
   }
@@ -586,7 +708,7 @@ function sampleViewer(sample: Sample) {
 // Its first trigger's sample; a goal sends none
 const sampleOf = (element: StudioElement, samples: Samples) =>
   reactsToEvents(element) && element.trigger.type !== GOAL_TRIGGER
-    ? samples.of(element.trigger.type)
+    ? samples.of(element.trigger)
     : null;
 
 /** The picture of the gift or emote its trigger's sample sent, "" for none. */
@@ -615,7 +737,7 @@ const sampleText = (
 const sampleViewerOf = (element: StudioElement, samples: Samples) =>
   element.trigger.type === GOAL_TRIGGER
     ? { src: "", name: "" }
-    : sampleViewer(samples.of(element.trigger.type));
+    : sampleViewer(samples.of(element.trigger));
 
 /** What Test plays on the stage for an element that reacts to an event. */
 export function sampleReact(
@@ -655,5 +777,7 @@ export const sampleDeps = (
   sent: (element) => sampleSentOf(element, samples),
   fill: () => SAMPLE_FILL,
   rows: (element) =>
-    samples.list(element.source).map((entry) => listRow(entry, language)),
+    samples
+      .list(element)
+      .map((entry) => listRow(entry, language, listInUsd(element))),
 });

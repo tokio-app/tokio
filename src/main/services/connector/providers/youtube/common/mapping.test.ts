@@ -89,6 +89,31 @@ describe("fromAction", () => {
     });
   });
 
+  it("reads a member's months off their badge's tooltip", () => {
+    const months = (tooltip: string) =>
+      fromAction(
+        add("liveChatTextMessageRenderer", {
+          ...author,
+          authorBadges: [
+            icon("MODERATOR"),
+            {
+              liveChatAuthorBadgeRenderer: {
+                ...member.liveChatAuthorBadgeRenderer,
+                tooltip,
+              },
+            },
+          ],
+          message: { runs: [{ text: "hey" }] },
+        }),
+      )?.data.user.subMonths;
+
+    expect(months("Member (2 months)")).toBe(2);
+    expect(months("Member (1 month)")).toBe(1);
+    expect(months("Member (1 year)")).toBe(12);
+    expect(months("Member (3 years)")).toBe(36);
+    expect(months("New member")).toBeUndefined();
+  });
+
   it("leaves custom emoji out of the text, each at its place", () => {
     const action = add("liveChatTextMessageRenderer", {
       ...author,

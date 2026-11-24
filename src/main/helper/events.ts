@@ -39,7 +39,10 @@ export const connectionState = ({
   reconnecting: connectorService.isReconnecting(),
   waiting: connectorService.isWaiting(),
   platforms: connectorService.status(),
-  stats: storeManagerService.getLiveStats(),
+  stats: {
+    ...storeManagerService.getLiveStats(),
+    platformViewers: connectorService.viewers(),
+  },
 });
 
 class EventStack {

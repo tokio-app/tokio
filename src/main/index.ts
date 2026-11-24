@@ -24,6 +24,7 @@ import { LiveService } from "@/services/live";
 import { MusicService } from "@/services/music";
 import { OverlayService } from "@/services/overlay";
 import { PathManagerService } from "@/services/path";
+import { RatesService } from "@/services/rates";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
 import { StudioService } from "@/services/studio";
@@ -113,6 +114,7 @@ const services: AppServices = {
   trayService: new TrayService(),
   translationService: new TranslationService(),
   controlsService: new ControlsService(),
+  ratesService: new RatesService(),
 };
 
 // Packaged, the notices are copied to resources/licenses (electron-builder.yml).

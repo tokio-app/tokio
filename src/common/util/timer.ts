@@ -5,7 +5,7 @@ import {
   type AlertTrigger,
   type Platform,
 } from "../types/connector";
-import { countsCoins, triggersFor } from "./platforms";
+import { giftCurrencies, triggersFor, type GiftCurrency } from "./platforms";
 
 // The event each trigger of the timer counts, so a profile's platforms say
 // which ones apply
@@ -19,16 +19,26 @@ const TIMER_TRIGGERS = {
   sub: TOKIO_EVENTS.SUBSCRIBE,
   gift_sub: TOKIO_EVENTS.GIFT_SUB,
   bit: TOKIO_EVENTS.CHEER,
+  kick: TOKIO_EVENTS.KICKS,
   superchat: TOKIO_EVENTS.SUPER_CHAT,
 } as const satisfies Record<keyof TimerSettings["look"]["names"], AlertTrigger>;
 
-// Which timer triggers apply to the platforms: the ones they send, coins
-// only when a platform's gifts have a price
+// The gift currency the coin row counts
+const CURRENCY_OF: Partial<Record<keyof typeof TIMER_TRIGGERS, GiftCurrency>> =
+  { coin: "coins" };
+
+// Which timer triggers apply to the platforms: the ones they send, and
+// coins only with TikTok
 export const timerTriggersOn = (platforms: readonly Platform[]) => {
   const sent = triggersFor(platforms);
-  const coins = countsCoins(platforms);
-  return (key: keyof typeof TIMER_TRIGGERS) =>
-    sent.includes(TIMER_TRIGGERS[key]) && (key !== "coin" || coins);
+  const currencies = giftCurrencies(platforms);
+  return (key: keyof typeof TIMER_TRIGGERS) => {
+    const currency = CURRENCY_OF[key];
+    return (
+      sent.includes(TIMER_TRIGGERS[key]) &&
+      (!currency || currencies.includes(currency))
+    );
+  };
 };
 
 // "5s", "0.5s", "1:30", "1:00:00", as the countdown timer shows time added.
@@ -54,10 +64,11 @@ export interface TimerTrigger {
 }
 
 /**
- * The triggers that add time, in the timer page's order, as the carousel shows them:
- * the streamer's name for each (the language's when blank), counted for coins,
- * likes and Bits, and the time it adds with the multiplier. Triggers that add
- * nothing, or that none of the profile's platforms send, are left out.
+ * The triggers that add time, in the timer page's order, as the carousel
+ * shows them: the streamer's name for each (the language's when blank),
+ * counted for coins, likes, Bits and Kicks, and the time it adds with the
+ * multiplier. Triggers that add nothing, or that none of the profile's
+ * platforms send, are left out.
  */
 export function timerTriggers(
   { seconds, multiplier, chat, look }: TimerSettings,
@@ -84,6 +95,7 @@ export function timerTriggers(
     ["sub", name("sub"), seconds.sub],
     ["gift_sub", name("gift_sub"), seconds.gift_sub],
     ["bit", `1 ${name("bit")}`, seconds.bit],
+    ["kick", `1 ${name("kick")}`, seconds.kick],
     ["superchat", name("superchat"), seconds.superchat],
   ];
   return triggers

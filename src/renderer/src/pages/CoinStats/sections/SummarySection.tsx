@@ -1,9 +1,8 @@
 import { Section } from "@/components";
-import { formatStat } from "@/helper";
 import { useLanguage, useT } from "@/ui/i18n";
 import { ReactNode } from "react";
 import styles from "../coinstats.module.css";
-import { READOUT, Totals } from "../helper";
+import { Stat, statText } from "../helper";
 
 interface Props {
   title: string;
@@ -11,11 +10,12 @@ interface Props {
   lines: string[];
   // The icon button on the title's row
   action: ReactNode;
-  totals: Totals;
+  // The tab's tiles (readout)
+  stats: Stat[];
 }
 
 // A LIVE or All time as Home showed it: when, and what it counted
-export function SummarySection({ title, lines, action, totals }: Props) {
+export function SummarySection({ title, lines, action, stats }: Props) {
   const t = useT();
   const language = useLanguage();
   return (
@@ -28,11 +28,17 @@ export function SummarySection({ title, lines, action, totals }: Props) {
       ))}
       actions={action}
     >
-      <div className={styles.readout}>
-        {READOUT.map(({ key, label }) => {
-          const { short, full } = formatStat(totals[key], language);
+      <div
+        className={styles.readout}
+        // All's money in a row of its own when it has four currencies
+        style={{
+          gridTemplateColumns: `repeat(${Math.max(3, stats.filter((s) => s.currency).length)}, minmax(0, 1fr))`,
+        }}
+      >
+        {stats.map(({ label, value, currency }) => {
+          const { short, full } = statText(value, currency, language);
           return (
-            <div key={key} className={styles.stat}>
+            <div key={label} className={styles.stat}>
               <span className={styles.stat_value} title={full}>
                 {short}
               </span>

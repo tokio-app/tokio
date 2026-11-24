@@ -19,7 +19,10 @@ const OVERLAY: StudioOverlay = {
 
 const setup = () =>
   createHandler({
-    storeManagerService: { getStudio: () => [OVERLAY] },
+    storeManagerService: {
+      getStudio: () => [OVERLAY],
+      getProfileData: async () => null,
+    },
     overlayService: {
       getGifts: async () => [],
       getCustomGifts: async () => [],

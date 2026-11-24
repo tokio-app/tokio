@@ -449,6 +449,15 @@ describe("gameEventText", () => {
     expect(text(giftAction([42]), "es-419")).toBe("Regalo");
   });
 
+  it("names a Kicks row Kicks", () => {
+    const kicks = action(
+      (a) => (a.trigger.platform = "kick"),
+      TOKIO_EVENTS.KICKS,
+    );
+
+    expect(text(kicks)).toBe("Kicks");
+  });
+
   it("counts the likes", () => {
     const likes = (n: number) =>
       action((a) => (a.likes_every = n), TOKIO_EVENTS.LIKE);

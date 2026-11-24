@@ -6,16 +6,17 @@ import {
   PLATFORM_INPUT,
   PLATFORM_LABELS,
 } from "@/common/util";
-import { Btn, Input } from "@/components";
-import { cx, formatDuration } from "@/helper";
+import { Btn, Input, Tabs } from "@/components";
+import { cx, formatDuration, PLATFORM_ICONS } from "@/helper";
 import { useMenu } from "@/hooks";
 import { rich, useT } from "@/ui/i18n";
 import { Link } from "@tanstack/react-router";
 import { type Ref, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { FiPlay, FiPlus, FiSquare, FiX } from "react-icons/fi";
+import { FiPlay, FiPlus, FiSquare } from "react-icons/fi";
 import styles from "../home.module.css";
-import { PLATFORM_ICONS } from "../helper";
+import { HomeTab, Views } from "../helper";
+import { StatValue } from "./StatValue";
 
 interface Props {
   username: string;
@@ -36,6 +37,13 @@ interface Props {
   status: Partial<Record<Platform, PlatformStatus>>;
   // The Twitch account signed in to, "" for none
   twitchLogin: string;
+  // A tab per platform, then All while LIVE on two or more
+  tabs: HomeTab[];
+  tab: HomeTab;
+  onTab: (tab: HomeTab) => void;
+  // The platforms in the LIVE, whose tabs say their viewers now
+  live: Platform[];
+  views: Views;
   onPlatformsChange: (platforms: Platform[]) => void;
   onUsernameChange: (username: string) => void;
   onChannelChange: (platform: Platform, channel: string) => void;
@@ -101,11 +109,14 @@ function AddPlatform({
     <div className={styles.add} ref={menu.ref} onKeyDown={menu.onKeyDown}>
       <Btn
         ref={menu.toggleRef}
+        variant="icon"
+        title={add}
+        aria-label={add}
         aria-haspopup="menu"
         aria-expanded={menu.open}
         onClick={menu.toggle}
       >
-        <FiPlus size={16} /> {add}
+        <FiPlus size={18} />
       </Btn>
       {menu.open && (
         <div className={styles.menu} role="menu" aria-label={add}>
@@ -132,8 +143,8 @@ function AddPlatform({
   );
 }
 
-// The slate: whether the LIVE is on, each platform with its channel, and
-// Connect
+// The slate: whether the LIVE is on, a tab per platform with its channel and
+// Connect, and Connect all
 export function DashboardSection(props: Props) {
   const {
     username,
@@ -148,6 +159,11 @@ export function DashboardSection(props: Props) {
     platforms,
     status,
     twitchLogin,
+    tabs,
+    tab,
+    onTab,
+    live,
+    views,
     onPlatformsChange,
     onUsernameChange,
     onChannelChange,
@@ -163,7 +179,7 @@ export function DashboardSection(props: Props) {
   const [missing, setMissing] = useState<Partial<Record<Platform, MessageKey>>>(
     {},
   );
-  // Rows whose Connect was pressed, until main says how they're doing
+  // Platforms whose Connect was pressed, until main says how they're doing
   const [pending, setPending] = useState<Platform[]>([]);
   const menu = useMenu();
   const slate = useRef<HTMLElement>(null);
@@ -188,8 +204,16 @@ export function DashboardSection(props: Props) {
 
   const on = (p: Platform) => status[p] !== undefined || pending.includes(p);
 
-  // Connects the ready ones and says what each other one needs, its field
-  // focused
+  // Opens a platform's tab with its field focused
+  const open = (platform: Platform) => {
+    flushSync(() => onTab(platform));
+    slate.current
+      ?.querySelector<HTMLElement>(`[data-platform="${platform}"]`)
+      ?.focus();
+  };
+
+  // Connects the ready ones and opens the first that needs something, its
+  // tab red until it's given
   const connect = (asked: Platform[]) => {
     const lacking: Partial<Record<Platform, MessageKey>> = {};
     for (const p of asked) {
@@ -203,15 +227,11 @@ export function DashboardSection(props: Props) {
       onConnect(ready.length === platforms.length ? undefined : ready);
     }
     const first = asked.find((p) => lacking[p]);
-    if (first && ready.length === 0) {
-      slate.current
-        ?.querySelector<HTMLInputElement>(`[data-platform="${first}"]`)
-        ?.focus();
-    }
+    if (first) open(first);
   };
 
   const remove = (platform: Platform) => {
-    // The focus goes to Add, as the row with its button leaves
+    // The focus goes to Add, as the tab with its × leaves
     flushSync(() => onPlatformsChange(platforms.filter((p) => p !== platform)));
     menu.toggleRef.current?.focus();
   };
@@ -222,9 +242,7 @@ export function DashboardSection(props: Props) {
         PLATFORMS.filter((p) => p === platform || platforms.includes(p)),
       ),
     );
-    slate.current
-      ?.querySelector<HTMLElement>(`[data-platform="${platform}"]`)
-      ?.focus();
+    open(platform);
   };
 
   const field = (platform: Platform) => {
@@ -233,7 +251,7 @@ export function DashboardSection(props: Props) {
     if (PLATFORM_INPUT[platform] === "account") {
       return twitchLogin ? (
         <span
-          className={styles.row_account}
+          className={styles.line_account}
           data-platform={platform}
           tabIndex={-1}
         >{`@${twitchLogin}`}</span>
@@ -257,7 +275,7 @@ export function DashboardSection(props: Props) {
     return (
       <Input
         ref={tiktok ? usernameRef : undefined}
-        className={styles.row_input}
+        className={styles.line_input}
         data-platform={platform}
         // Home keeps a channel being typed when the profile comes again
         data-channel={tiktok ? undefined : platform}
@@ -281,8 +299,7 @@ export function DashboardSection(props: Props) {
     );
   };
 
-  // How a row's platform is doing, or what it needs to connect, under its
-  // field
+  // How a platform is doing, or what it needs to connect, under its field
   const state = (platform: Platform) => {
     const now =
       status[platform] ??
@@ -291,7 +308,7 @@ export function DashboardSection(props: Props) {
     // Twitch's own sentence turns red instead
     if (need && !now && PLATFORM_INPUT[platform] !== "account") {
       return (
-        <span className={styles.row_need} role="alert">
+        <span className={styles.line_need} role="alert">
           {t(need)}
         </span>
       );
@@ -299,7 +316,7 @@ export function DashboardSection(props: Props) {
     if (now) {
       return (
         <span
-          className={cx(styles.row_state, now === "connected" && styles.row_up)}
+          className={cx(styles.line_state, now === "connected" && styles.up)}
         >
           {t(STATES[now])}
         </span>
@@ -307,13 +324,12 @@ export function DashboardSection(props: Props) {
     }
     // Down while the others are live
     return busy ? (
-      <span className={styles.row_state}>{t("home.dashboard.down")}</span>
+      <span className={styles.line_state}>{t("home.dashboard.down")}</span>
     ) : null;
   };
 
-  // With several, Connect all until anything is on
+  // Connect all until anything is on
   const anyOn = busy || platforms.some(on);
-  const primary = several ? anyOn : busy;
 
   return (
     <section className={styles.slate} ref={slate}>
@@ -321,119 +337,150 @@ export function DashboardSection(props: Props) {
           for this heading, so it's a 1px box, never display: none. */}
       <h2 className={styles.sr_only}>{t("home.dashboard.title")}</h2>
 
-      <p
-        className={cx(styles.status, connected && !away && styles.status_live)}
-      >
-        {/* A ring while the connection is away: rose while the LIVE goes on */}
-        <span
-          className={cx(
-            styles.dot,
-            connected && styles.dot_live,
-            away && styles.dot_away,
-          )}
-        />
-        {connected && !away ? (
-          <>
-            {/* Like the title bar's tally, said only to screen readers */}
-            <span className={styles.sr_only}>LIVE</span>{" "}
-            {startedAt !== null && <LiveTimer since={startedAt} />}
-          </>
-        ) : connected ? (
-          t("home.dashboard.reconnecting")
-        ) : waiting ? (
-          t("home.dashboard.waiting")
-        ) : (
-          t("home.dashboard.offline")
-        )}
-      </p>
-
       <div data-tour="connect" className={styles.connect_box}>
-        <ul className={styles.rows} aria-label={t("home.dashboard.platforms")}>
-          {platforms.map((platform) => {
-            const Icon = PLATFORM_ICONS[platform];
-            const name = PLATFORM_LABELS[platform];
-            const up = on(platform);
-            return (
-              <li
-                key={platform}
-                className={cx(styles.row, !several && styles.row_alone)}
-              >
-                <Icon
-                  className={cx(
-                    styles.row_icon,
-                    status[platform] === "connected" && styles.row_up,
-                  )}
-                  size={18}
-                  aria-hidden
-                />
-                <span className={styles.row_name}>{name}</span>
-                <div className={styles.row_field}>
-                  {field(platform)}
-                  {state(platform)}
-                </div>
-                {/* Alone, the platform is Connect's, and can't go */}
-                {several && (
-                  <>
-                    <Btn
-                      className={styles.row_btn}
-                      loading={pending.includes(platform) && !status[platform]}
-                      aria-label={`${t(up ? "common.disconnect" : "common.connect")} ${name}`}
-                      onClick={() =>
-                        up ? onDisconnect(platform) : connect([platform])
-                      }
-                    >
-                      {t(up ? "common.disconnect" : "common.connect")}
-                    </Btn>
-                    <Btn
-                      variant="icon"
-                      title={t("home.dashboard.removePlatform", {
-                        platform: name,
-                      })}
-                      aria-label={t("home.dashboard.removePlatform", {
-                        platform: name,
-                      })}
-                      disabled={up}
-                      onClick={() => remove(platform)}
-                    >
-                      <FiX size={16} />
-                    </Btn>
-                  </>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-
-        <div className={styles.connect_foot}>
-          <AddPlatform platforms={platforms} onAdd={add} menu={menu} />
-          {/* Rose only while connecting is the thing to do */}
-          <Btn
-            variant={primary ? "default" : "accent"}
-            size="lg"
-            className={styles.connect_btn}
-            loading={loading}
-            onClick={primary ? () => onDisconnect() : () => connect(platforms)}
-          >
-            {primary ? (
-              <>
-                <FiSquare size={18} />{" "}
-                {t(
-                  several
-                    ? "home.dashboard.disconnectAll"
-                    : "common.disconnect",
-                )}
-              </>
-            ) : (
-              <>
-                <FiPlay size={18} />{" "}
-                {t(several ? "home.dashboard.connectAll" : "common.connect")}
-              </>
+        {/* Whether the LIVE is on, and the switch for every platform */}
+        <div className={styles.slate_head}>
+          <p
+            className={cx(
+              styles.status,
+              connected && !away && styles.status_live,
             )}
-          </Btn>
+          >
+            {/* A ring while the connection is away: rose while the LIVE
+                goes on */}
+            <span
+              className={cx(
+                styles.dot,
+                connected && styles.dot_live,
+                away && styles.dot_away,
+              )}
+            />
+            {connected && !away ? (
+              <>
+                {/* Like the title bar's tally, said only to screen readers */}
+                <span className={styles.sr_only}>LIVE</span>{" "}
+                {startedAt !== null && <LiveTimer since={startedAt} />}
+              </>
+            ) : connected ? (
+              t("home.dashboard.reconnecting")
+            ) : waiting ? (
+              t("home.dashboard.waiting")
+            ) : (
+              t("home.dashboard.offline")
+            )}
+          </p>
+          {/* Alone, the platform's own Connect is all there is. Rose only
+              while connecting is the thing to do. */}
+          {several && (
+            <Btn
+              variant={anyOn ? "default" : "accent"}
+              size="lg"
+              className={styles.connect_btn}
+              loading={loading}
+              onClick={anyOn ? () => onDisconnect() : () => connect(platforms)}
+            >
+              {anyOn ? (
+                <>
+                  <FiSquare size={18} /> {t("home.dashboard.disconnectAll")}
+                </>
+              ) : (
+                <>
+                  <FiPlay size={18} /> {t("home.dashboard.connectAll")}
+                </>
+              )}
+            </Btn>
+          )}
         </div>
+
+        <div className={styles.tab_row}>
+          <Tabs
+            className={styles.platform_tabs}
+            label={t("home.dashboard.platforms")}
+            tabs={tabs.map((value) => {
+              // Each says its viewers now while it's in the LIVE
+              const count =
+                value === "all"
+                  ? views.current
+                  : live.includes(value)
+                    ? (views.platformViewers[value] ?? 0)
+                    : null;
+              const shown = count !== null && (
+                <StatValue value={count} className={styles.tab_count} />
+              );
+              if (value === "all") {
+                return {
+                  value,
+                  label: (
+                    <>
+                      {t("home.stats.all")}
+                      {shown}
+                    </>
+                  ),
+                };
+              }
+              const Icon = PLATFORM_ICONS[value];
+              const up = status[value] === "connected";
+              const name = PLATFORM_LABELS[value];
+              return {
+                value,
+                // Closing a tab removes the platform, never one that's on
+                // or the only one
+                onClose:
+                  several && !on(value) ? () => remove(value) : undefined,
+                closeLabel: t("home.dashboard.removePlatform", {
+                  platform: name,
+                }),
+                icon: <Icon className={cx(up && styles.up)} aria-hidden />,
+                // Rose while it's up, the picked one's too
+                accent: up ? "var(--accent-primary)" : undefined,
+                label: (
+                  <>
+                    {/* Red while it lacks what Connect needs */}
+                    <span className={cx(missing[value] && styles.tab_need)}>
+                      {name}
+                    </span>
+                    {shown}
+                  </>
+                ),
+              };
+            })}
+            value={tab}
+            onChange={onTab}
+          />
+          <AddPlatform platforms={platforms} onAdd={add} menu={menu} />
+        </div>
+
+        {tab !== "all" && (
+          <div className={styles.line}>
+            <div className={styles.line_field}>
+              {field(tab)}
+              {state(tab)}
+            </div>
+            {several ? (
+              <Btn
+                className={styles.line_btn}
+                loading={pending.includes(tab) && !status[tab]}
+                aria-label={`${t(on(tab) ? "common.disconnect" : "common.connect")} ${PLATFORM_LABELS[tab]}`}
+                onClick={() => (on(tab) ? onDisconnect(tab) : connect([tab]))}
+              >
+                {t(on(tab) ? "common.disconnect" : "common.connect")}
+              </Btn>
+            ) : (
+              // The only platform: Home's Connect, rose until it's on
+              <Btn
+                variant={busy ? "default" : "accent"}
+                className={styles.line_btn}
+                loading={loading}
+                onClick={busy ? () => onDisconnect() : () => connect(platforms)}
+              >
+                {t(busy ? "common.disconnect" : "common.connect")}
+              </Btn>
+            )}
+          </div>
+        )}
       </div>
 
-      {needsKey && !busy && platforms.includes("tiktok") && (
+      {needsKey && tab === "tiktok" && !on("tiktok") && (
         <p className={styles.key_hint}>
           {rich(t("home.dashboard.keyHint"), {
             link: (text) => (

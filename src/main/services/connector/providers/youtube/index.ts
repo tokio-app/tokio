@@ -10,7 +10,7 @@ import {
   kindOf,
   toFailure,
 } from "../../common";
-import { fromAction } from "./common/mapping";
+import { fromAction, type Mapped } from "./common/mapping";
 import {
   findLive,
   parseInput,
@@ -38,6 +38,9 @@ type Connection = {
   // The wait before the next poll or try, and its end
   retry?: NodeJS.Timeout;
   wake?: () => void;
+  // Each handle's viewer id (youtube:<channel id>) in this LIVE, by its
+  // lowercase, for Gifts, which name their sender by handle alone
+  ids: Map<string, string>;
 };
 
 /**
@@ -102,6 +105,7 @@ export class YouTubeConnector extends ConnectorProvider {
       up: false,
       reconnecting: false,
       stale: false,
+      ids: new Map(),
     };
     this._conn = conn;
     let wait: number;
@@ -176,6 +180,8 @@ export class YouTubeConnector extends ConnectorProvider {
     );
     if (!answer) return null;
     conn.continuation = answer.continuation;
+    // Who chatted before, so their Gifts land on their channel id
+    for (const action of answer.actions) this._named(conn, fromAction(action));
     return this._wait(answer.timeoutMs);
   }
 
@@ -251,7 +257,7 @@ export class YouTubeConnector extends ConnectorProvider {
     if (this._conn !== conn || !answer) return null;
     conn.continuation = answer.continuation;
     for (const action of answer.actions) {
-      const mapped = fromAction(action);
+      const mapped = this._named(conn, fromAction(action));
       if (!mapped) continue;
       if (mapped.event === TOKIO_EVENTS.CHAT) {
         this.emitChat(mapped.data, () => this._conn === conn);
@@ -260,6 +266,25 @@ export class YouTubeConnector extends ConnectorProvider {
       }
     }
     return this._wait(answer.timeoutMs);
+  }
+
+  /**
+   * Remembers a viewer's channel id by handle, and sends a Gift under it
+   * when known. A handle not seen in this LIVE keeps youtube:@handle, with
+   * no lookup: a Gift has no price, and they can come in bursts.
+   */
+  private _named(conn: Connection, mapped: Mapped | null): Mapped | null {
+    if (!mapped) return null;
+    const { user } = mapped.data;
+    const handle = user.handle.toLowerCase();
+    if (mapped.event !== TOKIO_EVENTS.GIFT) {
+      if (user.userId && handle) conn.ids.set(handle, user.userId);
+      return mapped;
+    }
+    const userId = conn.ids.get(handle);
+    return userId
+      ? { ...mapped, data: { ...mapped.data, user: { ...user, userId } } }
+      : mapped;
   }
 
   // The viewers, until the LIVE ends: its count turns into the video's views

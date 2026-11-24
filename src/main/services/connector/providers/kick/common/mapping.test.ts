@@ -56,6 +56,7 @@ describe("Kick mapping", () => {
             platform: "kick",
             moderator: false,
             superfan: false,
+            vip: false,
           },
           comment: { content: "hello there", emotes: [], lang: "" },
         },
@@ -100,7 +101,7 @@ describe("Kick mapping", () => {
       });
     });
 
-    it("reads moderators and Super Fans from the badges", () => {
+    it("reads moderators, VIPs and Super Fans from the badges", () => {
       const user = (badges: string[]) => {
         const mapped = chat("hi", badges);
         return mapped?.event === TOKIO_EVENTS.CHAT
@@ -112,12 +113,39 @@ describe("Kick mapping", () => {
       expect(user(["moderator", "vip"])).toMatchObject({
         moderator: true,
         superfan: false,
+        vip: true,
       });
       expect(user(["subscriber"])).toMatchObject({ superfan: true });
       expect(user(["founder", "og"])).toMatchObject({
         moderator: false,
         superfan: true,
+        vip: false,
       });
+    });
+
+    it("reads a subscriber's months off their badge's count", () => {
+      const months = (badges: object[]) => {
+        const mapped = fromPublication("App\\Events\\ChatMessageEvent", {
+          content: "hi",
+          sender: { ...sender(), identity: { badges } },
+        });
+        return mapped?.event === TOKIO_EVENTS.CHAT
+          ? mapped.data.user.subMonths
+          : "not chat";
+      };
+
+      // As kick.com's chat sent it on 2026-11-23
+      expect(
+        months([
+          { type: "subscriber", text: "Subscriber", count: 3, sort_order: 9 },
+        ]),
+      ).toBe(3);
+      expect(months([{ type: "vip" }, { type: "founder", count: 14 }])).toBe(
+        14,
+      );
+      expect(months([{ type: "subscriber" }])).toBeUndefined();
+      expect(months([{ type: "subscriber", count: 0 }])).toBeUndefined();
+      expect(months([{ type: "og", count: 5 }])).toBeUndefined();
     });
   });
 
@@ -170,7 +198,7 @@ describe("Kick mapping", () => {
     }
   });
 
-  it("maps a Kick to a gift worth its amount, ended at once", () => {
+  it("maps Kicks to their amount and pinned message, never a gift", () => {
     expect(
       fromPublication("KicksGifted", {
         gift_transaction_id: "made-up",
@@ -190,7 +218,7 @@ describe("Kick mapping", () => {
         },
       }),
     ).toEqual({
-      event: TOKIO_EVENTS.GIFT,
+      event: TOKIO_EVENTS.KICKS,
       data: {
         user: {
           username: "Kicker",
@@ -200,16 +228,22 @@ describe("Kick mapping", () => {
           userId: "kick:77",
           platform: "kick",
         },
-        gift: {
-          id: "kick:rage_quit",
-          name: "Rage Quit",
-          coins: 100,
-          image: "",
-          type: 0,
-          comboCount: 1,
-          repeatEnd: true,
-        },
+        kicks: 100,
+        message: "for you",
       },
+    });
+  });
+
+  it("gives Kicks sent without a message an empty one", () => {
+    const kicks = fromPublication("KicksGifted", {
+      sender: { id: 77, username: "Kicker" },
+      gift: { gift_id: "hype", name: "Hype", amount: 50 },
+      message: null,
+    });
+
+    expect(kicks).toMatchObject({
+      event: TOKIO_EVENTS.KICKS,
+      data: { kicks: 50, message: "" },
     });
   });
 

@@ -83,7 +83,7 @@ Notes for one area live in `.claude/rules/`. Claude Code loads each one when it 
 - `overlays.md`: overlay previews, imports and official overlays
 - `timer.md`: the countdown timer, its overlay and its page in Tools
 - `fans.md`: the fans each profile keeps, sent to overlays and listed in Tools → Fans
-- `history.md`: each profile's past LIVEs and gifters, Coin stats in Tools, and the top gifters overlays get
+- `history.md`: each profile's past LIVEs and gifters, LIVE history in Tools, and the top gifters overlays get
 - `studio.md`: Overlay Studio's stage, data, reactions and served page
 - `studio-editor.md`: Overlay Studio's editor
 - `served-pages.md`: what every page the overlay server serves itself must follow

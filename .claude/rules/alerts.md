@@ -23,22 +23,39 @@ paths:
 
 - `AlertTriggerSchema` derives the triggers from `TOKIO_EVENTS` (a new event: the `live-event` skill). `ROOM_USER` is left out there and from `AlertTrigger`: it comes every few seconds and is meant for overlays.
 - Music change alerts fire once each time a song starts (`MusicService.onSongChange`), not for one that fails to start, is skipped while it loads, or was already playing when a request came. Overlays get every `MUSIC_CHANGE`, queue changes too (songs a lower queue length drops included), but `MusicQueue.clear` sends one only when the queue held songs, since it runs on every chat while music is off.
-- Gift alerts fire once per combo, on `repeatEnd`, or with `every_gift` once per gift, at most `queue_length` times per event.
+- Gift alerts fire once per combo, on `repeatEnd`, or with `every_gift` once per gift, at most `queue_length` times per event. Only TikTok's gifts come in combos: YouTube's arrive one at a time (`comboCount` 1, `repeatEnd` true), so their rows have no **When it plays** choice, streak note or streak summary (`rowStreaks`, `src/common/util/rows.ts`).
+- **A row offers what its platforms send** (the user's call). `rowPlatforms` gives them: the row's own platform, else the profile's that send its event. Alerts, Overlay Studio and Games share the rows, so all three follow it:
+  - The emote picker lists the emotes of those platforms, told by their id's prefix (`idPlatform`), and keeps picked ones to clear.
+  - The variables are the event's minus the ones no such platform fills (`rowVariables`): YouTube's gifts have no `{count}`, and Kick's subs no `{comment}`. Studio's texts are still filled with every variable; only the editor's offer follows the row.
 - `GiftStreaks` (`src/main/helper/streaks.ts`, also used by `LiveService`, `GamesService` and the timer) counts what each gift event adds to its sender's streak. `AlertsService` runs it only while alerts are on, so alerts turned on mid-streak play the whole count so far.
 - Matching is `matchesTrigger` (`src/main/helper/triggers.ts`), shared with `GamesService`. Both get `added` and `total` from `streakOf` (same file), which counts the event in their `GiftStreaks` once; `total` is the `{count}`. `AlertsService` keeps `enabled` and the sound, message or media check.
 - An alert plays on its `trigger` or any of its `also_triggers` (Or rows, `MAX_TRIGGERS` in all, kept apart from `trigger` so an older Tokio still plays on the first). `handle` takes the first row that matches (`triggersOf(alert).find`): it decides `every_gift`'s repeat and the `alerts:<type>` queue, and `onError` gets it, so a notice names the row that fired (an Emote row on a chat still says Emote).
 - A trigger's `platform` limits it to that platform's events (missing is any; `.claude/rules/platforms.md`). The Redeem trigger's `keyword` is the reward's title, matched in any case, empty for any reward. Its variables are `{reward}`, with `{comment}` for what the viewer typed.
 - Alerts and Games share `TriggerSchema`, `TriggerFilter` and `TRIGGER_OPTIONS`; Games leaves five out (`GAME_TRIGGERS`). Game actions keep one trigger.
-- Only the Alerts editor offers these; game actions keep the defaults, which match everything:
-  - `min_coins`: the streak's worth when it ends (`gift.coins × total`), or each gift's with `every_gift`. Only for any gift: picked gifts are the alert's choice, so the matcher, the editor and the summary ignore it then.
+- Only the Alerts editor offers these, and Overlay Studio's reaction rows the minimum too; game actions keep the defaults, which match everything:
+  - `min_coins` is a row's minimum in its event's own unit (the user's call: each money event its own). The saved name stays, for older files and an older Tokio.
+    - **Gift:** the streak's worth when it ends (`gift.coins × total`), or each gift's with `every_gift`, in TikTok's coins. It applies only to any gift: picked gifts are the alert's choice, so the matcher, the editor and the summary ignore it then.
+    - **Bits:** the cheer's Bits.
+    - **Kicks:** the Kicks sent, like Bits (the user's call).
+    - **Super Chat:** its `usd`. One without dollars (null or missing) fires, so a missing rate never silences an alert.
+    - **Gifted subs:** the event's `count`.
+    - The matcher reads it through `worthOf`, and every other trigger ignores it.
+  - The editor and the summary name the unit by the row (`minUnit`):
+    - Coins on a gift row that can get TikTok's gifts, and none on a YouTube gift row (its gifts have no price) unless a minimum is already saved.
+    - Bits, Kicks, US dollars ("worth $5+", without cents, since a minimum is whole) or gifted subs on those events' rows.
+  - `MinimumField` (`components/AlertItem`) draws it under a row, in the Alerts editor and Overlay Studio's reaction rows alike (the user's call).
   - `roles` (`[]` is anyone): only Chat, Emote and Gift carry the viewer's roles, so `takesRoles` (`src/common/util/alerts.ts`, shared by the matcher, the editor and the summary) allows only them. Other triggers' saved roles are ignored.
+    - The editor offers a row the roles its platforms' events say (`rowRoles`): TikTok's chat, emotes and gifts say followers, moderators and Super Fans; Twitch's, YouTube's and Kick's chat and emotes say Moderators and their subscribers or members, from badges, and Twitch's and Kick's VIPs (`vip`, the user's call), but never who follows; their gifts say none.
+    - A role saved earlier stays shown to clear, and the matcher is unchanged.
+    - `roleName` names the Super Fan role as the row's platforms call it: Subscribers on Twitch and Kick, Members on YouTube, and every term on a row for any platform ("Super Fans, subscribers, and members", the user's call).
 - The Emote trigger (`EMOTE_TRIGGER`) isn't a live event: `matchesTrigger` matches it on `CHAT`. TikTok can't list a LIVE's emotes, so `StoreManagerService.recordEmotes` saves the ones seen in chat to `Profile.emotes`.
 - Keywords (`hasKeyword`, `src/main/helper/chat.ts`) match whole words (`wholeWord`), except next to scripts written without spaces (Chinese, Japanese, Thai); an emoji between words counts as a space.
 
 ## Gifts
 
+- Only a profile with TikTok asks TikTok for its gift list (the user's call). `refreshTikTokGifts` (`src/main/helper/gifts.ts`) fetches it once a run: at startup, or the first time TikTok is added on Home or a profile with it is picked, never awaited by those handlers. It updates the overlays and the games and Studio overlays, and pushes `GET_GIFTS`, since pages ask only when they open. A failed fetch is tried again by the next trigger. Startup without a saved list awaits TikTok, and a profile without TikTok then loads none, with no warning.
 - TikTok's gift list (`extra/gifts.json`) misses some, like other regions' gifts. `OverlayService.recordGift` saves the ones viewers send that aren't on it to `extra/custom-gifts.json`, shared by all profiles. It saves nothing while TikTok's list is empty, since every gift would look missing. After a failed save it writes nothing for `LOAD_RETRY_MS`, as emote saves do, so a file that can't be written isn't tried and logged on every gift. A file that's there but doesn't read is never written over (it fails instead), and a saved gift's details count as compared once a run only after their save went through.
-- The Alerts and Games pages read both through `useTriggerChoices` (`pages/Alerts`), with the emotes; `giftOptions` merges them. Overlay gift settings use TikTok's list only.
+- The Alerts and Games pages read both through `useTriggerChoices` (`pages/Alerts`), with the emotes; `giftOptions` merges them. Overlay gift settings use TikTok's list only. Picked gifts match TikTok's ids only, so `TriggerFilter` offers the picker on TikTok rows, on rows for any platform when the profile has TikTok, and wherever gifts are already picked, so they can be cleared.
 
 ## Page
 
@@ -50,7 +67,7 @@ paths:
 - An empty `name` shows its place's default (`alertName`); a new alert gets `defaultAlertName(index)`. Defaults count the place when made, so after a delete two alerts can share one. The search keeps each alert's list index for that, and adding an alert clears it, since it would hide the new one.
 - The alert's `volume` is the sound's or message's; a video has its own (`AlertMediaSchema.volume`), and another file keeps it and the duration.
 - `AlertEditor`'s panel `min-height` is the gift Trigger tab's, the tallest, so the dialog doesn't move between tabs. The pickers render after it, so they open over it and Escape closes the picker first.
-- The Trigger tab draws its rows with `TriggerRows` (`components/AlertItem`), shared with Overlay Studio: the first under **Event**, each other under **Or** with a remove button, then **Add a trigger**, `MAX_TRIGGERS` in all. Each row keeps its own filter, minimum coins and roles. With more rows than the panel holds, the tab scrolls inside it (`.scrolls`), so the dialog never outgrows the window.
+- The Trigger tab draws its rows with `TriggerRows` (`components/AlertItem`), shared with Overlay Studio: the first under **Event**, each other under **Or** with a remove button, then **Add a trigger**, `MAX_TRIGGERS` in all. Each row keeps its own filter, minimum and roles. With more rows than the panel holds, the tab scrolls inside it (`.scrolls`), so the dialog never outgrows the window.
 - A space between a picker tile's name and its length keeps the button's name "Clip 12s".
 
 ## Sounds
@@ -105,6 +122,7 @@ paths:
 - A Like alert offers `{username}`, `{handle}` and `{count}` (the batch's likes), since it plays each viewer's batch. Game actions and Overlay Studio, which count likes from every viewer, take `countedVariables`: the same lists with none on Like (the user's call). A text there that already has them still gets the last batch's, since `messageValues` reads the payload.
 - `{count}` in a gift alert's message is the streak's total, not TikTok's `comboCount`. It isn't offered on every gift; a message that has it gets the count so far. One event that adds several gifts makes the message once and sends one `ALERT_AUDIO` with `repeat`.
 - `_generate(..., false)` doesn't log a live alert's failed message; previews (`speak`) log their own, which `speakTest` counts on.
+- A TTS test (`TEST_ALERT`'s `tts` branch) fills the message with a sample from the `platform` it carries: the row's own, else the profile's first that sends its event (`samplePlatform`), resolved by the row's Play, the editor's Sound tab, the sound picker's TTS tab and MCP's alert test. Without one it's TikTok's (Music change).
 - Live alerts make their messages through a `TaskQueue` with the TTS page's cooldown and queue length.
 - `AlertsService.clear` runs wherever `ALERT_CLEAR` is sent: it drops the waiting messages, sounds and media, hides the media shown, and forgets the gift streaks, since their ends may be missed.
 

@@ -1,35 +1,129 @@
 import { MessageKey, translate } from "@/common/i18n";
-import { LiveSummary } from "@/common/types";
-import { allInRange, DateRange } from "@/common/util";
+import {
+  HistoryTotals,
+  LiveSummary,
+  Platform,
+  PLATFORMS,
+  TOKIO_EVENTS,
+} from "@/common/types";
+import {
+  allInRange,
+  Currency,
+  DateRange,
+  formatMoney,
+  formatStat,
+  PLATFORM_CURRENCY,
+  platformParts,
+  triggersFor,
+} from "@/common/util";
 import { DateTimeValue, NO_DATE } from "@/components";
 import { formatDate } from "@/helper";
 
-export type Totals = Pick<LiveSummary, "coins" | "gifts">;
+// Each platform's part of a LIVE or of some dates
+export type Parts = Partial<Record<Platform, HistoryTotals>>;
 
-export const READOUT: { key: keyof Totals; label: MessageKey }[] = [
-  { key: "coins", label: "coinStats.stats.coins" },
-  { key: "gifts", label: "coinStats.stats.gifts" },
-];
+// A platform's numbers, or all of them
+export type StatsTab = Platform | "all";
+
+const NO_PART: HistoryTotals = { amount: 0, gifts: 0, giftSubs: 0 };
 
 /**
- * The LIVEs' coins and gifts added up, and how long they ran in ms. With
- * dates, how long they ran in them, and only the coins and gifts of the LIVEs
- * all in them: main adds up the gifts in them of a LIVE they cut.
+ * The platforms the LIVEs were on, in Home's order: an older LIVE was
+ * TikTok's. TikTok's alone without LIVEs.
+ */
+export function historyPlatforms(lives: LiveSummary[]): Platform[] {
+  const found = PLATFORMS.filter((p) =>
+    lives.some((live) => platformParts(live)[p]),
+  );
+  return found.length > 0 ? found : ["tiktok"];
+}
+
+// A tab per platform, then All with two or more, as on Home
+export const statsTabs = (platforms: Platform[]): StatsTab[] =>
+  platforms.length > 1 ? [...platforms, "all"] : platforms;
+
+// A LIVE's part on the tab: its platform's money, or every gift on All
+export const liveValue = (live: LiveSummary, tab: StatsTab) =>
+  tab === "all" ? live.gifts : (platformParts(live)[tab]?.amount ?? 0);
+
+/**
+ * The LIVEs' parts added up, and how long they ran in ms. With dates, how
+ * long they ran in them, and only the parts of the LIVEs all in them: main
+ * adds up the gifts in them of a LIVE they cut.
  */
 export function allTime(
   lives: LiveSummary[],
   range: DateRange = {},
-): Totals & { length: number } {
+): { parts: Parts; length: number } {
   const { from = -Infinity, to = Infinity } = range;
-  const sum = { coins: 0, gifts: 0, length: 0 };
+  const parts: Parts = {};
+  let length = 0;
   for (const live of lives) {
-    sum.length += Math.min(live.endedAt, to) - Math.max(live.startedAt, from);
+    length += Math.min(live.endedAt, to) - Math.max(live.startedAt, from);
     if (!allInRange(live, range)) continue;
-    sum.coins += live.coins;
-    sum.gifts += live.gifts;
+    const own = platformParts(live);
+    for (const p of PLATFORMS) {
+      const part = own[p];
+      if (!part) continue;
+      const sum = (parts[p] ??= { ...NO_PART });
+      sum.amount += part.amount;
+      sum.gifts += part.gifts;
+      sum.giftSubs += part.giftSubs;
+    }
   }
-  return sum;
+  return { parts, length };
 }
+
+// Each currency's tile
+const MONEY: Record<Currency, MessageKey> = {
+  coins: "coinStats.stats.coins",
+  kicks: "coinStats.stats.kicks",
+  bits: "coinStats.stats.bits",
+  usd: "coinStats.stats.superChats",
+};
+
+// A tile: money in its currency, or a count without one
+export type Stat = { label: MessageKey; value: number; currency?: Currency };
+
+/**
+ * The summary's tiles. A platform's tab: its money, then its gifts and
+ * gifted subs where it sends them. All: each platform's money on its own
+ * tile, never added up, then every gift and every gifted sub.
+ */
+export function readout(
+  tab: StatsTab,
+  platforms: Platform[],
+  parts: Parts,
+): Stat[] {
+  const shown = tab === "all" ? platforms : [tab];
+  const sent = triggersFor(shown);
+  const sum = (key: "gifts" | "giftSubs") =>
+    shown.reduce((n, p) => n + (parts[p]?.[key] ?? 0), 0);
+  const stats: (Stat | false)[] = [
+    ...shown.map((p) => ({
+      label: MONEY[PLATFORM_CURRENCY[p]],
+      value: parts[p]?.amount ?? 0,
+      currency: PLATFORM_CURRENCY[p],
+    })),
+    sent.includes(TOKIO_EVENTS.GIFT) && {
+      label: "coinStats.stats.gifts",
+      value: sum("gifts"),
+    },
+    sent.includes(TOKIO_EVENTS.GIFT_SUB) && {
+      label: "coinStats.stats.giftSubs",
+      value: sum("giftSubs"),
+    },
+  ];
+  return stats.filter((stat) => stat !== false);
+}
+
+// Short with the exact number on hover: US dollars as money, the rest as
+// counts
+export const statText = (
+  value: number,
+  currency: Currency | undefined,
+  language: string,
+) => (currency === "usd" ? formatMoney : formatStat)(value, language);
 
 /**
  * The LIVE to select when the list changes, by its startedAt, or null for All

@@ -7,6 +7,7 @@ import {
   Section,
   VariableList,
 } from "@/components";
+import { usePlatforms } from "@/context/platforms";
 import { languageName } from "@/helper/voices";
 import { shownVariables, Updater, useTranslationLanguage } from "@/hooks";
 import { rich, useLanguage, useT } from "@/ui/i18n";
@@ -39,7 +40,8 @@ export function FormatSection({ format, update }: Props) {
   const t = useT();
   const lang = useLanguage();
   const translating = useTranslationLanguage();
-  const variables = shownVariables(TEMPLATE_VARIABLES, translating);
+  const platforms = usePlatforms();
+  const variables = shownVariables(TEMPLATE_VARIABLES, translating, platforms);
 
   return (
     <Section
@@ -125,27 +127,30 @@ export function FormatSection({ format, update }: Props) {
         }
       />
 
-      <div className={styles.check_group}>
-        <Check
-          label={t("tts.format.translate")}
-          checked={format.translate}
-          disabled={translating === ""}
-          onChange={(e) =>
-            update((f) => {
-              f.translate = e.target.checked;
-            })
-          }
-        />
-        <p className={styles.check_hint}>
-          {translating === ""
-            ? rich(t("tts.format.translateOff"), {
-                link: (text) => <Link to="/settings">{text}</Link>,
+      {/* Only TikTok's chat is translated */}
+      {platforms.includes("tiktok") && (
+        <div className={styles.check_group}>
+          <Check
+            label={t("tts.format.translate")}
+            checked={format.translate}
+            disabled={translating === ""}
+            onChange={(e) =>
+              update((f) => {
+                f.translate = e.target.checked;
               })
-            : t("tts.format.translateHint", {
-                language: languageName(translating, lang),
-              })}
-        </p>
-      </div>
+            }
+          />
+          <p className={styles.check_hint}>
+            {translating === ""
+              ? rich(t("tts.format.translateOff"), {
+                  link: (text) => <Link to="/settings">{text}</Link>,
+                })
+              : t("tts.format.translateHint", {
+                  language: languageName(translating, lang),
+                })}
+          </p>
+        </div>
+      )}
     </Section>
   );
 }

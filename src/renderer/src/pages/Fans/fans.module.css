@@ -46,14 +46,41 @@
   border-top: 1px solid var(--border);
 }
 
-/* The badge in its own slot, so the levels line up without one. TikTok draws
-   it 57×42: a heart with a ring around it. */
-.level {
+/* The lead column fits "120 months", or "Suscriptor", in Spanish too, and
+   on All the platform's icon before it */
+.wide .fan {
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+}
+
+.all .fan {
+  grid-template-columns: 136px minmax(0, 1fr) auto;
+}
+
+.lead {
   position: relative;
+  display: flex;
+  align-items: baseline;
+}
+
+/* The badge or the icon in its own slot, so the numbers line up without
+   one. TikTok draws the badge 57×42: a heart with a ring around it. */
+.slotted {
   display: grid;
   grid-template-columns: 27px auto;
   align-items: center;
   gap: var(--space-2);
+}
+
+.slotted > .number,
+.slotted > .months,
+.slotted > .kind {
+  grid-column: 2;
+}
+
+.icon {
+  justify-self: center;
+  color: var(--font-secondary);
+  font-size: 16px;
 }
 
 .badge {
@@ -64,12 +91,46 @@
 
 /* Home's readout */
 .number {
-  grid-column: 2;
   color: var(--font-primary);
   font-size: var(--font-lg);
   font-stretch: var(--stretch-readout);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* "14 months": the number as bold as a level, the word quieter */
+.months,
+.kind {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* What they are when their months aren't known, a step brighter than the
+   month word, since it stands alone */
+.kind {
+  color: var(--font-primary);
+}
+
+/* Home's platform tabs, as LIVE history's, with the Super Fans switch at
+   the end of their row. The tabs are taller, so it never moves them. */
+.tab_row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: calc(-1 * var(--space-2));
+  border-bottom: 1px solid var(--border);
+}
+
+/* The row draws the line under them all, as Home's does */
+.tabs {
+  align-self: flex-end;
+  border-bottom: none;
+}
+
+.tab_row .only {
+  margin-left: auto;
 }
 
 /* Only screen readers get it */

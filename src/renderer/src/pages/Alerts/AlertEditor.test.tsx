@@ -1,7 +1,9 @@
 import { Alert } from "@/common/schemas";
+import { EMOTE_TRIGGER, Platform, TOKIO_EVENTS } from "@/common/types";
+import { PlatformsContext } from "@/context/platforms";
 import { alertMedia, mediaFile } from "@test/fixtures";
 import { renderWithProviders } from "@test/render";
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, Mock, vi } from "vitest";
 import { AlertEditor } from "./AlertEditor";
 import { createAlert } from "@/common/util";
@@ -262,5 +264,189 @@ describe("AlertEditor's video cut", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("AlertEditor's minimum", () => {
+  const gift = (patch: Partial<Alert["trigger"]> = {}) =>
+    alert({
+      trigger: {
+        ...createAlert().trigger,
+        type: TOKIO_EVENTS.GIFT,
+        ...patch,
+      },
+    });
+  const open = (item: Alert, platforms: Platform[]) =>
+    renderWithProviders(
+      <PlatformsContext value={platforms}>
+        <AlertEditor
+          alert={item}
+          index={0}
+          gifts={[]}
+          emotes={[]}
+          testing={null}
+          onTest={vi.fn()}
+          onChange={vi.fn()}
+          onPickSound={vi.fn()}
+          onPickMedia={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </PlatformsContext>,
+    );
+  const minimum = () => screen.queryByRole("group", { name: "Worth at least" });
+
+  // The streak's note only where gifts come in streaks, TikTok's: YouTube's
+  // come one at a time
+  it.each([
+    [["tiktok"], {}, "coins", true],
+    // Kick sends no gifts
+    [["tiktok", "kick"], {}, "coins", true],
+    [["tiktok", "youtube"], { platform: "tiktok" }, "coins", true],
+    // A minimum saved on a row with no price stays to fix
+    [["youtube"], { min_coins: 10 }, "coins", false],
+  ] as const)(
+    "names it for %j and %j in %s, the note %s",
+    (platforms, patch, unit, note) => {
+      open(gift(patch), [...platforms]);
+
+      expect(minimum()).toHaveTextContent(
+        new RegExp(`^Worth at least ${unit}${note ? "The" : "$"}`),
+      );
+      expect(
+        screen.getByRole("spinbutton", { name: "Worth at least" }),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it("has none for a row with no price", () => {
+    open(gift({ platform: "youtube" }), ["tiktok", "youtube"]);
+
+    expect(minimum()).toBeNull();
+  });
+
+  it.each([
+    [TOKIO_EVENTS.CHEER, "Worth at least", "Bits"],
+    [TOKIO_EVENTS.KICKS, "Worth at least", "Kicks"],
+    [TOKIO_EVENTS.SUPER_CHAT, "Worth at least", "USD"],
+    [TOKIO_EVENTS.GIFT_SUB, "At least", "gifted subs"],
+  ] as const)("takes %s's in its own unit", (type, label, unit) => {
+    open(gift({ type }), ["twitch", "youtube", "kick"]);
+
+    expect(screen.getByRole("group", { name: label })).toHaveTextContent(
+      new RegExp(`^${label} ${unit}$`),
+    );
+    expect(screen.getByRole("spinbutton", { name: label })).toBeInTheDocument();
+  });
+
+  it("has none for events without money", () => {
+    open(gift({ type: TOKIO_EVENTS.FOLLOW }), ["twitch"]);
+
+    expect(minimum()).toBeNull();
+    expect(screen.queryByRole("group", { name: "At least" })).toBeNull();
+  });
+});
+
+describe("AlertEditor's rows on their platforms", () => {
+  const ALL: Platform[] = ["tiktok", "twitch", "youtube", "kick"];
+  const row = (patch: Partial<Alert["trigger"]>) =>
+    alert({ trigger: { ...createAlert().trigger, ...patch } });
+  const open = (item: Alert, platforms: Platform[]) =>
+    renderWithProviders(
+      <PlatformsContext value={platforms}>
+        <AlertEditor
+          alert={item}
+          index={0}
+          gifts={[]}
+          emotes={[]}
+          testing={null}
+          onTest={vi.fn()}
+          onChange={vi.fn()}
+          onPickSound={vi.fn()}
+          onPickMedia={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </PlatformsContext>,
+    );
+  // The From field's checkboxes, by name, and whether each is checked
+  const roles = () => {
+    const from = screen.queryByRole("group", { name: "From" });
+    return from
+      ? within(from)
+          .getAllByRole("checkbox")
+          .map((box) => [
+            box.closest("label")?.textContent,
+            box instanceof HTMLInputElement && box.checked,
+          ])
+      : null;
+  };
+
+  it("offers the roles the row's platforms say, as they call them", () => {
+    const { unmount } = open(
+      row({ type: TOKIO_EVENTS.CHAT, platform: "tiktok" }),
+      ALL,
+    );
+    expect(roles()).toEqual([
+      ["Followers", false],
+      ["Moderators", false],
+      ["Super Fans", false],
+    ]);
+    unmount();
+
+    // Twitch never says who follows, its Super Fans are subscribers, and it
+    // has VIPs
+    const twitch = open(
+      row({ type: TOKIO_EVENTS.CHAT, platform: "twitch" }),
+      ALL,
+    );
+    expect(roles()).toEqual([
+      ["Moderators", false],
+      ["Subscribers", false],
+      ["VIPs", false],
+    ]);
+    twitch.unmount();
+
+    const youtube = open(
+      row({ type: EMOTE_TRIGGER, platform: "youtube" }),
+      ALL,
+    );
+    expect(roles()).toEqual([
+      ["Moderators", false],
+      ["Members", false],
+    ]);
+    youtube.unmount();
+
+    // Any platform names each
+    open(row({ type: TOKIO_EVENTS.CHAT }), ALL);
+    expect(roles()).toEqual([
+      ["Followers", false],
+      ["Moderators", false],
+      ["Super Fans, subscribers, and members", false],
+      ["VIPs", false],
+    ]);
+  });
+
+  it("keeps a role saved before, to clear it", () => {
+    open(
+      row({ type: TOKIO_EVENTS.CHAT, platform: "kick", roles: ["follower"] }),
+      ALL,
+    );
+
+    expect(roles()).toEqual([
+      ["Followers", true],
+      ["Moderators", false],
+      ["Subscribers", false],
+      ["VIPs", false],
+    ]);
+  });
+
+  it("has no roles or gift filter on a Kicks row, and a minimum", () => {
+    open(row({ type: TOKIO_EVENTS.KICKS, platform: "kick" }), ALL);
+
+    // Kicks come without badges
+    expect(roles()).toBeNull();
+    expect(screen.queryByRole("group", { name: "Gifts" })).toBeNull();
+    expect(
+      screen.getByRole("spinbutton", { name: "Worth at least" }),
+    ).toBeInTheDocument();
   });
 });

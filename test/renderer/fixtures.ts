@@ -21,12 +21,12 @@ import {
   Gifter,
   LiveSession,
   LiveSummary,
+  LiveTotals,
   MusicInfo,
   MyInstantsSound,
   OverlayApp,
   PackageLicense,
   TimerData,
-  TopGifter,
   VoiceData,
   VoiceEngine,
 } from "@/common/types";
@@ -130,12 +130,27 @@ export const viewer = (name: string): ActivityUser => ({
   picture: `https://example.com/${slug(name)}.png`,
 });
 
+/** A LIVE's totals: nothing counted, changed by `patch`. */
+export const liveTotals = (patch: Partial<LiveTotals> = {}): LiveTotals => ({
+  followers: 0,
+  shares: 0,
+  gifts: 0,
+  coins: 0,
+  kicks: 0,
+  bits: 0,
+  superChats: 0,
+  giftSubs: 0,
+  ...patch,
+});
+
 /** LIVE_SESSION's data: no LIVE and nothing counted, changed by `patch`. */
 export const liveSession = (patch: Partial<LiveSession> = {}): LiveSession => ({
   startedAt: null,
-  totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
+  totals: liveTotals(),
   activity: [],
   viewers: [],
+  platforms: {},
+  usd: 0,
   ...patch,
 });
 
@@ -149,32 +164,24 @@ export const liveSummary = (
   endedAt: startedAt + 3_600_000,
   coins: 0,
   gifts: 0,
+  platforms: {},
   ...patch,
 });
 
 /** A viewer who sent `coins` in `gifts` gifts, without a picture. */
-export const gifter = (name: string, coins: number, gifts = 1): Gifter => ({
+export const gifter = (
+  name: string,
+  coins: number,
+  gifts = 1,
+  patch: Partial<Gifter> = {},
+): Gifter => ({
   userId: `id-${slug(name)}`,
   username: name,
   handle: slug(name),
   picture: "",
   coins,
   gifts,
-  giftedAt: 0,
-});
-
-/** A viewer who sent `coins` this LIVE in one gift, all they ever sent, without a picture. */
-export const topGifter = (
-  name: string,
-  coins: number,
-  patch: Partial<TopGifter> = {},
-): TopGifter => ({
-  userId: `id-${slug(name)}`,
-  username: name,
-  handle: slug(name),
-  picture: "",
-  live: { coins, gifts: 1 },
-  allTime: { coins, gifts: 1 },
+  giftSubs: 0,
   giftedAt: 0,
   ...patch,
 });

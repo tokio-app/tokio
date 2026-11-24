@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { TOKIO_EVENTS } from "../types/connector";
+import { PLATFORMS, TOKIO_EVENTS } from "../types/connector";
 import {
   CUT,
   GAMES_OVERLAY_MAX_COLUMNS,
+  kicksRow,
   MAX_TRIGGERS,
   TriggerSchema,
 } from "./profile";
@@ -90,10 +91,12 @@ export const STUDIO_SHAPES = [
   "bubble",
 ] as const;
 
-// What a list shows a row of: this LIVE's top gifters, or its newest
+// What a list shows a row of: this LIVE's top gifters in their platform's
+// money, its top sub gifters (Twitch, YouTube, Kick), or its newest
 // followers, gifts or chat messages
 export const STUDIO_LIST_SOURCES = [
   "gifters",
+  "giftsubs",
   "followers",
   "gifts",
   "chat",
@@ -178,14 +181,14 @@ export const StudioTriggerSchema = z.discriminatedUnion("type", [
 const REACTION = {
   when: z.enum(STUDIO_WHEN).default("always"),
   // Its type and gifts have no defaults
-  trigger: StudioTriggerSchema.prefault({
+  trigger: z.preprocess(kicksRow, StudioTriggerSchema).prefault({
     type: TOKIO_EVENTS.FOLLOW,
     gifts: [],
   }),
   // The others it reacts to as well, kept apart from trigger so an older
   // Tokio still reacts to the first
   also_triggers: z
-    .array(StudioTriggerSchema)
+    .array(z.preprocess(kicksRow, StudioTriggerSchema))
     .max(MAX_TRIGGERS - 1)
     .default([]),
   // Seconds between a trigger and what it plays
@@ -408,6 +411,9 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
     ...ELEMENT,
     kind: z.literal("list"),
     source: z.enum(STUDIO_LIST_SOURCES).default("gifters"),
+    // Whose top gifters or sub gifters the list shows: each platform's
+    // currency is counted apart, and older overlays showed TikTok's
+    platform: z.enum(PLATFORMS).default("tiktok"),
     // How many it shows at most
     rows: z.number().int().min(1).max(STUDIO_MAX_LIST_ROWS).default(5),
     // As a text's: a font installed where the streaming app runs, Archivo
@@ -521,7 +527,9 @@ const StudioGuidesSchema = z.object({
 // autosave while it's typed.
 const StudioCounterSchema = z.object({
   name: NumberNameSchema.default(""),
-  trigger: TriggerSchema.prefault({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
+  trigger: z
+    .preprocess(kicksRow, TriggerSchema)
+    .prefault({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
 });
 
 // A studio overlay, served at getStudioOverlayURL(id). The strict schema,

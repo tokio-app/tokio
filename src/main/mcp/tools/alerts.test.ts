@@ -211,6 +211,43 @@ describe("alerts MCP tools", () => {
   });
 
   describe("alert", () => {
+    it("explains each minimum's unit, Kicks' in Kicks", async () => {
+      const { h } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const { value } = await call("describe", { name: "alert" });
+
+      for (const text of [
+        "Bits",
+        `on ${TOKIO_EVENTS.KICKS}, Kick's Kicks`,
+        "US dollars",
+        "subs gifted",
+        "Kick sends no gifts",
+      ]) {
+        expect(value).toMatchObject({
+          kind: { notes: expect.stringContaining(text) },
+        });
+      }
+    });
+
+    it("says which platforms' events carry VIPs", async () => {
+      const { h } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const { value } = await call("describe", { name: "alert" });
+
+      expect(value).toMatchObject({
+        kind: {
+          notes: expect.stringContaining(
+            "roles (follower, moderator, superfan, vip)",
+          ),
+        },
+      });
+      expect(value).toMatchObject({
+        kind: { notes: expect.stringContaining("Twitch's and Kick's vip too") },
+      });
+    });
+
     it("lists the alerts with their triggers' filters", async () => {
       const { h } = setup([
         alert(),

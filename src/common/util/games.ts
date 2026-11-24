@@ -8,6 +8,7 @@ import type {
 } from "@/common/schemas";
 import {
   ALERT_TRIGGER_LABELS,
+  AlertTrigger,
   CustomGift,
   EMOTE_TRIGGER,
   GameOverlayRow,
@@ -162,7 +163,7 @@ export function giftNames(
 /**
  * The event's own text on the games overlay, in the language: the gifts'
  * names, "100 likes", chat's keyword quoted like the timer's carousel (“tnt”,
- * none without one, as its bubble says chat), or the trigger's label.
+ * none without one, as its bubble says chat), or the trigger's name.
  * For an id in gifts twice, the first entry wins, so TikTok's list goes first.
  */
 export function gameEventText(
@@ -173,9 +174,8 @@ export function gameEventText(
   const { trigger, likes_every } = action;
   const label = translate(language, ALERT_TRIGGER_LABELS[trigger.type]);
   if (trigger.type === TOKIO_EVENTS.GIFT) {
-    if (trigger.gifts.length === 0) {
+    if (trigger.gifts.length === 0)
       return translate(language, "common.anyGift");
-    }
     return giftNames(trigger.gifts, gifts, language) ?? label;
   }
   if (trigger.type === TOKIO_EVENTS.LIKE) {
@@ -389,13 +389,17 @@ export const createStep = (kind: StepKind): GameStep => ({
 });
 
 // A new game action: a follow spawns a zombie
-export function createAction(edition: MinecraftEdition): GameAction {
+// type: the event it starts on, newRowTrigger's for the profile
+export function createAction(
+  edition: MinecraftEdition,
+  type: AlertTrigger = TOKIO_EVENTS.FOLLOW,
+): GameAction {
   return {
     id: crypto.randomUUID(),
     enabled: true,
     edition,
     trigger: {
-      type: TOKIO_EVENTS.FOLLOW,
+      type,
       gifts: [],
       every_gift: false,
       emotes: [],

@@ -2,6 +2,7 @@ import { MessageKey, translate } from "@/common/i18n";
 import { gift } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
+  amountLabel,
   COIN_OPERATORS,
   coinsLabel,
   coinUnit,
@@ -164,5 +165,12 @@ describe("coinsLabel, giftsLabel and coinUnit", () => {
     expect(coinUnit(2, "en")).toBe("coins");
     expect(coinsLabel(1, "es-419")).toBe("1 moneda");
     expect(giftsLabel(1500, "es-419")).toBe("1,500 regalos");
+  });
+
+  it("names an amount by the gift currency it was paid in", () => {
+    expect(amountLabel(500, "coins", "en")).toBe("500 coins");
+    expect(amountLabel(1, "kicks", "en")).toBe("1 Kick");
+    expect(amountLabel(1200, "kicks", "en")).toBe("1,200 Kicks");
+    expect(amountLabel(200, "kicks", "es-419")).toBe("200 Kicks");
   });
 });

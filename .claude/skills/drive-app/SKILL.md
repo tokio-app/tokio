@@ -46,7 +46,13 @@ A run rewrites every picture, and most differ only by chance: made-up IDs and ke
   await push("app:home:res:connect", {
     success: true,
     live: true,
-    stats: { views: 1200, viewers: 85, likes: 3400 },
+    platforms: { tiktok: "connected" },
+    stats: {
+      views: 1200,
+      viewers: 85,
+      likes: 3400,
+      platformViewers: { tiktok: 85 },
+    },
   });
   await push("app:home:res:session", { data: session }); // a LiveSession, src/common/types/live.ts
   ```

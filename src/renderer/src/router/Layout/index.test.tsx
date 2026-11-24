@@ -156,7 +156,7 @@ describe("Layout", () => {
     await send(APP_EVENTS_RESPONSE.CONNECTED, {
       success: true,
       live: false,
-      stats: { views: 0, viewers: 0, likes: 0 },
+      stats: { views: 0, viewers: 0, likes: 0, platformViewers: {} },
     });
 
     await user.click(titleBar().getByText("Default"));
@@ -169,7 +169,7 @@ describe("Layout", () => {
     await renderApp("/settings");
     expect(titleBar().queryByText("LIVE")).not.toBeInTheDocument();
 
-    const stats = { views: 0, viewers: 0, likes: 0 };
+    const stats = { views: 0, viewers: 0, likes: 0, platformViewers: {} };
     // Opened while a connect is still in progress
     await send(APP_EVENTS_RESPONSE.CONNECTED, {
       success: true,

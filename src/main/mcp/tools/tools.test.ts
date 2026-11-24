@@ -1,5 +1,9 @@
 import { TimerSettingsSchema } from "@/common/schemas";
-import { APP_EVENTS_RESPONSE, type Gifter } from "@/common/types";
+import {
+  APP_EVENTS_RESPONSE,
+  type Gifter,
+  type Platform,
+} from "@/common/types";
 import lives from "@/events/pages/lives";
 import tools from "@/events/pages/tools";
 import { createHandler } from "@test/handler";
@@ -122,7 +126,7 @@ describe("tools MCP tools", () => {
     });
   });
 
-  it("lists the fans matching a search, without pictures", async () => {
+  it("lists every platform's fans matching a search, without pictures", async () => {
     const fan = (username: string, handle: string, fanLevel: number) => ({
       userId: handle,
       username,
@@ -132,23 +136,53 @@ describe("tools MCP tools", () => {
       superfan: false,
       seenAt: 0,
     });
+    const sub = (handle: string, platform: Platform, months?: number) => ({
+      ...fan(handle, handle, 0),
+      userId: `${platform}:${handle}`,
+      fanBadge: "",
+      superfan: true,
+      platform,
+      ...(months && { months }),
+    });
     const h = createHandler({
       fansService: {
-        list: () => [fan("Kai", "kai", 20), fan("Ana", "ana_b", 5)],
+        all: () => [
+          fan("Kai", "kai", 20),
+          fan("Ana", "ana_b", 5),
+          sub("ana_t", "twitch", 14),
+          sub("ana_y", "youtube"),
+        ],
       },
     });
     const { call } = await mcpClient(h.handler);
+    const seen = "1970-01-01T00:00:00.000Z";
 
     expect((await call("list", { kind: "fans", query: "@ana" })).value).toEqual(
       {
-        total: 1,
+        total: 3,
         fans: [
           {
             nickname: "Ana",
             handle: "ana_b",
+            platform: "tiktok",
             fanLevel: 5,
             superfan: false,
-            lastSeenAt: "1970-01-01T00:00:00.000Z",
+            lastSeenAt: seen,
+          },
+          {
+            nickname: "ana_t",
+            handle: "ana_t",
+            platform: "twitch",
+            months: 14,
+            superfan: true,
+            lastSeenAt: seen,
+          },
+          {
+            nickname: "ana_y",
+            handle: "ana_y",
+            platform: "youtube",
+            superfan: true,
+            lastSeenAt: seen,
           },
         ],
       },
@@ -163,22 +197,59 @@ describe("tools MCP tools", () => {
       picture: "https://p16.tiktokcdn.com/kai.jpg",
       coins: 500,
       gifts: 3,
+      giftSubs: 0,
       giftedAt: 1000,
+    };
+    const kicker: Gifter = {
+      ...gifter,
+      userId: "kick:2",
+      username: "Bea",
+      handle: "bea",
+      coins: 200,
+      gifts: 1,
+      platform: "kick",
+    };
+    const twitcher: Gifter = {
+      ...gifter,
+      userId: "twitch:3",
+      username: "Mia",
+      handle: "mia",
+      coins: 100,
+      gifts: 0,
+      giftSubs: 5,
+      platform: "twitch",
+    };
+    const parts = {
+      tiktok: { amount: 500, gifts: 3, giftSubs: 0 },
+      kick: { amount: 200, gifts: 1, giftSubs: 0 },
+      twitch: { amount: 100, gifts: 0, giftSubs: 5 },
     };
     const live = {
       username: "streamer",
       startedAt: 1_000,
       endedAt: 61_000,
       coins: 500,
-      gifts: 3,
+      kicks: 200,
+      gifts: 4,
+      platforms: parts,
+    };
+    // Each amount named after its currency
+    const named = {
+      tiktok: { coins: 500, gifts: 3, giftSubs: 0 },
+      twitch: { bits: 100, gifts: 0, giftSubs: 5 },
+      kick: { kicks: 200, gifts: 1, giftSubs: 0 },
     };
     const setup = () => {
-      const history = { lives: [live], gifters: [gifter] };
+      const history = {
+        lives: [live],
+        gifters: [gifter, kicker, twitcher],
+        subGifters: [twitcher],
+      };
       const historyService = {
         getHistory: () => history,
         getLive: vi.fn(async (startedAt: number) =>
           startedAt === live.startedAt
-            ? { ...live, gifters: [gifter], minutes: [] }
+            ? { ...live, gifters: [gifter, kicker, twitcher], minutes: [] }
             : null,
         ),
         deleteLive: vi.fn(async () => {
@@ -186,8 +257,21 @@ describe("tools MCP tools", () => {
           return true;
         }),
         clear: vi.fn(async () => true),
-        getTotals: vi.fn(async () => ({ coins: 500, gifts: 3 })),
-        getGifters: vi.fn(async () => [{ ...gifter, rank: 1 }]),
+        getTotals: vi.fn(async () => ({
+          coins: 500,
+          kicks: 200,
+          gifts: 4,
+          platforms: parts,
+        })),
+        // Each ranked within their platform
+        getGifters: vi.fn(async () => ({
+          gifters: [
+            { ...gifter, rank: 1 },
+            { ...kicker, rank: 1 },
+            { ...twitcher, rank: 1 },
+          ],
+          subGifters: [{ ...twitcher, rank: 1 }],
+        })),
       };
       const h = createHandler({ historyService }, { stack: lives });
       return { h, historyService };
@@ -197,6 +281,23 @@ describe("tools MCP tools", () => {
       handle: "kai",
       coins: 500,
       gifts: 3,
+      giftSubs: 0,
+      lastGiftAt: "1970-01-01T00:00:01.000Z",
+    };
+    const kickRow = {
+      nickname: "Bea",
+      handle: "bea",
+      kicks: 200,
+      gifts: 1,
+      giftSubs: 0,
+      lastGiftAt: "1970-01-01T00:00:01.000Z",
+    };
+    const twitchRow = {
+      nickname: "Mia",
+      handle: "mia",
+      bits: 100,
+      gifts: 0,
+      giftSubs: 5,
       lastGiftAt: "1970-01-01T00:00:01.000Z",
     };
 
@@ -212,14 +313,21 @@ describe("tools MCP tools", () => {
             username: "streamer",
             startedAt: "1970-01-01T00:00:01.000Z",
             endedAt: "1970-01-01T00:01:01.000Z",
-            coins: 500,
-            gifts: 3,
+            gifts: 4,
+            platforms: named,
           },
         ],
       });
       expect(
         (await call("get", { kind: "lives", id: "1000" })).value,
-      ).toMatchObject({ totalGifters: 1, gifters: [row] });
+      ).toMatchObject({
+        gifts: 4,
+        platforms: named,
+        totalGifters: 3,
+        gifters: { tiktok: [row], twitch: [twitchRow], kick: [kickRow] },
+        // Only who gifted some
+        subGifters: { tiktok: [], twitch: [twitchRow], kick: [] },
+      });
       expect((await call("get", { kind: "lives", id: "5" })).isError).toBe(
         true,
       );
@@ -260,9 +368,26 @@ describe("tools MCP tools", () => {
       const from = new Date(2026, 10, 1).getTime();
       const to = Date.UTC(2026, 10, 2);
       expect(res.value).toEqual({
-        totals: { coins: 500, gifts: 3 },
+        platform: "tiktok",
+        by: "amount",
+        totals: named,
         gifters: [{ rank: 1, ...row }],
       });
+      expect(
+        (await call("get_gifters", { platform: "kick" })).value,
+      ).toMatchObject({
+        platform: "kick",
+        gifters: [{ rank: 1, ...kickRow }],
+      });
+      expect(
+        (await call("get_gifters", { platform: "twitch" })).value,
+      ).toMatchObject({ gifters: [{ rank: 1, ...twitchRow }] });
+      expect(
+        (await call("get_gifters", { platform: "twitch", by: "subs" })).value,
+      ).toMatchObject({ by: "subs", gifters: [{ rank: 1, ...twitchRow }] });
+      expect(
+        (await call("get_gifters", { platform: "kick", by: "subs" })).value,
+      ).toMatchObject({ gifters: [] });
       expect(historyService.getTotals).toHaveBeenCalledWith({ from, to });
       expect(historyService.getGifters).toHaveBeenCalledWith({
         from,

@@ -219,18 +219,51 @@
 }
 
 /* A trigger's platform, then its event, which takes the rest of the row */
+/* The platform, then the event. Where the row is narrow, as in Overlay
+   Studio's panel, the event goes under the platform instead of cutting both
+   short. */
 .pick {
+  container-type: inline-size;
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   min-width: 0;
 }
 
+/* Wide enough for Spanish's "Cualquier plataforma" */
 .pick > :first-child {
   flex: 0 0 auto;
-  width: 168px;
+  width: 200px;
 }
 
 .pick > :last-child {
   flex: 1;
   min-width: 0;
+}
+
+@container (max-width: 359px) {
+  .pick > :first-child,
+  .pick > :last-child {
+    flex-basis: 100%;
+  }
+}
+
+/* A row's minimum: its input inside the sentence that names its unit */
+.minimum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  color: var(--font-primary);
+  font-size: var(--font-sm);
+  font-weight: 500;
+}
+
+.minimum_input {
+  width: 88px;
+}
+
+.minimum_note {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
 }

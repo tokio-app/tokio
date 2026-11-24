@@ -53,4 +53,23 @@ describe("Tabs", () => {
     expect(onChange).not.toHaveBeenCalled();
     for (const tab of screen.getAllByRole("tab")) expect(tab).toBeDisabled();
   });
+
+  it("closes a tab from its ×, the open tab's the one in the Tab order", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const closable = TABS.map((tab) => ({
+      ...tab,
+      onClose: () => onClose(tab.value),
+      closeLabel: `Remove ${tab.value}`,
+    }));
+    render(<Tabs tabs={closable} value="Spotify" onChange={vi.fn()} />);
+
+    // The other tab's × is for the pointer only
+    expect(screen.getAllByRole("button", { name: /^Remove/ })).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Remove Spotify" }));
+    expect(onClose).toHaveBeenCalledWith("Spotify");
+
+    await user.click(screen.getByTitle("Remove YouTube", { exact: true }));
+    expect(onClose).toHaveBeenLastCalledWith("YouTube");
+  });
 });

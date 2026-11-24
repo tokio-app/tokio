@@ -121,7 +121,7 @@ function tone(file, hz) {
 
 const user = (name, handle) => ({ handle, name, picture: "" });
 
-// Coin stats' and Fans' data, sent as main's replies: the LIVEs newest first
+// LIVE history's and Fans' data, sent as main's replies: the LIVEs newest first
 // (days ago, minutes after 8 PM, hours, coins, gifts), the top gifters and
 // the fans
 const DAY = 86_400_000;
@@ -139,7 +139,14 @@ const LIVES = [
 ].map(([days, minutes, hours, coins, gifts]) => {
   const startedAt = evening - days * DAY + minutes * 60_000;
   const endedAt = startedAt + hours * 3_600_000;
-  return { username: "tokio.demo", startedAt, endedAt, coins, gifts };
+  return {
+    username: "tokio.demo",
+    startedAt,
+    endedAt,
+    coins,
+    gifts,
+    platforms: { tiktok: { amount: coins, gifts, giftSubs: 0 } },
+  };
 });
 const GIFTERS = [
   ["Leo", "leo_on_air", 9870, 412],
@@ -157,6 +164,7 @@ const GIFTERS = [
   picture: "",
   coins,
   gifts,
+  giftSubs: 0,
   giftedAt: evening - (i + 1) * DAY,
 }));
 // TikTok's own badge for the level's tier, as the connector gets it
@@ -434,10 +442,10 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
       .getByRole("option", { name: tr(alert.trigger), exact: true })
       .click();
 
-    // The coins show only for any gift, before the gifts are picked
+    // The minimum shows only for any gift, before the gifts are picked
     if (alert.coins) {
       await editor
-        .getByRole("spinbutton", { name: tr("Coins") })
+        .getByRole("spinbutton", { name: tr("Worth at least") })
         .fill(alert.coins);
       await editor.getByRole("checkbox", { name: tr(alert.role) }).check();
       await crop("alerts-trigger", editor);
@@ -1069,8 +1077,8 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await page.getByTitle(tr("Create ID")).click();
   await crop("tools-test-overlays", toolSection(tr("Test overlays")));
 
-  // Coin stats on All time, once its own request found no LIVEs
-  await tool(tr("Coin stats"));
+  // LIVE history on All time, once its own request found no LIVEs
+  await tool(tr("LIVE history"));
   await page
     .getByText(tr(en["coinStats.list.empty"], "coinStats.list.empty"))
     .waitFor();
@@ -1080,7 +1088,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     .getByRole("option")
     .nth(1)
     .waitFor();
-  await crop("coin-stats", toolSection(tr("Coin stats")));
+  await crop("coin-stats", toolSection(tr("LIVE history")));
 
   // Fans, once its own request found none, with TikTok's badges loaded
   await tool(tr("Fans"));
@@ -1343,7 +1351,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await crop("home-feed-settings", dialog);
   await dialog.getByRole("button", { name: tr("Cancel") }).click();
   await page.getByPlaceholder(tr("@username")).fill("@tokio.demo");
-  // The box alone: its row, Add a platform and Connect
+  // The box alone: the platform's tab with its +, and its connection
   await crop("home-connect", page.locator('[data-tour="connect"]'), {
     pad: 16,
   });
@@ -1401,41 +1409,60 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await push("app:home:res:connect", {
     success: true,
     live: true,
-    stats: { views: 18250, viewers: 342, likes: 52410 },
+    platforms: { tiktok: "connected" },
+    stats: {
+      views: 18250,
+      viewers: 342,
+      likes: 52410,
+      platformViewers: { tiktok: 342 },
+    },
   });
+  const totals = {
+    followers: 48,
+    shares: 17,
+    gifts: 126,
+    coins: 3480,
+    kicks: 0,
+    bits: 0,
+    superChats: 0,
+    giftSubs: 0,
+  };
+  // Each minute's highest viewer count: a climb, a peak of 412, then
+  // settling toward the 342 watching now
+  const viewers = [
+    40, 82, 94, 109, 145, 165, 161, 176, 209, 220, 220, 247, 276, 276, 275, 297,
+    308, 295, 299, 325, 332, 325, 342, 365, 359, 349, 364, 373, 357, 355, 378,
+    385, 374, 385, 405, 397, 382, 392, 401, 386, 381, 402, 401, 397, 402, 404,
+    409, 412, 397, 403, 388, 378, 394, 398, 378, 373, 384, 370, 344, 344, 353,
+    339, 330, 351, 365, 354, 356, 374, 372, 354, 360, 378, 371, 363, 381, 371,
+    366, 368, 361, 355, 350, 346, 342,
+  ];
   await push("app:home:res:session", {
     data: {
       startedAt: Date.now() - (1 * 60 + 23) * 60_000,
-      totals: { followers: 48, shares: 17, gifts: 126, coins: 3480 },
+      totals,
       activity,
-      // Each minute's highest viewer count: a climb, a peak of 412, then
-      // settling toward the 342 watching now
-      viewers: [
-        40, 82, 94, 109, 145, 165, 161, 176, 209, 220, 220, 247, 276, 276, 275,
-        297, 308, 295, 299, 325, 332, 325, 342, 365, 359, 349, 364, 373, 357,
-        355, 378, 385, 374, 385, 405, 397, 382, 392, 401, 386, 381, 402, 401,
-        397, 402, 404, 409, 412, 397, 403, 388, 378, 394, 398, 378, 373, 384,
-        370, 344, 344, 353, 339, 330, 351, 365, 354, 356, 374, 372, 354, 360,
-        378, 371, 363, 381, 371, 366, 368, 361, 355, 350, 346, 342,
-      ],
+      viewers,
+      platforms: { tiktok: { totals, viewers } },
+      usd: 0,
     },
   });
   // This LIVE's top gifters, from the feed's people
-  await push("app:home:res:gifters", {
-    data: [
-      ["Leo", "leo_on_air", 1000, 1],
-      ["Ana", "ana.bakes", 480, 14],
-      ["Sam", "samwise", 300, 9],
-    ].map(([username, handle, coins, gifts], i) => ({
-      userId: `live-gifter-${i}`,
-      username,
-      handle,
-      picture: "",
-      live: { coins, gifts },
-      allTime: { coins, gifts },
-      giftedAt: Date.now() - (i + 1) * 60_000,
-    })),
-  });
+  const gifters = [
+    ["Leo", "leo_on_air", 1000, 1],
+    ["Ana", "ana.bakes", 480, 14],
+    ["Sam", "samwise", 300, 9],
+  ].map(([username, handle, coins, gifts], i) => ({
+    userId: `live-gifter-${i}`,
+    username,
+    handle,
+    picture: "",
+    coins,
+    gifts,
+    giftSubs: 0,
+    giftedAt: Date.now() - (i + 1) * 60_000,
+  }));
+  await push("app:home:res:gifters", { byPlatform: { tiktok: gifters } });
   // A song playing, so the rail shows it at its foot
   await push("app:music:res:music:connected", { success: true });
   await push("app:home:res:songs", {

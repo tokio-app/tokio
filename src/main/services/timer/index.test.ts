@@ -80,6 +80,7 @@ const settings = (
       sub: 0,
       gift_sub: 0,
       bit: 0,
+      kick: 0,
       superchat: 0,
       ...seconds,
     },
@@ -334,6 +335,23 @@ describe("TimerService", () => {
 
       // 2 more Roses of 5 coins, 2 s each
       expect(changes).toEqual([20_000]);
+    });
+
+    it("counts Kick's Kicks per Kick, and nothing for a YouTube gift", () => {
+      ready(settings({}, { coin: 2, kick: 0.5 }));
+      const youtube = gift(1, true, 100, "y");
+
+      timer.handle(TOKIO_EVENTS.KICKS, {
+        user: { ...viewer("k"), platform: "kick" },
+        kicks: 100,
+        message: "",
+      });
+      timer.handle(TOKIO_EVENTS.GIFT, {
+        ...youtube,
+        user: { ...youtube.user, platform: "youtube" },
+      });
+
+      expect(changes).toEqual([50_000]);
     });
 
     it("adds the like cycles and carries the rest over", () => {

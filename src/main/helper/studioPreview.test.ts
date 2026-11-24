@@ -41,6 +41,7 @@ const services = () =>
       getOverlays: () => [],
     },
     serverService: { getPort: () => 37891 },
+    storeManagerService: { getProfileData: async () => null },
   }).handler;
 
 type Page = InstanceType<typeof BrowserWindow>["webContents"];

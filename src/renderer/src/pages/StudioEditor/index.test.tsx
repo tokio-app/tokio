@@ -9,7 +9,12 @@ import {
   StudioOverlay,
   TriggerSchema,
 } from "@/common/schemas";
-import { APP_EVENTS, APP_EVENTS_RESPONSE, TOKIO_EVENTS } from "@/common/types";
+import {
+  APP_EVENTS,
+  APP_EVENTS_RESPONSE,
+  Platform,
+  TOKIO_EVENTS,
+} from "@/common/types";
 import { newStudioElement, newStudioGroup } from "@/common/util";
 import { rotateCursor } from "./helper";
 import { createAction } from "@/common/util";
@@ -1627,6 +1632,25 @@ describe("StudioEditor", () => {
     expect(page().getByText("This event has no variables.")).toBeVisible();
   });
 
+  it("lists only the variables the row's platform fills", async () => {
+    const element = text({
+      text: "Thanks",
+      when: "event",
+      trigger: TriggerSchema.parse({
+        type: TOKIO_EVENTS.GIFT,
+        gifts: [],
+        platform: "youtube",
+      }),
+    });
+    const { user } = await open(scene(element));
+    await user.click(row(/^Thanks/));
+
+    // YouTube's Gifts come one at a time: no count to say
+    const event = within(page().getByText("From the event:").closest("p")!);
+    expect(event.getByTitle("Insert {gift}")).toBeVisible();
+    expect(event.queryByTitle("Insert {count}")).toBeNull();
+  });
+
   it("makes an element show on an event, with its trigger, seconds and entrance", async () => {
     const element = text({ text: "Thanks {username}" });
     const { user } = await open(scene(element));
@@ -1715,6 +1739,101 @@ describe("StudioEditor", () => {
       page().getByRole("radio", { name: "The emote a viewer sends" }),
     ).toBeChecked();
     expect(page().getByText(/once viewers use them/)).toBeVisible();
+  });
+
+  describe("on the profile's platforms", () => {
+    const usingPlatforms = (platforms: Platform[]) =>
+      send(
+        APP_EVENTS_RESPONSE.GET_PROFILE,
+        profileReply((p) => {
+          p.platforms = platforms;
+        }),
+      );
+
+    it("adds a Gift element only where gifts come", async () => {
+      const { user } = await open(holding());
+      // Twitch sends none, Kick sends Kicks
+      await usingPlatforms(["twitch", "kick"]);
+      await user.click(addMenu());
+      expect(screen.queryByRole("menuitem", { name: "Gift" })).toBeNull();
+      expect(screen.getByRole("menuitem", { name: "Emote" })).toBeVisible();
+      await user.keyboard("{Escape}");
+
+      await usingPlatforms(["youtube"]);
+      await user.click(addMenu());
+      expect(screen.getByRole("menuitem", { name: "Gift" })).toBeVisible();
+    });
+
+    it("picks from TikTok's gifts only with TikTok, or to change one picked", async () => {
+      const sent = elementOf("gift", { label: "Sent" });
+      const picked = elementOf("gift", { label: "Picked", gift: 5655 });
+      const { user } = await open(scene(sent, picked));
+      await usingPlatforms(["youtube"]);
+
+      await user.click(row(/^Sent/));
+      expect(
+        page().getByRole("radio", { name: "The gift a viewer sends" }),
+      ).toBeChecked();
+      expect(
+        page().queryByRole("radio", { name: "A gift you pick" }),
+      ).toBeNull();
+
+      await user.click(row(/^Picked/));
+      expect(
+        page().getByRole("radio", { name: "A gift you pick" }),
+      ).toBeChecked();
+    });
+
+    it("picks from the emotes of the profile's platforms", async () => {
+      const element = elementOf("emote");
+      const { user } = await open(scene(element));
+      await usingPlatforms(["kick"]);
+      await send(APP_EVENTS_RESPONSE.EMOTES, {
+        data: [
+          { id: "7001", image: "https://x/7001.png" },
+          {
+            id: "kick:37226",
+            image: "https://files.kick.com/emotes/37226/fullsize",
+          },
+        ],
+      });
+      await user.click(row(/^Emote/));
+
+      await user.click(
+        page().getByRole("radio", { name: "An emote you pick" }),
+      );
+
+      // TikTok's comes first, but the profile has only Kick
+      await waitFor(() =>
+        expect(savedElement()).toMatchObject({
+          emote: { id: "kick:37226" },
+        }),
+      );
+    });
+
+    it("lists followers and gifts only from platforms that send them", async () => {
+      const list = elementOf("list", { source: "gifts" });
+      const { user } = await open(holding(list));
+      await usingPlatforms(["twitch"]);
+      await user.click(row(/^Latest gifts/));
+
+      await user.click(field("Shows").getByText("Latest gifts"));
+      const shows = page().getByRole("group", { name: "Shows" });
+      expect(inList(shows, "New followers")).toBeTruthy();
+      // Twitch sends no gifts, but the saved source stays to change
+      expect(inList(shows, "Latest gifts")).toBeTruthy();
+      await user.keyboard("{Escape}");
+
+      await usingPlatforms(["kick"]);
+      await user.click(field("Shows").getByText("Latest gifts"));
+      expect(inList(shows, "New followers")).toBeNull();
+      await user.click(inList(shows, "Chat")!);
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ source: "chat" }),
+      );
+      await user.click(field("Shows").getByText("Chat"));
+      expect(inList(shows, "Latest gifts")).toBeNull();
+    });
   });
 
   it("turns a shape's fill off and a border on", async () => {
@@ -1991,7 +2110,8 @@ describe("StudioEditor", () => {
       "Shape, shows on Follow or Gift",
     );
 
-    // A goal watches a LIVE number, but the LIVE's length, or a counter
+    // A goal watches a LIVE number the profile's platforms fill, but the
+    // LIVE's length, or a counter
     await pick(user, "Trigger 2", "Gift", "Goal reached");
     await waitFor(() =>
       expect(savedElement()?.also_triggers).toEqual([
@@ -2002,6 +2122,8 @@ describe("StudioEditor", () => {
     await user.click(within(goal).getByText("{likes}"));
     expect(inList(goal, "{coins}")).not.toBeNull();
     expect(inList(goal, "{uptime}")).toBeNull();
+    expect(inList(goal, "{kicks}")).toBeNull();
+    expect(inList(goal, "{bits}")).toBeNull();
     await user.click(inList(goal, "{roses}")!);
     const value = within(goal).getByRole("spinbutton", { name: "Goal" });
     await user.clear(value);
@@ -2054,6 +2176,38 @@ describe("StudioEditor", () => {
     expect(
       field("Trigger").getByRole("spinbutton", { name: "Likes per reaction" }),
     ).toBeVisible();
+  });
+
+  it("holds a reaction to a minimum in its event's unit, as an alert's", async () => {
+    const { user } = await open(
+      scene(
+        elementOf("shape", {
+          when: "event",
+          trigger: TriggerSchema.parse({ type: TOKIO_EVENTS.CHEER, gifts: [] }),
+          also_triggers: [
+            TriggerSchema.parse({ type: TOKIO_EVENTS.FOLLOW, gifts: [] }),
+          ],
+        }),
+      ),
+    );
+    await user.click(row(/^Rectangle/));
+
+    // Bits have one, in Bits; a follow none
+    const minimum = field("Worth at least");
+    expect(minimum.getByText("Bits")).toBeVisible();
+    expect(
+      page().getAllByRole("spinbutton", { name: "Worth at least" }),
+    ).toHaveLength(1);
+    const input = minimum.getByRole("spinbutton");
+    await user.clear(input);
+    await user.type(input, "100");
+
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        trigger: { type: TOKIO_EVENTS.CHEER, min_coins: 100 },
+        also_triggers: [{ type: TOKIO_EVENTS.FOLLOW, min_coins: 0 }],
+      }),
+    );
   });
 
   it("offers a viewer's extra rows only the events a viewer sends, and no goal", async () => {
@@ -4205,6 +4359,87 @@ describe("StudioEditor", () => {
         "12.4K",
       );
       expect(page().getByRole("group", { name: "Number color" })).toBeVisible();
+    });
+
+    it("picks whose top gifters it shows once the profile uses another platform", async () => {
+      const list = elementOf("list");
+      const { user } = await open(holding(list));
+      await user.click(row(/^Top gifters/));
+      // TikTok's alone: nothing to pick
+      expect(page().queryByRole("group", { name: "Platform" })).toBeNull();
+
+      await send(
+        APP_EVENTS_RESPONSE.GET_PROFILE,
+        profileReply((p) => {
+          p.platforms = ["tiktok", "youtube"];
+        }),
+      );
+      await user.click(field("Platform").getByText("TikTok"));
+      const platform = page().getByRole("group", { name: "Platform" });
+      // The profile's platforms, each ranking in its own currency
+      expect(inList(platform, "TikTok")).toBeTruthy();
+      expect(inList(platform, "Twitch")).toBeNull();
+      expect(inList(platform, "Kick")).toBeNull();
+      await user.click(inList(platform, "YouTube")!);
+
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ platform: "youtube" }),
+      );
+      // YouTube's in US dollars
+      expect(drawn(list.id).querySelector(".studio-number")!.textContent).toBe(
+        "$124.00",
+      );
+
+      // A profile without YouTube keeps it shown, to change
+      await send(APP_EVENTS_RESPONSE.GET_PROFILE, profileReply());
+      await user.click(field("Platform").getByText("YouTube"));
+      const kept = page().getByRole("group", { name: "Platform" });
+      expect(inList(kept, "TikTok")).toBeTruthy();
+      expect(inList(kept, "Kick")).toBeNull();
+    });
+
+    it("tops Twitch's Bits and its gifted subs as two sources", async () => {
+      const list = elementOf("list");
+      const { user } = await open(holding(list));
+      await send(
+        APP_EVENTS_RESPONSE.GET_PROFILE,
+        profileReply((p) => {
+          p.platforms = ["twitch"];
+        }),
+      );
+      await user.click(row(/^Top gifters/));
+
+      // The saved TikTok top stays to change, named by its money
+      await user.click(field("Shows").getByText("Top gifters this LIVE"));
+      const shows = page().getByRole("group", { name: "Shows" });
+      expect(inList(shows, "New followers")).toBeTruthy();
+      expect(inList(shows, "Latest gifts")).toBeNull();
+      await user.click(inList(shows, "Top gifted subs this LIVE")!);
+
+      // TikTok gifts no subs: the list moves to Twitch's
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          source: "giftsubs",
+          platform: "twitch",
+        }),
+      );
+      expect(row(/^Top gifted subs this LIVE/)).toBeVisible();
+
+      // Twitch's money top is its Bits
+      await user.click(field("Shows").getByText("Top gifted subs this LIVE"));
+      await user.click(
+        inList(
+          page().getByRole("group", { name: "Shows" }),
+          "Top Bits this LIVE",
+        )!,
+      );
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          source: "gifters",
+          platform: "twitch",
+        }),
+      );
+      expect(row(/^Top Bits this LIVE/)).toBeVisible();
     });
 
     it("lists another source, with its own rows and fields", async () => {

@@ -29,6 +29,7 @@ import {
   GamesStatus,
   Gift,
   GiftEvent,
+  Gifter,
   LikeEvent,
   LiveHistory,
   MusicInfo,
@@ -42,7 +43,7 @@ import {
   defaultProfile,
   defaultStoreData,
   formatStat,
-  generateTikTokEventSample,
+  generateEventSample,
   timerTriggers,
 } from "@/common/util";
 import config from "@/config";
@@ -56,6 +57,7 @@ import { HISTORY_EVENTS, type HistoryService } from "@/services/history";
 import { LiveService } from "@/services/live";
 import type { MusicService } from "@/services/music";
 import type { OverlayService } from "@/services/overlay";
+import type { RatesService } from "@/services/rates";
 import type { StoreManagerService } from "@/services/store";
 import { StudioService } from "@/services/studio";
 import type { TimerService } from "@/services/timer";
@@ -110,6 +112,8 @@ const folders: Folders = {
 };
 
 const noStats = { likes: 0, viewers: 0, views: 0 };
+// What CONNECTED says without a LIVE
+const noLiveStats = { ...noStats, platformViewers: {} };
 const profile: Profile = { ...defaultProfile, name: "Stream" };
 const profiles = [{ name: "Stream", file: "stream.json" }];
 const tiktokRose: Gift = {
@@ -239,6 +243,7 @@ function setup() {
     ...conn,
     username: "streamer",
     setLogFile: vi.fn(),
+    setRates: vi.fn((..._args: Parameters<ConnectorService["setRates"]>) => {}),
     setChatStage: vi.fn(
       (..._args: Parameters<ConnectorService["setChatStage"]>) => {},
     ),
@@ -252,6 +257,7 @@ function setup() {
       (..._args: Parameters<ConnectorService["onTwitchAccount"]>) => {},
     ),
     status: vi.fn((): ReturnType<ConnectorService["status"]> => ({})),
+    viewers: vi.fn((): ReturnType<ConnectorService["viewers"]> => ({})),
     isConnected: vi.fn(() => false),
     isReconnecting: vi.fn(() => false),
     isWaiting: vi.fn(() => false),
@@ -401,13 +407,25 @@ function setup() {
     ),
     load: vi.fn(async (_file: string) => true),
     start: vi.fn((_username: string) => {}),
+    join: vi.fn((..._args: Parameters<HistoryService["join"]>) => {}),
+    setRates: vi.fn((..._args: Parameters<HistoryService["setRates"]>) => {}),
     record: vi.fn((..._args: Parameters<HistoryService["record"]>) => {}),
     end: vi.fn(() => {}),
     top: vi.fn((): { live: TopGifter[]; allTime: TopGifter[] } => ({
       live: [],
       allTime: [],
     })),
-    getHistory: vi.fn((): LiveHistory => ({ lives: [], gifters: [] })),
+    topByPlatform: vi.fn(
+      (): ReturnType<HistoryService["topByPlatform"]> => ({}),
+    ),
+    topSubGifters: vi.fn(
+      (): ReturnType<HistoryService["topSubGifters"]> => ({}),
+    ),
+    getHistory: vi.fn((): LiveHistory => ({
+      lives: [],
+      gifters: [],
+      subGifters: [],
+    })),
     save: vi.fn(async () => true),
     onChange: vi.fn((_listener: () => void) => {}),
   };
@@ -426,6 +444,17 @@ function setup() {
   const yamlManagerService = { setLogFile: vi.fn() };
   const studioService = new StudioService();
   const controlsService = new ControlsService();
+  const rateListeners: (() => void)[] = [];
+  const ratesService = {
+    setLogFile: vi.fn(),
+    refresh: vi.fn(async (_now?: number) => {}),
+    toUsd: vi.fn(
+      (..._args: Parameters<RatesService["toUsd"]>): number | null => 0,
+    ),
+    onChange: vi.fn((listener: () => void) => {
+      rateListeners.push(listener);
+    }),
+  };
   const translationService = {
     setLogFile: vi.fn(),
     forChat: vi.fn(
@@ -461,6 +490,7 @@ function setup() {
     yamlManagerService,
     translationService,
     controlsService,
+    ratesService,
   });
 
   return {
@@ -494,6 +524,8 @@ function setup() {
     yamlManagerService,
     translationService,
     controlsService,
+    ratesService,
+    rateListeners,
   };
 }
 
@@ -555,7 +587,7 @@ describe("init events", () => {
 
     it.each(triggers)("passes %s to the alerts", async (trigger) => {
       const s = await live();
-      const { data } = generateTikTokEventSample(trigger);
+      const { data } = generateEventSample(trigger);
 
       // Music change comes once per song, through onSongChange
       const songStarts = {
@@ -605,8 +637,8 @@ describe("init events", () => {
 
     it("drops live events while the alerts are off", async () => {
       const s = await live({ alerts: false });
-      const first = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data;
-      const second = generateTikTokEventSample(TOKIO_EVENTS.SHARE).data;
+      const first = generateEventSample(TOKIO_EVENTS.FOLLOW).data;
+      const second = generateEventSample(TOKIO_EVENTS.SHARE).data;
 
       s.conn.emit(TOKIO_EVENTS.FOLLOW, first);
       s.features.alerts = true;
@@ -672,7 +704,7 @@ describe("init events", () => {
 
       s.conn.emit(
         TOKIO_EVENTS.GIFT,
-        generateTikTokEventSample(TOKIO_EVENTS.GIFT).data,
+        generateEventSample(TOKIO_EVENTS.GIFT).data,
       );
 
       await vi.waitFor(() => {
@@ -690,6 +722,22 @@ describe("init events", () => {
         "alerts.log",
         expect.any(Error),
       );
+    });
+
+    it("names a Kicks alert Kicks when it fails", async () => {
+      const s = await live();
+      s.alertsService.handle.mockRejectedValue(new Error("decode failed"));
+      const { data } = generateEventSample(TOKIO_EVENTS.KICKS, "kick");
+
+      s.conn.emit(TOKIO_EVENTS.KICKS, data);
+
+      await vi.waitFor(() => {
+        expect(s.h.notices).toEqual([
+          expect.objectContaining({
+            message: "Unable to play the Kicks alert.",
+          }),
+        ]);
+      });
     });
 
     // The failure callback the alerts got for a follow
@@ -743,6 +791,24 @@ describe("init events", () => {
         expect.objectContaining({
           message:
             "The sound of the Emote alert is missing. Pick it again in Alerts.",
+        }),
+      ]);
+    });
+
+    it("names a Kicks row Kicks", async () => {
+      const { s, callback } = await onFailure();
+      const first = alert();
+
+      callback(first, undefined, {
+        ...first.trigger,
+        type: TOKIO_EVENTS.KICKS,
+        platform: "kick",
+      });
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          message:
+            "The sound of the Kicks alert is missing. Pick it again in Alerts.",
         }),
       ]);
     });
@@ -856,7 +922,7 @@ describe("init events", () => {
     it.each(triggers)("passes %s to the games", async (trigger) => {
       // Whatever features are on
       const s = await live({ alerts: false });
-      const { data } = generateTikTokEventSample(trigger);
+      const { data } = generateEventSample(trigger);
 
       // Music change comes once per song, through the alerts' onSongChange
       const songStarts = {
@@ -1322,6 +1388,20 @@ describe("init events", () => {
       ).toBe(true);
     });
 
+    it("sends the numbers again when the exchange rates load", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      withOverlay(s, [
+        element("t", { kind: "text", text: "{viewers} watching" }),
+      ]);
+      s.serverService.sendToClient.mockClear();
+
+      for (const listener of s.rateListeners) listener();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(texts(s)).toEqual([["0 watching"]]);
+    });
+
     it("counts the session's followers while LIVE", async () => {
       const s = await live();
       withOverlay(s, [element("t", { kind: "text", text: "{followers} new" })]);
@@ -1338,19 +1418,19 @@ describe("init events", () => {
       const s = await live();
       withOverlay(s, [element("l", { kind: "list" })]);
       s.serverService.sendToClient.mockClear();
-      s.historyService.top.mockReturnValue({
-        live: [
+      s.historyService.topByPlatform.mockReturnValue({
+        tiktok: [
           {
             userId: "1",
             username: "Ana",
             handle: "ana",
             picture: "",
-            live: { coins: 50, gifts: 1 },
-            allTime: { coins: 50, gifts: 1 },
+            coins: 50,
+            gifts: 1,
+            giftSubs: 0,
             giftedAt: 0,
           },
         ],
-        allTime: [],
       });
 
       for (const [listener] of s.historyService.onChange.mock.calls) listener();
@@ -1619,7 +1699,7 @@ describe("init events", () => {
         s.conn.emit(TOKIO_EVENTS.LIKE, like(n * 100));
       }
       expect(s.h.pushed(APP_EVENTS_RESPONSE.VIEWS)).toEqual([
-        { data: { views: 10, viewers: 1 } },
+        { data: { views: 10, viewers: 1, platformViewers: {} } },
       ]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.LIKES)).toEqual([{ likes: 100 }]);
 
@@ -1629,13 +1709,36 @@ describe("init events", () => {
 
       vi.advanceTimersByTime(1);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.VIEWS)).toEqual([
-        { data: { views: 10, viewers: 1 } },
-        { data: { views: 30, viewers: 3 } },
+        { data: { views: 10, viewers: 1, platformViewers: {} } },
+        { data: { views: 30, viewers: 3, platformViewers: {} } },
       ]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.LIKES)).toEqual([
         { likes: 100 },
         { likes: 300 },
       ]);
+    });
+
+    it("pushes each platform's viewers with the room's, and keeps their minutes", async () => {
+      vi.useFakeTimers({ now: 0 });
+      const s = await live();
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
+      s.connectorService.viewers.mockReturnValue({ tiktok: 6, kick: 2 });
+
+      s.conn.emit(TOKIO_EVENTS.ROOM_USER, roomUser(100, 8));
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.VIEWS)).toEqual([
+        {
+          data: {
+            views: 100,
+            viewers: 8,
+            platformViewers: { tiktok: 6, kick: 2 },
+          },
+        },
+      ]);
+      expect(s.liveService.getSession()).toMatchObject({
+        viewers: [8],
+        platforms: { tiktok: { viewers: [6] }, kick: { viewers: [2] } },
+      });
     });
 
     it("keeps the likes from going down until the LIVE disconnects", async () => {
@@ -1679,7 +1782,16 @@ describe("init events", () => {
   });
 
   describe("live session", () => {
-    const noTotals = { followers: 0, shares: 0, gifts: 0, coins: 0 };
+    const noTotals = {
+      followers: 0,
+      shares: 0,
+      gifts: 0,
+      coins: 0,
+      kicks: 0,
+      bits: 0,
+      superChats: 0,
+      giftSubs: 0,
+    };
     // What the Home page got, oldest first
     const sessions = (s: Setup) =>
       s.h.pushed(APP_EVENTS_RESPONSE.LIVE_SESSION).map(({ data }) => data);
@@ -1693,7 +1805,14 @@ describe("init events", () => {
       connect(s);
 
       expect(sessions(s)).toEqual([
-        { startedAt: 5000, totals: noTotals, activity: [], viewers: [] },
+        {
+          startedAt: 5000,
+          totals: noTotals,
+          activity: [],
+          viewers: [],
+          platforms: {},
+          usd: 0,
+        },
       ]);
     });
 
@@ -1717,6 +1836,50 @@ describe("init events", () => {
           expect.objectContaining({ type: "follow" }),
         ],
       });
+    });
+
+    it("gives the connector the rates, so every Super Chat carries its dollars", async () => {
+      const s = await live();
+      expect(s.connectorService.setRates).toHaveBeenCalledWith(s.ratesService);
+    });
+
+    it("adds up the Super Chats in dollars, and pushes them again when the rates load", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      connect(s);
+      s.ratesService.toUsd.mockReturnValue(null);
+      s.conn.emit(TOKIO_EVENTS.SUPER_CHAT, {
+        user: { ...user, platform: "youtube" },
+        amount: "€5.00",
+        message: "",
+        sticker: "",
+      });
+      vi.advanceTimersByTime(250);
+      expect(sessions(s).at(-1)).toMatchObject({ usd: null });
+      expect(s.ratesService.toUsd).toHaveBeenLastCalledWith({ EUR: 5 });
+
+      s.ratesService.toUsd.mockReturnValue(5.75);
+      for (const listener of s.rateListeners) listener();
+      vi.advanceTimersByTime(250);
+
+      expect(sessions(s).at(-1)).toMatchObject({ usd: 5.75 });
+    });
+
+    it("loads the exchange rates when YouTube is in the LIVE", async () => {
+      const s = await live();
+      const [changed] = s.connectorService.onPlatform.mock.calls[0];
+
+      connect(s);
+      changed("twitch", "up");
+      expect(s.ratesService.refresh).not.toHaveBeenCalled();
+
+      s.connectorService.status.mockReturnValue({ youtube: "connected" });
+      connect(s);
+      expect(s.ratesService.refresh).toHaveBeenCalledOnce();
+      changed("youtube", "up");
+      changed("youtube", "ended");
+      expect(s.ratesService.refresh).toHaveBeenCalledTimes(2);
+      expect(s.ratesService.setLogFile).toHaveBeenCalledWith(files.logs.system);
     });
 
     it("pushes nothing for events that don't change it", async () => {
@@ -1830,7 +1993,7 @@ describe("init events", () => {
 
     it.each(TIMER_EVENTS)("passes %s to the timer", async (event) => {
       const s = await live();
-      const { data } = generateTikTokEventSample(event);
+      const { data } = generateEventSample(event);
 
       emitLive(s.conn, event, data);
 
@@ -2057,13 +2220,27 @@ describe("init events", () => {
 
     it.each(FAN_EVENTS)("records the viewer of %s", async (event) => {
       const s = await live();
-      const { data } = generateTikTokEventSample(event);
+      const { data } = generateEventSample(event);
 
       emitLive(s.conn, event, data);
 
       expect(s.fansService.record).toHaveBeenCalledExactlyOnceWith(
         data.user,
         event,
+        "months" in data ? data.months : undefined,
+      );
+    });
+
+    it("records a sub with its months", async () => {
+      const s = await live();
+      const { data } = generateEventSample(TOKIO_EVENTS.SUBSCRIBE);
+
+      emitLive(s.conn, TOKIO_EVENTS.SUBSCRIBE, { ...data, months: 7 });
+
+      expect(s.fansService.record).toHaveBeenCalledExactlyOnceWith(
+        data.user,
+        TOKIO_EVENTS.SUBSCRIBE,
+        7,
       );
     });
 
@@ -2186,6 +2363,17 @@ describe("init events", () => {
       allTime: { coins: 105, gifts: 6 },
       giftedAt: 1000,
     };
+    // Ana's records in this LIVE, which Home gets
+    const record: Gifter = {
+      userId: "42",
+      username: "Ana",
+      handle: "ana",
+      picture: "ana.png",
+      coins: 5,
+      gifts: 5,
+      giftSubs: 0,
+      giftedAt: 1000,
+    };
     const top = (live: TopGifter[] = [], allTime: TopGifter[] = []) => ({
       live,
       allTime,
@@ -2203,9 +2391,29 @@ describe("init events", () => {
       );
     });
 
+    it("tells the history each platform in the LIVE, the first one and those that come up later", async () => {
+      const s = await live();
+      s.connectorService.status.mockReturnValue({
+        kick: "connected",
+        twitch: "connecting",
+      });
+
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
+      expect(s.historyService.join.mock.calls).toEqual([["kick"]]);
+      expect(s.historyService.start).toHaveBeenCalledBefore(
+        s.historyService.join,
+      );
+
+      const [changed] = s.connectorService.onPlatform.mock.calls[0];
+      changed("twitch", "up");
+      changed("youtube", "lost");
+      expect(s.historyService.join.mock.calls).toEqual([["kick"], ["twitch"]]);
+      expect(s.historyService.setRates).toHaveBeenCalledWith(s.ratesService);
+    });
+
     it.each(HISTORY_EVENTS)("records %s", async (event) => {
       const s = await live();
-      const { data } = generateTikTokEventSample(event);
+      const { data } = generateEventSample(event);
 
       emitLive(s.conn, event, data);
 
@@ -2217,7 +2425,7 @@ describe("init events", () => {
 
     it("ends the LIVE, pushes the LIVEs and saves when the connection stops", async () => {
       const s = await live();
-      const history: LiveHistory = { lives: [], gifters: [] };
+      const history: LiveHistory = { lives: [], gifters: [], subGifters: [] };
       s.historyService.getHistory.mockReturnValue(history);
 
       s.conn.emit(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
@@ -2265,6 +2473,8 @@ describe("init events", () => {
 
       change(s);
       s.historyService.top.mockReturnValue(top([gifter]));
+      s.historyService.topByPlatform.mockReturnValue({ tiktok: [record] });
+      s.historyService.topSubGifters.mockReturnValue({ kick: [record] });
       change(s);
       change(s);
       expect(s.serverService.sendToAll.mock.calls).toEqual([[message()]]);
@@ -2275,10 +2485,14 @@ describe("init events", () => {
         [message()],
         [message(top([gifter]))],
       ]);
-      // Home gets this LIVE's with each push
+      // Home gets each platform's in this LIVE with each push, gifted subs
+      // topped apart
       expect(s.h.pushed(APP_EVENTS_RESPONSE.LIVE_GIFTERS)).toEqual([
-        { data: [] },
-        { data: [gifter] },
+        { byPlatform: {}, subsByPlatform: {} },
+        {
+          byPlatform: { tiktok: [record] },
+          subsByPlatform: { kick: [record] },
+        },
       ]);
     });
 
@@ -2376,7 +2590,7 @@ describe("init events", () => {
           reconnecting: false,
           waiting: false,
           platforms: {},
-          stats: noStats,
+          stats: noLiveStats,
         },
       ]);
       expect(s.storeManagerService.updateLiveStats).toHaveBeenLastCalledWith(
@@ -2450,7 +2664,7 @@ describe("init events", () => {
           reconnecting: false,
           waiting: true,
           platforms: {},
-          stats: noStats,
+          stats: noLiveStats,
         },
       ]);
     });
@@ -2492,7 +2706,7 @@ describe("init events", () => {
           reconnecting: false,
           waiting: false,
           platforms: {},
-          stats: noStats,
+          stats: noLiveStats,
         },
       ]);
     });
@@ -2528,7 +2742,7 @@ describe("init events", () => {
         live: true,
         waiting: false,
         platforms: {},
-        stats: noStats,
+        stats: noLiveStats,
       };
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
         { ...state, reconnecting: true },
@@ -3124,9 +3338,7 @@ describe("init events", () => {
   describe("music playback", () => {
     it("pushes the queue to the window as it changes", async () => {
       const s = await live();
-      const { data: songs } = generateTikTokEventSample(
-        TOKIO_EVENTS.MUSIC_CHANGE,
-      );
+      const { data: songs } = generateEventSample(TOKIO_EVENTS.MUSIC_CHANGE);
 
       s.music.emit(TOKIO_EVENTS.MUSIC_CHANGE, songs);
       s.h.win.close();
@@ -3249,7 +3461,7 @@ describe("init events", () => {
       s.conn.emit(TOKIO_EVENTS.FOLLOW, { user });
       s.conn.emit(
         TOKIO_EVENTS.SHARE,
-        generateTikTokEventSample(TOKIO_EVENTS.SHARE).data,
+        generateEventSample(TOKIO_EVENTS.SHARE).data,
       );
       await vi.waitFor(() => expect(plays).toHaveLength(2));
       const [follow, share] = plays;
@@ -3768,6 +3980,36 @@ describe("init events", () => {
         expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
           { success: true },
         ]);
+      });
+    });
+
+    describe("on a profile without TikTok", () => {
+      const kickOnly = (s: ReturnType<typeof setup>) =>
+        s.storeManagerService.getProfileData.mockResolvedValue({
+          ...profile,
+          platforms: ["kick"],
+        });
+
+      it("never asks TikTok, and loads the gifts saved last time", async () => {
+        const s = setup();
+        kickOnly(s);
+        s.overlayService.getGifts.mockResolvedValue([lion]);
+
+        await load(s);
+
+        expect(s.overlayService.load).toHaveBeenCalledExactlyOnceWith([lion]);
+        expect(s.connectorService.fetchGifts).not.toHaveBeenCalled();
+      });
+
+      it("loads none without saved ones, and doesn't warn", async () => {
+        const s = setup();
+        kickOnly(s);
+
+        await load(s);
+
+        expect(s.overlayService.load).toHaveBeenCalledExactlyOnceWith([]);
+        expect(s.connectorService.fetchGifts).not.toHaveBeenCalled();
+        expect(noticesFor(s, FEEDBACK_CODES.GIFTS_FETCH_FAILED)).toEqual([]);
       });
     });
 

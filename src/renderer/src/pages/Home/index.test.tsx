@@ -2,11 +2,12 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE, LiveSession } from "@/common/types";
 import { EULER_SIGNUP_URL } from "@/common/util";
 import { createAlert } from "@/common/util";
 import {
+  gifter,
   liveSession,
+  liveTotals,
   profileReply,
   settingsReply,
   song,
-  topGifter,
   viewer,
 } from "@test/fixtures";
 import { send, sent, sentEvents } from "@test/ipc";
@@ -15,18 +16,36 @@ import { act, screen, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const connected = (stats = { views: 1234, viewers: 12, likes: 5 }) =>
-  send(APP_EVENTS_RESPONSE.CONNECTED, { success: true, live: true, stats });
+const connected = (
+  stats = {
+    views: 1234,
+    viewers: 12,
+    likes: 5,
+    platformViewers: { tiktok: 12 },
+  },
+) =>
+  send(APP_EVENTS_RESPONSE.CONNECTED, {
+    success: true,
+    live: true,
+    platforms: { tiktok: "connected" },
+    stats,
+  });
 
 const disconnected = () =>
   send(APP_EVENTS_RESPONSE.CONNECTED, {
     success: false,
     live: false,
-    stats: { views: 0, viewers: 0, likes: 0 },
+    stats: { views: 0, viewers: 0, likes: 0, platformViewers: {} },
   });
 
-const session = (patch: Partial<LiveSession> = {}) =>
-  send(APP_EVENTS_RESPONSE.LIVE_SESSION, { data: liveSession(patch) });
+// As main sends it with TikTok alone, whose numbers are all of them
+const session = (patch: Partial<LiveSession> = {}) => {
+  const data = liveSession(patch);
+  const { totals, viewers } = data;
+  return send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
+    data: { ...data, platforms: { tiktok: { totals, viewers } } },
+  });
+};
 
 const page = () => within(screen.getByRole("main"));
 const username = () => page().getByPlaceholderText("@username");
@@ -131,7 +150,7 @@ describe("Home", () => {
     await send(APP_EVENTS_RESPONSE.CONNECTED, {
       success: true,
       live: false,
-      stats: { views: 0, viewers: 0, likes: 0 },
+      stats: { views: 0, viewers: 0, likes: 0, platformViewers: {} },
     });
 
     expect(status()).toHaveTextContent("Offline");
@@ -220,12 +239,15 @@ describe("Home", () => {
       success: true,
       live: true,
       reconnecting: true,
-      stats: { views: 1234, viewers: 12, likes: 5 },
+      platforms: { tiktok: "reconnecting" },
+      stats: { views: 1234, viewers: 12, likes: 5, platformViewers: {} },
     });
 
-    expect(page().getByText("Reconnecting…").closest("p")).toHaveTextContent(
-      /^Reconnecting…$/,
-    );
+    // The status line, apart from the row's own
+    const line = page()
+      .getAllByText("Reconnecting…")
+      .find((text) => !text.closest("li"));
+    expect(line?.closest("p")).toHaveTextContent(/^Reconnecting…$/);
     // The LIVE goes on: its numbers stay, and Disconnect still stops it
     expect(page().queryByText("Coins")).toBeInTheDocument();
     expect(page().getByRole("button", { name: "Disconnect" })).toBeEnabled();
@@ -241,7 +263,7 @@ describe("Home", () => {
       success: true,
       live: false,
       waiting: true,
-      stats: { views: 0, viewers: 0, likes: 0 },
+      stats: { views: 0, viewers: 0, likes: 0, platformViewers: {} },
     });
 
     expect(page().getByText("Waiting for the LIVE…")).toBeInTheDocument();
@@ -281,7 +303,7 @@ describe("Home", () => {
       gifters: page().queryByRole("heading", { name: "Top gifters" }),
     });
     await session({
-      totals: { followers: 3, shares: 2, gifts: 1, coins: 1 },
+      totals: liveTotals({ followers: 3, shares: 2, gifts: 1, coins: 1 }),
     });
 
     expect(shown()).toEqual({ numbers: false, chart: null, gifters: null });
@@ -290,7 +312,7 @@ describe("Home", () => {
     await send(APP_EVENTS_RESPONSE.CONNECTED, {
       success: true,
       live: false,
-      stats: { views: 0, viewers: 0, likes: 0 },
+      stats: { views: 0, viewers: 0, likes: 0, platformViewers: {} },
     });
     expect(shown()).toEqual({ numbers: false, chart: null, gifters: null });
 
@@ -312,7 +334,7 @@ describe("Home", () => {
     expect(stat("Total views")).toHaveAttribute("title", "1,234");
 
     await send(APP_EVENTS_RESPONSE.VIEWS, {
-      data: { viewers: 40, views: 2000 },
+      data: { viewers: 40, views: 2000, platformViewers: { tiktok: 40 } },
     });
     await send(APP_EVENTS_RESPONSE.LIKES, { likes: 99 });
 
@@ -327,7 +349,12 @@ describe("Home", () => {
 
     await session({
       startedAt: Date.now(),
-      totals: { followers: 3, shares: 2, gifts: 1500, coins: 12_000 },
+      totals: liveTotals({
+        followers: 3,
+        shares: 2,
+        gifts: 1500,
+        coins: 12_000,
+      }),
     });
 
     expect(stat("New followers")).toHaveTextContent("3");
@@ -342,7 +369,9 @@ describe("Home", () => {
       page().getByRole("img", { name: "Viewers during the LIVE" });
     const peak = () => page().getByText(/^Peak/);
     const views = (viewers: number) =>
-      send(APP_EVENTS_RESPONSE.VIEWS, { data: { viewers, views: 2000 } });
+      send(APP_EVENTS_RESPONSE.VIEWS, {
+        data: { viewers, views: 2000, platformViewers: { tiktok: viewers } },
+      });
 
     it("draws each minute, with the live count for this one", async () => {
       await renderApp();
@@ -386,13 +415,15 @@ describe("Home", () => {
       await renderApp();
       await connected();
 
+      const top = [
+        gifter("Leo", 1000),
+        gifter("Ana", 480, 1, { username: "" }),
+        gifter("Sam", 300),
+        gifter("Kai", 120),
+      ];
       await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
-        data: [
-          topGifter("Leo", 1000),
-          topGifter("Ana", 480, { username: "" }),
-          topGifter("Sam", 300),
-          topGifter("Kai", 120),
-        ],
+        byPlatform: { tiktok: top },
+        subsByPlatform: {},
       });
 
       expect(gifters().map((g) => g.textContent)).toEqual([
@@ -411,7 +442,10 @@ describe("Home", () => {
       await renderApp();
       await connected();
 
-      await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, { data: [] });
+      await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
+        byPlatform: {},
+        subsByPlatform: {},
+      });
 
       expect(page().getByText("No gifts yet")).toBeInTheDocument();
     });
@@ -639,6 +673,7 @@ describe("Home", () => {
             raid: false,
             redeem: false,
             superchat: false,
+            kicks: false,
           };
         }),
       );
@@ -703,6 +738,7 @@ describe("Home", () => {
             raid: true,
             redeem: true,
             superchat: true,
+            kicks: true,
           },
         },
       ]);

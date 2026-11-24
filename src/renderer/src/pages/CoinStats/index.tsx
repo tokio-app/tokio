@@ -2,10 +2,19 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   AppEventsResponseMap,
+  Gifter,
   LiveHistory,
   LiveSummary,
+  PLATFORMS,
 } from "@/common/types";
-import { DateRange, inRange } from "@/common/util";
+import {
+  bySubs,
+  DateRange,
+  inRange,
+  PLATFORM_LABELS,
+  platformOf,
+  platformParts,
+} from "@/common/util";
 import {
   BackButton,
   Btn,
@@ -14,8 +23,9 @@ import {
   Page,
   Section,
   Spinner,
+  Tabs,
 } from "@/components";
-import { formatDate, formatDuration } from "@/helper";
+import { formatDate, formatDuration, PLATFORM_ICONS } from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useLanguage, useT } from "@/ui/i18n";
 import { ReactNode, useEffect, useRef, useState } from "react";
@@ -26,11 +36,19 @@ import {
   capitalize,
   DateFilter,
   dateRange,
+  historyPlatforms,
   keepSelection,
   NO_FILTER,
   periodText,
+  readout,
+  StatsTab,
+  statsTabs,
 } from "./helper";
-import { GiftersList, GiftersSection } from "./sections/GiftersSection";
+import {
+  GiftersList,
+  GiftersSection,
+  Ranking,
+} from "./sections/GiftersSection";
 import { ListSection } from "./sections/ListSection";
 import { SummarySection } from "./sections/SummarySection";
 
@@ -42,7 +60,13 @@ type GiftersReply = AppEventsResponseMap[APP_EVENTS_RESPONSE.GIFTERS];
 const SEARCH_DELAY_MS = 250;
 
 // The header row, with the dashboard or the spinner under it
-function Frame({ children }: { children: ReactNode }) {
+function Frame({
+  actions,
+  children,
+}: {
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
   const t = useT();
   return (
     <Page width="wide">
@@ -50,6 +74,7 @@ function Frame({ children }: { children: ReactNode }) {
         <Section
           icon={<BackButton to="/tools" title={t("tools.back")} />}
           title={t("coinStats.title")}
+          actions={actions}
         >
           {children}
         </Section>
@@ -77,6 +102,10 @@ export function CoinStats() {
   const [searchReply, setSearchReply] = useState<GiftersReply>();
   const [deleting, setDeleting] = useState<LiveSummary>();
   const [clearing, setClearing] = useState(false);
+  // The tab picked, kept while the history lacks it
+  const [picked, setPicked] = useState<StatsTab>();
+  // The gifters' ranking picked on a tab; another tab opens on its money
+  const [ranked, setRanked] = useState<{ tab: StatsTab; by: Ranking }>();
   // The next LIVES is another profile's, which starts from its newest LIVE
   const switched = useRef(false);
   // The profile the last GET_PROFILE named. It also comes as a resync (an MCP
@@ -88,7 +117,17 @@ export function CoinStats() {
   const visible = (lives: LiveSummary[]) =>
     range ? lives.filter((live) => inRange(live, range)) : lives;
   const shown = visible(history?.lives ?? []);
-  const live = shown.find((l) => l.startedAt === selected);
+  // A tab per platform the history has, then All, the first until another
+  // is picked. Each platform's counts in its own currency, never added up.
+  const platforms = historyPlatforms(history?.lives ?? []);
+  const tabs = statsTabs(platforms);
+  const tab = picked && tabs.includes(picked) ? picked : tabs[0];
+  const by = ranked?.tab === tab ? ranked.by : "amount";
+  // A platform's tab lists the LIVEs that were on it
+  const tabLives =
+    tab === "all" ? shown : shown.filter((l) => platformParts(l)[tab]);
+  // One on another platform's tab alone shows the totals
+  const live = tabLives.find((l) => l.startedAt === selected);
   // The LIVEs the gifters come from: all of the selected one, or the filter's
   const scope: DateRange = live
     ? { from: live.startedAt, to: live.endedAt }
@@ -181,16 +220,28 @@ export function CoinStats() {
     );
   }
 
-  const dates = isDates(datesReply) ? datesReply : undefined;
-  // Main adds up the gifts in the dates of a LIVE they cut
-  const total = { ...allTime(shown, range ?? {}), ...dates?.totals };
+  // A list's gifters on the tab's platform, in main's order and with its
+  // ranks. All ranks none.
+  const paid = <G extends Gifter>(list?: G[]) =>
+    list?.filter((g) => platformOf(g) === tab);
 
-  // The gifters panel: a search's matches, or the selection's gifters
+  const dates = isDates(datesReply) ? datesReply : undefined;
+  const total = allTime(tabLives, range ?? {});
+  // Main adds up the gifts in the dates of a LIVE they cut
+  const parts = dates?.totals ? platformParts(dates.totals) : total.parts;
+  // The first row's: the tab's money, or every gift on All
+  const amount =
+    tab === "all"
+      ? Object.values(parts).reduce((n, part) => n + part.gifts, 0)
+      : (parts[tab]?.amount ?? 0);
+
+  // The gifters panel: a search's matches, or the selection's gifters, in
+  // the ranking picked
   const gifters = (): GiftersList => {
     if (searching) {
       const found = isSearch(searchReply) ? searchReply : undefined;
       return {
-        gifters: found?.data,
+        gifters: paid(by === "subs" ? found?.subGifters : found?.data),
         empty: t("coinStats.gifters.noMatch", { query: search.trim() }),
         failed:
           found?.success === false
@@ -200,24 +251,31 @@ export function CoinStats() {
     }
     if (live) {
       const got = reply?.startedAt === live.startedAt ? reply : undefined;
+      // The record holds all its gifters, in byAmount order
+      const all = got?.data?.gifters;
       return {
-        gifters: got?.data?.gifters,
-        empty: t("coinStats.gifters.empty"),
+        gifters: paid(
+          by === "subs"
+            ? all?.filter((g) => g.giftSubs > 0).sort(bySubs)
+            : all?.filter((g) => g.coins > 0),
+        ),
         failed:
           got?.success === false ? t("coinStats.gifters.failed") : undefined,
       };
     }
     if (range) {
       return {
-        gifters: dates?.data,
-        empty: t("coinStats.gifters.emptyDates"),
+        gifters: paid(by === "subs" ? dates?.subGifters : dates?.data),
+        dated: true,
         failed:
           dates?.success === false
             ? t("coinStats.gifters.failedDates")
             : undefined,
       };
     }
-    return { gifters: history.gifters, empty: t("coinStats.gifters.empty") };
+    return {
+      gifters: paid(by === "subs" ? history.subGifters : history.gifters),
+    };
   };
 
   return (
@@ -231,6 +289,26 @@ export function CoinStats() {
       {clearing && <ClearHistoryModal onClose={() => setClearing(false)} />}
 
       <Frame>
+        {tabs.length > 1 && (
+          <Tabs
+            className={styles.tabs}
+            label={t("coinStats.platform")}
+            tabs={tabs.map((value) => {
+              if (value === "all") return { value, label: t("coinStats.all") };
+              const Icon = PLATFORM_ICONS[value];
+              return {
+                value,
+                icon: <Icon aria-hidden />,
+                label: PLATFORM_LABELS[value],
+              };
+            })}
+            value={tab}
+            onChange={(next) => {
+              setPicked(next);
+              setRanked(undefined);
+            }}
+          />
+        )}
         <div className={styles.dashboard}>
           {/* Swapped at once on a new selection, with no motion */}
           <div className={styles.column}>
@@ -258,13 +336,18 @@ export function CoinStats() {
                     <FiTrash2 size={18} />
                   </Btn>
                 }
-                totals={live}
+                // On All, the platforms it was on
+                stats={readout(
+                  tab,
+                  PLATFORMS.filter((p) => platformParts(live)[p]),
+                  platformParts(live),
+                )}
               />
             ) : (
               <SummarySection
                 title={periodText(filter, language, now)}
                 lines={[
-                  t("coinStats.allTime.count", { count: shown.length }),
+                  t("coinStats.allTime.count", { count: tabLives.length }),
                   t("coinStats.allTime.length", {
                     length: formatDuration(total.length),
                   }),
@@ -277,7 +360,8 @@ export function CoinStats() {
                       title={t("coinStats.allTime.clear")}
                       disabled={
                         history.lives.length === 0 &&
-                        history.gifters.length === 0
+                        history.gifters.length === 0 &&
+                        history.subGifters.length === 0
                       }
                       onClick={() => setClearing(true)}
                     >
@@ -285,24 +369,25 @@ export function CoinStats() {
                     </Btn>
                   )
                 }
-                totals={total}
+                stats={readout(tab, platforms, parts)}
               />
             )}
             {/* One in both cases, so an open search stays open */}
             <GiftersSection
-              title={t(
-                live ? "coinStats.gifters.title" : "coinStats.gifters.top",
-              )}
               {...gifters()}
+              platform={tab === "all" ? null : tab}
+              by={by}
+              onBy={(next) => setRanked({ tab, by: next })}
               search={search}
               onSearch={setSearch}
             />
           </div>
 
           <ListSection
-            lives={shown}
+            lives={tabLives}
             title={periodText(filter, language, now)}
-            coins={total.coins}
+            amount={amount}
+            tab={tab}
             filter={filter}
             filtered={!!range}
             selected={live ? live.startedAt : null}

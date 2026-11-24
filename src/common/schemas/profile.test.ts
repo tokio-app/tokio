@@ -45,6 +45,74 @@ describe("ProfileSchema", () => {
     );
   });
 
+  it("loads a Kick gift row, saved while Kicks were gifts, as a Kicks row", () => {
+    const saved = structuredClone(defaultProfile);
+    const kickGift = {
+      type: TOKIO_EVENTS.GIFT,
+      platform: "kick",
+      gifts: [],
+      min_coins: 100,
+    };
+    const tiktokGift = { type: TOKIO_EVENTS.GIFT, gifts: [5655] };
+    const alert = {
+      id: "a1",
+      enabled: true,
+      trigger: kickGift,
+      also_triggers: [tiktokGift, kickGift],
+      sound: null,
+      volume: 100,
+    };
+    const action = { id: "g1", enabled: true, trigger: kickGift, steps: [] };
+    Object.assign(saved.alerts, { items: [alert] });
+    Object.assign(saved.games, { actions: [action] });
+
+    const parsed = ProfileSchema.parse(saved);
+
+    const kicks = {
+      type: TOKIO_EVENTS.KICKS,
+      platform: "kick",
+      min_coins: 100,
+    };
+    expect(parsed.alerts.items[0].trigger).toMatchObject({
+      ...kicks,
+      gifts: [],
+    });
+    expect(parsed.alerts.items[0].also_triggers).toMatchObject([
+      { type: TOKIO_EVENTS.GIFT, gifts: [5655] },
+      kicks,
+    ]);
+    expect(parsed.games.actions[0].trigger).toMatchObject(kicks);
+  });
+
+  it("loads permissions saved before other platforms' rules with none", () => {
+    const saved = structuredClone(defaultProfile);
+    const permissions: Partial<Profile["tts"]["permissions"]> =
+      saved.tts.permissions;
+    delete permissions.platforms;
+    const music: Partial<Profile["music"]["permissions"]> =
+      saved.music.permissions;
+    delete music.platforms;
+
+    const parsed = ProfileSchema.parse(saved);
+
+    expect(parsed.tts.permissions.platforms).toEqual({});
+    expect(parsed.music.permissions.platforms).toEqual({});
+  });
+
+  it("fills a platform's permissions saved in part with everyone's", () => {
+    const saved = structuredClone(defaultProfile);
+    saved.music.permissions.platforms = {
+      youtube: { all: false, superfans: true, moderators: false, vips: false },
+    };
+    const kick: object = { moderators: true };
+    Object.assign(saved.music.permissions.platforms, { kick });
+
+    expect(ProfileSchema.parse(saved).music.permissions.platforms).toEqual({
+      youtube: { all: false, superfans: true, moderators: false, vips: false },
+      kick: { all: true, superfans: false, moderators: true, vips: false },
+    });
+  });
+
   it("gives TTS settings saved before special users none", () => {
     const saved = structuredClone(defaultProfile);
     const tts: Partial<Profile["tts"]> = saved.tts;

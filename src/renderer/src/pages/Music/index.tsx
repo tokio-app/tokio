@@ -23,7 +23,7 @@ export function Music() {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // For the permissions' note on platforms that don't say who follows
+  // The permissions' tabs, one per platform
   const [platforms, setPlatforms] = useState(defaultProfile.platforms);
   const { settings, update } = useEditableSettings("music", (profile) =>
     setPlatforms(profile.platforms),

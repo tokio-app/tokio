@@ -5,7 +5,7 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { generateTikTokEventSample } from "@/common/util";
+import { generateEventSample } from "@/common/util";
 import Logger from "@/logger";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -65,7 +65,7 @@ const account: PlatformAccount = {
   key: "refresh",
 };
 
-const viewer = generateTikTokEventSample(TOKIO_EVENTS.CHAT).data.user;
+const viewer = generateEventSample(TOKIO_EVENTS.CHAT).data.user;
 const chatOf = (content: string, lang = "en"): ChatEvent => ({
   user: viewer,
   comment: { content, emotes: [], lang },
@@ -150,7 +150,7 @@ describe("ConnectorService", () => {
     const { service, provider } = setup();
     const listener = vi.fn();
     const onReconnect = vi.fn();
-    const follow = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data;
+    const follow = generateEventSample(TOKIO_EVENTS.FOLLOW).data;
 
     service.on(TOKIO_EVENTS.FOLLOW, listener);
     service.onReconnect(onReconnect);
@@ -178,7 +178,7 @@ describe("ConnectorService", () => {
     service.onReconnect(reconnect);
     const first = new FakeConnector();
     const second = new FakeConnector();
-    const follow = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data;
+    const follow = generateEventSample(TOKIO_EVENTS.FOLLOW).data;
 
     service.addProvider("First", first, true);
     service.addProvider("Second", second, true);
@@ -189,6 +189,46 @@ describe("ConnectorService", () => {
 
     expect(received).toHaveBeenCalledExactlyOnceWith(follow);
     expect(reconnect).toHaveBeenCalledExactlyOnceWith("reconnected", "tiktok");
+  });
+
+  it("gives every listener a Super Chat's dollars, null without rates or a readable amount", () => {
+    const { service, provider } = setup();
+    const first = vi.fn();
+    const second = vi.fn();
+    service.on(TOKIO_EVENTS.SUPER_CHAT, first);
+    service.on(TOKIO_EVENTS.SUPER_CHAT, second);
+    const chat = (amount: string) => ({
+      user: viewer,
+      amount,
+      message: "hi",
+      sticker: "",
+    });
+
+    // Before setRates, as before the rates load
+    provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("MX$100.00"));
+    let loaded = false;
+    const usdOf = vi.fn((currency: string, value: number) =>
+      loaded && currency === "MXN" ? value / 20 : null,
+    );
+    service.setRates({ usdOf });
+    provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("MX$100.00"));
+    loaded = true;
+    provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("MX$100.00"));
+    provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("100 bananas"));
+    // Loaded, but without a rate for it
+    provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("ARS 1,000.00"));
+
+    expect(first.mock.calls.map(([d]) => d.usd)).toEqual([
+      null,
+      null,
+      5,
+      null,
+      null,
+    ]);
+    expect(first.mock.calls[2][0]).toEqual({ ...chat("MX$100.00"), usd: 5 });
+    expect(second.mock.calls).toEqual(first.mock.calls);
+    expect(usdOf).toHaveBeenCalledWith("MXN", 100);
+    expect(usdOf).toHaveBeenCalledWith("ARS", 1000);
   });
 
   it("logs gifts it can't fetch", async () => {
@@ -218,11 +258,11 @@ describe("ConnectorService", () => {
     const { provider } = setup();
     provider.setLogFile("connector.log");
     const user = {
-      ...generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data.user,
+      ...generateEventSample(TOKIO_EVENTS.FOLLOW).data.user,
     };
     user.handle = "handle";
-    const gift = generateTikTokEventSample(TOKIO_EVENTS.GIFT).data;
-    const chat = generateTikTokEventSample(TOKIO_EVENTS.CHAT).data;
+    const gift = generateEventSample(TOKIO_EVENTS.GIFT).data;
+    const chat = generateEventSample(TOKIO_EVENTS.CHAT).data;
     const received = vi.fn();
     provider.on(TOKIO_EVENTS.GIFT, received);
 
@@ -236,7 +276,7 @@ describe("ConnectorService", () => {
     });
     provider.fire(
       TOKIO_EVENTS.ROOM_USER,
-      generateTikTokEventSample(TOKIO_EVENTS.ROOM_USER).data,
+      generateEventSample(TOKIO_EVENTS.ROOM_USER).data,
     );
     provider.fire(TOKIO_EVENTS.CONNECTED);
 
@@ -435,6 +475,20 @@ describe("ConnectorService", () => {
       expect(rooms).toHaveBeenLastCalledWith(room(10, 100, 2));
       tiktok.fire(TOKIO_EVENTS.DISCONNECTED, undefined);
       expect(rooms).toHaveBeenCalledTimes(3);
+    });
+
+    it("gives each platform's viewers, for as long as it's up", () => {
+      const { service, tiktok, twitch } = both();
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+      expect(service.viewers()).toEqual({});
+
+      tiktok.fire(TOKIO_EVENTS.ROOM_USER, room(10, 100, 2));
+      twitch.fire(TOKIO_EVENTS.ROOM_USER, room(5, 0));
+      expect(service.viewers()).toEqual({ tiktok: 10, twitch: 5 });
+
+      twitch.fire(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+      expect(service.viewers()).toEqual({ tiktok: 10 });
     });
 
     it("says how each platform is doing", () => {

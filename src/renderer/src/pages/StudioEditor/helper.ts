@@ -16,10 +16,13 @@ import {
   StudioTriggerSchema,
 } from "@/common/schemas";
 import type { StageFit } from "@/common/studio/stage";
-import { CustomGift, StudioView } from "@/common/types";
+import { CustomGift, Platform, StudioView } from "@/common/types";
 import {
   ALERT_MESSAGE_VARIABLES,
+  Currency,
+  PLATFORM_CURRENCY,
   STUDIO_NUMBERS,
+  studioNumbersFor,
   triggersOf,
 } from "@/common/util";
 import { EmoteOption, eventName } from "@/components";
@@ -39,16 +42,26 @@ export const KIND_NAMES: Record<StudioElementKind, MessageKey> = {
 
 /**
  * What a goal or a goal bar can watch, as a Select's options shown the way a
- * text writes them: the LIVE numbers but uptime, which only grows, then the
- * overlay's named counters.
+ * text writes them: the LIVE numbers the profile's platforms fill but uptime,
+ * which only grows, and the ones `kept` already watch, then the overlay's
+ * named counters.
  */
-export const goalNumbers = (counters: StudioCounter[]) =>
-  [
+export const goalNumbers = (
+  counters: StudioCounter[],
+  platforms: readonly Platform[],
+  kept: readonly string[],
+) => {
+  const offered = studioNumbersFor(platforms);
+  return [
     ...new Set([
-      ...STUDIO_NUMBERS.filter((name) => name !== "uptime"),
+      ...STUDIO_NUMBERS.filter(
+        (name) =>
+          name !== "uptime" && (offered.includes(name) || kept.includes(name)),
+      ),
       ...counters.flatMap((c) => c.name || []),
     ]),
   ].map((name) => ({ value: name, label: `{${name}}` }));
+};
 
 // An embed's source as a Select's value ("games:2" for one column), and back
 export function sourceValue(source: StudioSource | null) {
@@ -82,6 +95,26 @@ type NameContext = {
   t: (key: MessageKey) => string;
 };
 
+// The money each platform's top list ranks by, as its source's name says it
+const MONEY_TOPS: Record<Currency, MessageKey> = {
+  coins: "studio.list.sources.gifters",
+  bits: "studio.list.sources.bits",
+  kicks: "studio.list.sources.kicks",
+  usd: "studio.list.sources.superChats",
+};
+
+/**
+ * A list's source as the editor names it: the top gifters by their
+ * platform's money ("Top Bits this LIVE"), the others by what they list.
+ */
+export const listSourceName = ({
+  source,
+  platform,
+}: Pick<StudioElementOf<"list">, "source" | "platform">): MessageKey =>
+  source === "gifters"
+    ? MONEY_TOPS[PLATFORM_CURRENCY[platform]]
+    : `studio.list.sources.${source}`;
+
 /**
  * What the layers list calls an element with no label: what it shows (its
  * text, file, gift, emote, embed, shape or list's source), else its kind.
@@ -107,7 +140,7 @@ export function elementName(
       case "shape":
         return context.t(`studio.shapes.${element.shape}`);
       case "list":
-        return context.t(`studio.list.sources.${element.source}`);
+        return context.t(listSourceName(element));
       default:
         return "";
     }

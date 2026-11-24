@@ -1,4 +1,5 @@
 import { Permissions } from "@/common/schemas";
+import { Platform } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import { PlatformsContext } from "@/context/platforms";
 import { useImmerState } from "@/hooks/useImmerState";
@@ -150,37 +151,149 @@ describe("PermissionsSection", () => {
 });
 
 describe("PermissionsSection with other platforms", () => {
-  const note = /doesn't say who follows/;
+  const lists = "The lists apply on every platform.";
 
-  it("says Twitch's chat never passes the follower and fan level roles", () => {
+  function withPlatforms(
+    platforms: Platform[],
+    recipe?: (p: Permissions) => void,
+  ) {
     const initial = structuredClone(defaultProfile.tts.permissions);
-    render(
-      <PlatformsContext value={["tiktok", "twitch"]}>
+    recipe?.(initial);
+    const view = render(
+      <PlatformsContext value={platforms}>
         <PermissionsForm initial={initial} />
       </PlatformsContext>,
     );
+    return { user: userEvent.setup(), view };
+  }
 
-    expect(screen.getByText(note)).toHaveTextContent(
-      "Twitch doesn't say who follows or send fan levels, so its chat never passes Followers only or Minimum fan level.",
-    );
+  const tab = (name: string) => screen.getByRole("tab", { name });
+
+  it("has a tab for each of the profile's platforms, TikTok's open", () => {
+    withPlatforms(["kick", "tiktok", "youtube"]);
+
+    const tabs = screen.getByRole("tablist", { name: "Platform" });
+    expect(
+      within(tabs)
+        .getAllByRole("tab")
+        .map((t) => t.textContent),
+    ).toEqual(["TikTok", "YouTube", "Kick"]);
+    expect(tab("TikTok")).toHaveAttribute("aria-selected", "true");
+    expect(box("Followers only")).toBeInTheDocument();
+    expect(box("Minimum fan level")).toBeInTheDocument();
+    expect(screen.getByText(lists)).toBeInTheDocument();
   });
 
-  it("names YouTube next to Twitch", () => {
-    const initial = structuredClone(defaultProfile.tts.permissions);
-    render(
-      <PlatformsContext value={["tiktok", "twitch", "youtube"]}>
-        <PermissionsForm initial={initial} />
-      </PlatformsContext>,
-    );
-
-    expect(screen.getByText(/don't say who follows/)).toHaveTextContent(
-      "Twitch and YouTube don't say who follows or send fan levels, so their chat never passes Followers only or Minimum fan level.",
-    );
-  });
-
-  it("says nothing with TikTok alone", () => {
+  it("has no tabs with one platform", () => {
     setup();
 
-    expect(screen.queryByText(note)).not.toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.queryByText(lists)).not.toBeInTheDocument();
+  });
+
+  it("shows Twitch's rules alone without tabs", () => {
+    withPlatforms(["twitch"]);
+
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(box("Subscribers only")).toBeInTheDocument();
+    expect(screen.queryByText(lists)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      "Twitch",
+      ["Allow everyone", "Subscribers only", "Moderators only", "VIPs only"],
+    ],
+    ["YouTube", ["Allow everyone", "Members only", "Moderators only"]],
+    [
+      "Kick",
+      ["Allow everyone", "Subscribers only", "Moderators only", "VIPs only"],
+    ],
+  ])("offers on %s's tab what its chat says", async (name, labels) => {
+    const { user } = withPlatforms(["tiktok", "twitch", "youtube", "kick"]);
+
+    await user.click(tab(name));
+
+    expect(
+      screen.getAllByRole("checkbox").map((c) => c.parentElement?.textContent),
+    ).toEqual([...labels, "Use allow and block lists"]);
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+  });
+
+  it("allows everyone on a platform without its own rules", async () => {
+    const { user } = withPlatforms(["tiktok", "twitch"], (p) => {
+      p.all = false;
+      p.followers = true;
+    });
+
+    await user.click(tab("Twitch"));
+
+    expect(box("Allow everyone")).toBeChecked();
+    expect(box("Subscribers only")).not.toBeChecked();
+  });
+
+  it("saves a platform's rules apart from TikTok's", async () => {
+    const { user } = withPlatforms(["tiktok", "twitch"]);
+
+    await user.click(tab("Twitch"));
+    await user.click(box("Allow everyone"));
+    await user.click(box("Subscribers only"));
+
+    expect(current().platforms).toEqual({
+      twitch: { all: false, superfans: true, moderators: false, vips: false },
+    });
+    expect(current().all).toBe(true);
+    expect(current().superfans).toBe(false);
+
+    await user.click(tab("TikTok"));
+    expect(box("Allow everyone")).toBeChecked();
+    expect(box("Super Fans only")).not.toBeChecked();
+  });
+
+  it("shows a platform's saved rules", async () => {
+    const { user } = withPlatforms(["tiktok", "kick"], (p) => {
+      p.platforms.kick = {
+        all: false,
+        superfans: false,
+        moderators: true,
+        vips: true,
+      };
+    });
+
+    await user.click(tab("Kick"));
+
+    expect(box("Allow everyone")).not.toBeChecked();
+    expect(box("Subscribers only")).not.toBeChecked();
+    expect(box("Moderators only")).toBeChecked();
+    expect(box("VIPs only")).toBeChecked();
+  });
+
+  it("keeps the shared lists under every tab", async () => {
+    const { user } = withPlatforms(["tiktok", "youtube"]);
+
+    await user.click(tab("YouTube"));
+    await user.click(box("Use allow and block lists"));
+    await user.type(field("Block list"), "troll");
+
+    expect(current().list).toEqual({
+      enabled: true,
+      white: [],
+      black: ["troll"],
+    });
+    expect(current().platforms).toEqual({});
+  });
+
+  it("goes back to the first tab when the open one's platform leaves", async () => {
+    const { user, view } = withPlatforms(["tiktok", "twitch"]);
+    await user.click(tab("Twitch"));
+
+    view.rerender(
+      <PlatformsContext value={["tiktok"]}>
+        <PermissionsForm initial={current()} />
+      </PlatformsContext>,
+    );
+
+    expect(box("Followers only")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "VIPs only" })).toBeNull();
   });
 });

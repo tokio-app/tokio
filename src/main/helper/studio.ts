@@ -1,11 +1,13 @@
-import { StudioOverlay, StudioSource } from "@/common/schemas";
+import { StudioElementOf, StudioOverlay, StudioSource } from "@/common/schemas";
 import {
   CustomGift,
+  Gifter,
   STUDIO_MESSAGE,
   STUDIO_REACT_MESSAGE,
   StudioMessage,
   StudioNumbers,
   StudioReact,
+  StudioListEntry,
   StudioView,
 } from "@/common/types";
 import {
@@ -13,6 +15,7 @@ import {
   ALERTS_PATH,
   formatError,
   goalValue,
+  listInUsd,
   listRow,
   MINECRAFT_OVERLAY_PATH,
   sampleCounts,
@@ -42,6 +45,28 @@ type Services = Pick<
   | "pathManagerService"
 >;
 
+// A top list's rows: who sent the most of the platform's money, with an
+// amount, or who gifted the most subs, apart (the user's call)
+const topOf = (
+  history: Pick<Services["historyService"], "topByPlatform" | "topSubGifters">,
+  { source, platform }: Pick<StudioElementOf<"list">, "source" | "platform">,
+): StudioListEntry[] =>
+  source === "giftsubs"
+    ? (history.topSubGifters()[platform] ?? []).map((g) =>
+        topRow(g, g.giftSubs),
+      )
+    : (history.topByPlatform()[platform] ?? [])
+        .filter((g) => g.coins > 0)
+        .map((g) => topRow(g, g.coins));
+
+const topRow = (gifter: Gifter, value: number): StudioListEntry => ({
+  picture: gifter.picture,
+  name: gifter.username || gifter.handle,
+  text: "",
+  icon: "",
+  value,
+});
+
 /**
  * The live numbers studio texts show: the LIVE's likes and viewers, the
  * session's totals and how long it has run, 0 while not LIVE so they reset
@@ -55,7 +80,8 @@ export function liveNumbers(
   now = Date.now(),
 ): StudioNumbers {
   const { likes, viewers } = storeManagerService.getLiveStats();
-  const { startedAt, totals } = liveService.getSession();
+  const session = liveService.getSession();
+  const { startedAt, totals } = session;
   const live = startedAt !== null;
   return {
     likes,
@@ -63,7 +89,11 @@ export function liveNumbers(
     followers: live ? totals.followers : 0,
     shares: live ? totals.shares : 0,
     coins: live ? totals.coins : 0,
+    kicks: live ? totals.kicks : 0,
+    bits: live ? totals.bits : 0,
+    superchats: live ? session.usd : 0,
     gifts: live ? totals.gifts : 0,
+    giftsubs: live ? totals.giftSubs : 0,
     uptime: live ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0,
   };
 }
@@ -115,18 +145,13 @@ function viewOf(
       sentPicture(element, studio.kept(overlay.id, element)?.values ?? null),
     fill: (element) =>
       goalValue(element.number, numbers, studio.counts(overlay)) / element.goal,
-    // This LIVE's top gifters by coins, else the newest first
-    rows: ({ source }) =>
-      (source === "gifters"
-        ? services.historyService.top().live.map((g) => ({
-            picture: g.picture,
-            name: g.username || g.handle,
-            text: "",
-            icon: "",
-            value: g.live.coins,
-          }))
-        : studio.list(source)
-      ).map((entry) => listRow(entry, language())),
+    // This LIVE's top gifters on the list's platform, by its money alone or
+    // by gifted subs, else the newest first
+    rows: (list) =>
+      (list.source === "gifters" || list.source === "giftsubs"
+        ? topOf(services.historyService, list)
+        : studio.list(list.source)
+      ).map((entry) => listRow(entry, language(), listInUsd(list))),
     // The page doesn't show it; the editor names embeds itself
     label: () => "",
   });
@@ -232,9 +257,13 @@ export async function sendStudioOverlay(services: Services, id: string) {
  * values, for MCP's preview. No camera turns on for it.
  */
 export async function studioSampleView(
-  { overlayService }: Pick<Services, "overlayService">,
+  {
+    overlayService,
+    storeManagerService,
+  }: Pick<Services, "overlayService" | "storeManagerService">,
   overlay: StudioOverlay,
 ): Promise<StudioView> {
+  const profile = await storeManagerService.getProfileData();
   // As sendStudioOverlays takes them
   const gifts = [
     ...(await overlayService.getGifts()),
@@ -248,6 +277,10 @@ export async function studioSampleView(
     embedPath,
     camera: () => null,
     label: () => "",
-    ...sampleDeps(new Samples(), language(), sampleCounts(overlay)),
+    ...sampleDeps(
+      new Samples(profile?.platforms ?? ["tiktok"]),
+      language(),
+      sampleCounts(overlay),
+    ),
   });
 }

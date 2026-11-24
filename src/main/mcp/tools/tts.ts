@@ -3,7 +3,15 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { MULTILINGUAL } from "@/common/util";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { fail, invalid, invokeOk, ok, profileOf, pushProfile } from "../common";
+import {
+  fail,
+  invalid,
+  invokeOk,
+  ok,
+  permissionsNote,
+  profileOf,
+  pushProfile,
+} from "../common";
 import {
   defineKind,
   defineSection,
@@ -63,7 +71,7 @@ export const sections: Sections = {
       "Chat text-to-speech for the active profile. Only chat messages are read here; alerts have their own spoken messages.",
       "voice: the voice chat is read in, { engine, name, lang, id } exactly as list_voices gives it. It's replaced whole, so send all four.",
       "filters: speed and pitch 0.5-2 (1 is normal), volume 0-100.",
-      "permissions: who is read. all lets everyone; otherwise followers, superfans, moderators, or a minimum level (level.enabled, level.value). With list.enabled, handles in list.black are never read and a non-empty list.white alone decides.",
+      permissionsNote("who is read", "are never read"),
       "format.template: what's read, with the variables {username}, {handle}, {comment} and {translation}. format.trigger: mode any reads every message; dot, slash and custom read only messages starting with value ('.', '/', or a custom command such as '!tts'), which is cut off. remove_emojis leaves emojis out. translate reads the chat translation in {comment}'s place, when chat translation is on (app section).",
       "protection: cooldown seconds between messages, queue_length messages waiting at most, comment_length characters at most in a message and in its translation (a longer one isn't read), banned words that stop a message.",
       "replacements: whole words replaced before reading ({ old, new }).",

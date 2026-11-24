@@ -55,8 +55,17 @@ describe("toChat", () => {
     });
 
     expect(toChat(event, "1971641")).toEqual({
-      user: { ...viewer, moderator: true, superfan: true },
+      user: { ...viewer, moderator: true, superfan: true, vip: false },
       comment: { content: "Hi chat", emotes: [], lang: "" },
+    });
+  });
+
+  it("flags a VIP from their badge", () => {
+    const event = chat([text("hey")], { badges: [{ set_id: "vip" }] });
+
+    expect(toChat(event, "1")?.user).toMatchObject({
+      vip: true,
+      moderator: false,
     });
   });
 
@@ -72,7 +81,24 @@ describe("toChat", () => {
     expect(toChat(chat([text("hey")]), "1")?.user).toMatchObject({
       moderator: false,
       superfan: false,
+      vip: false,
     });
+  });
+
+  it("reads a subscriber's months off their badge's info", () => {
+    const months = (badges: { set_id: string; info?: string }[]) =>
+      toChat(chat([text("hey")], { badges }), "1")?.user.subMonths;
+
+    expect(months([{ set_id: "subscriber", info: "16" }])).toBe(16);
+    expect(
+      months([
+        { set_id: "moderator", info: "" },
+        { set_id: "founder", info: "3" },
+      ]),
+    ).toBe(3);
+    expect(months([{ set_id: "subscriber", info: "" }])).toBeUndefined();
+    expect(months([{ set_id: "subscriber" }])).toBeUndefined();
+    expect(months([{ set_id: "moderator", info: "7" }])).toBeUndefined();
   });
 
   it("leaves emotes and cheermotes out of the text, each emote at its place", () => {

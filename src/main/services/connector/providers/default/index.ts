@@ -191,9 +191,10 @@ export class TikTokLiveConnector extends ConnectorProvider {
 
   public async fetchGifts(): Promise<GiftResponse> {
     try {
-      // Gifts are fetched at startup, before any connect. Without a room
-      // the connection only asks for the region's list, which needs neither
-      // a user nor the signer, so any username does.
+      // Gifts are fetched before any connect, once a profile with TikTok is
+      // active (refreshTikTokGifts). Without a room the connection only asks
+      // for the region's list, which needs neither a user nor the signer, so
+      // any username does.
       const connection =
         this._connection ??
         new TikTokLiveConnection("tiktok", {

@@ -1,6 +1,6 @@
 import { Alert, AlertSound, MEDIA_DURATION, MediaFile } from "@/common/schemas";
 import { APP_EVENTS_RESPONSE } from "@/common/types";
-import { createAlert, defaultProfile } from "@/common/util";
+import { createAlert, defaultProfile, newRowTrigger } from "@/common/util";
 import { Btn, MediaPicker, Page, SoundPicker } from "@/components";
 import {
   useAlertTest,
@@ -84,7 +84,7 @@ export function Alerts() {
   const addAlert = () => {
     setSearch("");
     update((s) => {
-      s.items.push(createAlert(s.items.length));
+      s.items.push(createAlert(s.items.length, newRowTrigger(platforms)));
     });
   };
 

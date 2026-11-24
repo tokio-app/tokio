@@ -137,6 +137,10 @@ export const SERVICES: { name: string; note: string }[] = [
     note: "Music requests, and a LIVE's chat, Super Chats, memberships, Gifts and viewer count (www.youtube.com), read from YouTube's public pages the way youtube.com does, which isn't an official API.",
   },
   {
+    name: "Frankfurter",
+    note: "The US dollar's exchange rates (api.frankfurter.dev), to add up a LIVE's YouTube Super Chats in dollars, fetched at most once a day while YouTube is part of a LIVE. Central banks' public reference rates.",
+  },
+  {
     name: "uBlock Origin's filter lists",
     note: "The YouTube player's ad blocker, when Block ads is on (ublockorigin.github.io, then its mirrors ublockorigin.pages.dev and cdn.jsdelivr.net). uBlock Origin's own lists and its copies of EasyList and EasyPrivacy belong to their authors, are under the GPL-3.0 or CC BY-SA 3.0, and aren't covered by Tokio's license. Tokio downloads them on the user's machine and doesn't ship them.",
   },

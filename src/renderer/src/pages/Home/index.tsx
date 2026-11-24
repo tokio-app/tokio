@@ -4,14 +4,8 @@ import {
   MusicInfo,
   Platform,
   PlatformStatus,
-  TopGifter,
 } from "@/common/types";
-import {
-  defaultProfile,
-  countsCoins,
-  defaultStoreData,
-  isPlatform,
-} from "@/common/util";
+import { defaultProfile, defaultStoreData, isPlatform } from "@/common/util";
 import { Modal } from "@/components";
 import {
   useImmerState,
@@ -22,7 +16,14 @@ import {
 import { useT } from "@/ui/i18n";
 import { useRef, useState } from "react";
 import styles from "./home.module.css";
-import { feedKinds, liveStats, NO_SESSION } from "./helper";
+import {
+  feedKinds,
+  HomeTab,
+  LiveGifters,
+  livePlatforms,
+  NO_SESSION,
+  Views,
+} from "./helper";
 import { ActivitySection } from "./sections/ActivitySection";
 import { DashboardSection } from "./sections/DashboardSection";
 import { FeaturesSection } from "./sections/FeaturesSection";
@@ -59,11 +60,20 @@ export function Home() {
   const [waiting, setWaiting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [likes, setLikes] = useState(0);
-  const [views, setViews] = useState({ current: 0, total: 0 });
+  const [views, setViews] = useState<Views>({
+    current: 0,
+    total: 0,
+    platformViewers: {},
+  });
   const [session, setSession] = useState(NO_SESSION);
-  const [gifters, setGifters] = useState<TopGifter[]>([]);
+  const [gifters, setGifters] = useState<LiveGifters>({
+    byPlatform: {},
+    subsByPlatform: {},
+  });
   const [songs, setSongs] = useState<MusicInfo[]>([]);
   const [paused, setPaused] = useState(false);
+  // The tab picked over the connection and the numbers, null for the first
+  const [picked, setPicked] = useState<HomeTab | null>(null);
 
   useIpcRequest(APP_EVENTS.GET_PROFILE);
   useIpcRequest(APP_EVENTS.GET_SETTINGS);
@@ -121,7 +131,11 @@ export function Home() {
     // leaves Disconnect to press
     setLoading(res.success && !res.live && !res.waiting);
     setLikes(res.stats.likes);
-    setViews({ current: res.stats.viewers, total: res.stats.views });
+    setViews({
+      current: res.stats.viewers,
+      total: res.stats.views,
+      platformViewers: res.stats.platformViewers,
+    });
   });
 
   // What main holds, also when it refused the change
@@ -135,7 +149,11 @@ export function Home() {
 
   useIpcListener(APP_EVENTS_RESPONSE.VIEWS, (res) => {
     if (res?.data) {
-      setViews({ current: res.data.viewers, total: res.data.views });
+      setViews({
+        current: res.data.viewers,
+        total: res.data.views,
+        platformViewers: res.data.platformViewers,
+      });
     }
   });
 
@@ -153,14 +171,22 @@ export function Home() {
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.LIVE_GIFTERS, (res) => {
-    if (res) setGifters(res.data);
+    if (res) setGifters(res);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.SONGS, (res) => {
     if (res) setSongs(res.data);
   });
 
-  const { totals } = session;
+  // The profile's platforms in the LIVE: All adds them up once there are two.
+  // One removed mid-LIVE keeps its numbers in the session but has no tab.
+  const live = connected
+    ? livePlatforms(status, session).filter((p) => platforms.includes(p))
+    : [];
+  const tabs: HomeTab[] = live.length > 1 ? [...platforms, "all"] : platforms;
+  // The one picked while it's there, else the first platform's
+  const tab = picked !== null && tabs.includes(picked) ? picked : tabs[0];
+
   // The queue keeps its songs while the player is gone
   const song = musicConnected ? songs.find((s) => s.playing) : undefined;
 
@@ -218,6 +244,11 @@ export function Home() {
               platforms={platforms}
               status={status}
               twitchLogin={twitchLogin}
+              tabs={tabs}
+              tab={tab}
+              onTab={setPicked}
+              live={live}
+              views={views}
               onPlatformsChange={(picked) => {
                 setPlatforms(picked);
                 window.api.emit(APP_EVENTS.SET_PLATFORMS, {
@@ -248,16 +279,15 @@ export function Home() {
               }}
             />
 
-            {connected && (
+            {/* A platform's numbers while it's in the LIVE */}
+            {(tab === "all" || live.includes(tab)) && (
               <LiveSection
-                viewers={views.current}
-                minutes={session.viewers}
-                stats={liveStats(platforms, {
-                  ...totals,
-                  likes,
-                  views: views.total,
-                })}
-                gifters={countsCoins(platforms) ? gifters : null}
+                tab={tab}
+                platforms={live}
+                session={session}
+                views={views}
+                likes={likes}
+                gifters={gifters}
               />
             )}
 
