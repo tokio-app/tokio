@@ -518,6 +518,19 @@
   font-size: var(--font-2xl);
 }
 
+/* A tab's tops read as one block: no hairline between them */
+.tops {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.tops > section:not(:last-child) {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
 .gifters {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

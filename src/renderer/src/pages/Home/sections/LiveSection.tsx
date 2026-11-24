@@ -81,20 +81,22 @@ export function LiveSection({ tab, platforms, ...numbers }: Props) {
       </div>
 
       {gifters && (
-        <TopList
-          title={t(MONEY_TOPS[gifters.currency].title)}
-          empty={t(MONEY_TOPS[gifters.currency].empty)}
-          list={gifters.list}
-          label={(g) => amountLabel(g.coins, gifters.currency, language)}
-        />
-      )}
-      {subGifters && (
-        <TopList
-          title={t("home.gifters.subs")}
-          empty={t("home.gifters.emptySubs")}
-          list={subGifters}
-          label={(g) => t("gifts.giftSubs", { count: g.giftSubs })}
-        />
+        <div className={styles.tops}>
+          <TopList
+            title={t(MONEY_TOPS[gifters.currency].title)}
+            empty={t(MONEY_TOPS[gifters.currency].empty)}
+            list={gifters.list}
+            label={(g) => amountLabel(g.coins, gifters.currency, language)}
+          />
+          {subGifters && (
+            <TopList
+              title={t("home.gifters.subs")}
+              empty={t("home.gifters.emptySubs")}
+              list={subGifters}
+              label={(g) => t("gifts.giftSubs", { count: g.giftSubs })}
+            />
+          )}
+        </div>
       )}
     </div>
   );
