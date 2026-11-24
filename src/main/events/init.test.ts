@@ -421,7 +421,11 @@ function setup() {
     topSubGifters: vi.fn(
       (): ReturnType<HistoryService["topSubGifters"]> => ({}),
     ),
-    getHistory: vi.fn((): LiveHistory => ({ lives: [], gifters: [] })),
+    getHistory: vi.fn((): LiveHistory => ({
+      lives: [],
+      gifters: [],
+      subGifters: [],
+    })),
     save: vi.fn(async () => true),
     onChange: vi.fn((_listener: () => void) => {}),
   };
@@ -2421,7 +2425,7 @@ describe("init events", () => {
 
     it("ends the LIVE, pushes the LIVEs and saves when the connection stops", async () => {
       const s = await live();
-      const history: LiveHistory = { lives: [], gifters: [] };
+      const history: LiveHistory = { lives: [], gifters: [], subGifters: [] };
       s.historyService.getHistory.mockReturnValue(history);
 
       s.conn.emit(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });

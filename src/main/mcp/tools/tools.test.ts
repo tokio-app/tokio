@@ -243,6 +243,7 @@ describe("tools MCP tools", () => {
       const history = {
         lives: [live],
         gifters: [gifter, kicker, twitcher],
+        subGifters: [twitcher],
       };
       const historyService = {
         getHistory: () => history,
@@ -263,11 +264,14 @@ describe("tools MCP tools", () => {
           platforms: parts,
         })),
         // Each ranked within their platform
-        getGifters: vi.fn(async () => [
-          { ...gifter, rank: 1 },
-          { ...kicker, rank: 1 },
-          { ...twitcher, rank: 1 },
-        ]),
+        getGifters: vi.fn(async () => ({
+          gifters: [
+            { ...gifter, rank: 1 },
+            { ...kicker, rank: 1 },
+            { ...twitcher, rank: 1 },
+          ],
+          subGifters: [{ ...twitcher, rank: 1 }],
+        })),
       };
       const h = createHandler({ historyService }, { stack: lives });
       return { h, historyService };
@@ -321,6 +325,8 @@ describe("tools MCP tools", () => {
         platforms: named,
         totalGifters: 3,
         gifters: { tiktok: [row], twitch: [twitchRow], kick: [kickRow] },
+        // Only who gifted some
+        subGifters: { tiktok: [], twitch: [twitchRow], kick: [] },
       });
       expect((await call("get", { kind: "lives", id: "5" })).isError).toBe(
         true,
@@ -363,6 +369,7 @@ describe("tools MCP tools", () => {
       const to = Date.UTC(2026, 10, 2);
       expect(res.value).toEqual({
         platform: "tiktok",
+        by: "amount",
         totals: named,
         gifters: [{ rank: 1, ...row }],
       });
@@ -375,6 +382,12 @@ describe("tools MCP tools", () => {
       expect(
         (await call("get_gifters", { platform: "twitch" })).value,
       ).toMatchObject({ gifters: [{ rank: 1, ...twitchRow }] });
+      expect(
+        (await call("get_gifters", { platform: "twitch", by: "subs" })).value,
+      ).toMatchObject({ by: "subs", gifters: [{ rank: 1, ...twitchRow }] });
+      expect(
+        (await call("get_gifters", { platform: "kick", by: "subs" })).value,
+      ).toMatchObject({ gifters: [] });
       expect(historyService.getTotals).toHaveBeenCalledWith({ from, to });
       expect(historyService.getGifters).toHaveBeenCalledWith({
         from,

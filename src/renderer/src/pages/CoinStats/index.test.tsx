@@ -29,8 +29,14 @@ const saturday = liveSummary(SATURDAY, {
   gifts: 40,
 });
 
-const lives = (list: LiveSummary[], gifters: Gifter[] = []) =>
-  send(APP_EVENTS_RESPONSE.LIVES, { data: { lives: list, gifters } });
+const lives = (
+  list: LiveSummary[],
+  gifters: Gifter[] = [],
+  subGifters: Gifter[] = [],
+) =>
+  send(APP_EVENTS_RESPONSE.LIVES, {
+    data: { lives: list, gifters, subGifters },
+  });
 
 const record = (live: LiveSummary, gifters: Gifter[]) =>
   send(APP_EVENTS_RESPONSE.LIVE, {

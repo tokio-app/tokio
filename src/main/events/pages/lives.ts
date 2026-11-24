@@ -67,15 +67,16 @@ events.push(
         totals,
       });
     }
-    const data = await historyService.getGifters({ from, to, query, signal });
-    if (data === null) return;
+    const lists = await historyService.getGifters({ from, to, query, signal });
+    if (lists === null) return;
     e.reply(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,
       from,
       to,
       query,
       totals,
-      data,
+      data: lists.gifters,
+      subGifters: lists.subGifters,
     });
   },
   {

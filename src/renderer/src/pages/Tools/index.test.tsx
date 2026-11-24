@@ -26,7 +26,9 @@ const CLOCK: TestOverlay = { id: "4f9c2a", name: "Clock" };
 const timer = (recipe?: (data: TimerData) => void) =>
   send(APP_EVENTS_RESPONSE.TIMER, timerReply(recipe));
 const lives = (...data: ReturnType<typeof liveSummary>[]) =>
-  send(APP_EVENTS_RESPONSE.LIVES, { data: { lives: data, gifters: [] } });
+  send(APP_EVENTS_RESPONSE.LIVES, {
+    data: { lives: data, gifters: [], subGifters: [] },
+  });
 const fans = (...data: Fan[]) => send(APP_EVENTS_RESPONSE.FANS, { data });
 const testOverlays = (...data: TestOverlay[]) =>
   send(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS, { success: true, data });

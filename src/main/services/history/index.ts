@@ -15,6 +15,7 @@ import {
 } from "@/common/types";
 import {
   allInRange,
+  bySubs,
   DateRange,
   formatError,
   GIFT_CURRENCY,
@@ -131,10 +132,6 @@ type Waiting = { user: UserData; currency: string; value: number; at: number };
 const byAmount = (a: Gifter, b: Gifter) =>
   b.coins - a.coins || b.giftSubs - a.giftSubs || a.giftedAt - b.giftedAt;
 
-// Home's top sub gifters: the most gifted subs first
-const bySubs = (a: Gifter, b: Gifter) =>
-  b.giftSubs - a.giftSubs || a.giftedAt - b.giftedAt;
-
 // Overlays' order, as before gifted subs counted
 const byCoins = (a: Gifter, b: Gifter) =>
   b.coins - a.coins || a.giftedAt - b.giftedAt;
@@ -172,6 +169,27 @@ const placer = () => {
 const topOfEach = (sorted: Gifter[], count: number) => {
   const place = placer();
   return sorted.filter((gifter) => place(gifter) <= count);
+};
+
+// The two rankings LIVE history shows: who sent an amount, in byAmount
+// order (which `sorted` is), and who gifted subs, the most first
+const rankings = (sorted: Gifter[]) => ({
+  gifters: sorted.filter((g) => g.coins > 0),
+  subGifters: sorted.filter((g) => g.giftSubs > 0).sort(bySubs),
+});
+
+// Each gifter with their place in the list among their platform's, the
+// ones `named` keeps up to SHOWN_GIFTERS of each
+const ranked = (sorted: Gifter[], named: (gifter: Gifter) => boolean) => {
+  const place = placer();
+  const shown = placer();
+  const found: RankedGifter[] = [];
+  for (const gifter of sorted) {
+    const rank = place(gifter);
+    if (named(gifter) && shown(gifter) <= SHOWN_GIFTERS)
+      found.push({ ...gifter, rank });
+  }
+  return found;
 };
 
 const LIVE_FILE = /^(\d+)\.json$/;
@@ -491,12 +509,15 @@ export class HistoryService extends Service {
 
   /**
    * The finished LIVEs, newest first, and each platform's top gifters of all
-   * time, in one list in byAmount order.
+   * time, in one list in byAmount order of those who sent an amount, and in
+   * another by gifted subs of those who gifted some.
    */
   public getHistory(): LiveHistory {
+    const { gifters, subGifters } = rankings([...this._gifters.values()]);
     return {
       lives: [...this._lives].reverse(),
-      gifters: topOfEach([...this._gifters.values()], SHOWN_GIFTERS),
+      gifters: topOfEach(gifters, SHOWN_GIFTERS),
+      subGifters: topOfEach(subGifters, SHOWN_GIFTERS),
     };
   }
 
@@ -554,10 +575,12 @@ export class HistoryService extends Service {
   }
 
   /**
-   * Each platform's top SHOWN_GIFTERS of the finished LIVEs in some dates, in
-   * one list in byAmount order, counting only the gifts in them of a LIVE
-   * they cut, each with their place among their platform's gifters, and with
-   * a query only the ones whose name or @handle has it. Every LIVE whole is
+   * Each platform's top SHOWN_GIFTERS of the finished LIVEs in some dates,
+   * counting only the gifts in them of a LIVE they cut: in one list in
+   * byAmount order of those who sent an amount, and in another by gifted
+   * subs of those who gifted some. Each has their place in their list among
+   * their platform's, and with a query only the ones whose name or @handle
+   * has it are there. Every LIVE whole is
    * all time's list; other dates are added up from the LIVEs' files, leaving
    * out a file that doesn't load. Null when another profile loaded while they
    * were read, or the signal aborted.
@@ -570,13 +593,16 @@ export class HistoryService extends Service {
   }: DateRange & {
     query?: string;
     signal?: AbortSignal;
-  }): Promise<RankedGifter[] | null> {
+  }): Promise<{
+    gifters: RankedGifter[];
+    subGifters: RankedGifter[];
+  } | null> {
     const dir = this._dir;
-    if (dir === null) return [];
+    if (dir === null) return { gifters: [], subGifters: [] };
     const range = { from, to };
     const lives = this._lives.filter((l) => inRange(l, range));
     // Kept in byAmount order, and read from no file
-    let ranked = [...this._gifters.values()];
+    let sorted = [...this._gifters.values()];
     if (
       lives.length < this._lives.length ||
       !lives.every((l) => allInRange(l, range))
@@ -603,19 +629,15 @@ export class HistoryService extends Service {
           });
         }
       }
-      ranked = [...gifters.values()].sort(byAmount);
+      sorted = [...gifters.values()].sort(byAmount);
     }
 
     const named = viewerMatcher(query);
-    const place = placer();
-    const shown = placer();
-    const found: RankedGifter[] = [];
-    for (const gifter of ranked) {
-      const rank = place(gifter);
-      if (named(gifter) && shown(gifter) <= SHOWN_GIFTERS)
-        found.push({ ...gifter, rank });
-    }
-    return found;
+    const lists = rankings(sorted);
+    return {
+      gifters: ranked(lists.gifters, named),
+      subGifters: ranked(lists.subGifters, named),
+    };
   }
 
   /**

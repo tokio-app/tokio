@@ -7,6 +7,7 @@ import {
   PLATFORMS,
 } from "@/common/types";
 import {
+  bySubs,
   PLATFORM_CURRENCY,
   platformOf,
   platformParts,
@@ -121,7 +122,7 @@ export const kinds: Kinds = {
   }),
   lives: defineKind({
     notes:
-      "The active profile's finished LIVEs (Tools → LIVE history), newest first; the one going on joins when it ends. The id is when it started, in ms. query matches the @username Tokio connected to. platforms has each platform the LIVE was on: what viewers spent there in its own currency (coins on TikTok, kicks on Kick, bits on Twitch, usd for YouTube's Super Chats in US dollars), its gifts and its gifted subs (giftSubs). Currencies are never added together; gifts counts every platform's. get gives its top 50 gifters on each platform. Removing one also takes its gifts out of the all-time ranking; it can't be undone.",
+      "The active profile's finished LIVEs (Tools → LIVE history), newest first; the one going on joins when it ends. The id is when it started, in ms. query matches the @username Tokio connected to. platforms has each platform the LIVE was on: what viewers spent there in its own currency (coins on TikTok, kicks on Kick, bits on Twitch, usd for YouTube's Super Chats in US dollars), its gifts and its gifted subs (giftSubs). Currencies are never added together; gifts counts every platform's. get gives its top 50 gifters on each platform by what they spent (gifters, only who spent some) and by gifted subs (subGifters, only who gifted some, the most first). Removing one also takes its gifts out of the all-time ranking; it can't be undone.",
     list: ({ historyService }, { query, limit }) => {
       const wanted = query?.trim().replace(/^@/, "").toLowerCase();
       const found = historyService
@@ -149,6 +150,16 @@ export const kinds: Kinds = {
         );
       }
       const parts = platformParts(live);
+      // Each platform's first 50, on every platform the LIVE was on
+      const tops = (sorted: Gifter[]) =>
+        Object.fromEntries(
+          PLATFORMS.filter((p) => parts[p] || live.gifters.some(on(p))).map(
+            (platform) => [
+              platform,
+              sorted.filter(on(platform)).slice(0, 50).map(gifterRow),
+            ],
+          ),
+        );
       return ok({
         id,
         username: live.username,
@@ -158,13 +169,9 @@ export const kinds: Kinds = {
         platforms: platformTotals(parts),
         totalGifters: live.gifters.length,
         // In each platform's order
-        gifters: Object.fromEntries(
-          PLATFORMS.filter((p) => parts[p] || live.gifters.some(on(p))).map(
-            (platform) => [
-              platform,
-              live.gifters.filter(on(platform)).slice(0, 50).map(gifterRow),
-            ],
-          ),
+        gifters: tops(live.gifters.filter((g) => g.coins > 0)),
+        subGifters: tops(
+          live.gifters.filter((g) => g.giftSubs > 0).sort(bySubs),
         ),
       });
     },
@@ -196,6 +203,7 @@ const GiftersInput = z
     to: z.string().optional(),
     query: z.string().optional(),
     platform: z.enum(PLATFORMS).optional(),
+    by: z.enum(["amount", "subs"]).optional(),
     limit: z.number().int().min(1).max(100).optional(),
   })
   .strict();
@@ -233,12 +241,12 @@ export const tools: ToolDef<any>[] = [
     name: "get_gifters",
     title: "Top gifters",
     description:
-      "The active profile's top gifters over its finished LIVEs on one platform (tiktok, the default, twitch, youtube or kick), the most spent first, then the most gifted subs. Each has their rank among that platform's gifters, what they spent in its currency (coins on TikTok, bits on Twitch, usd for YouTube's Super Chats in US dollars, kicks on Kick), their gifts and their gifted subs (giftSubs). totals has each platform's in the dates, each in its own currency, never added together. from (included) and to (left out) are ISO dates or date-times; a date alone is midnight on this PC, and leaving both out means all time. query keeps the gifters whose nickname or @handle has it, ranks kept. The LIVE going on isn't counted until it ends: get_activity has its top gifters.",
+      "The active profile's top gifters over its finished LIVEs on one platform (tiktok, the default, twitch, youtube or kick). by amount, the default, ranks who spent some, the most spent first, then the most gifted subs; by subs ranks who gifted subs (twitch, youtube and kick have them), the most first. Each has their rank in that ranking among that platform's gifters, what they spent in its currency (coins on TikTok, bits on Twitch, usd for YouTube's Super Chats in US dollars, kicks on Kick), their gifts and their gifted subs (giftSubs). totals has each platform's in the dates, each in its own currency, never added together. from (included) and to (left out) are ISO dates or date-times; a date alone is midnight on this PC, and leaving both out means all time. query keeps the gifters whose nickname or @handle has it, ranks kept. The LIVE going on isn't counted until it ends: get_activity has its top gifters.",
     input: GiftersInput,
     annotations: READ,
     run: async (
       { historyService },
-      { from, to, query, platform = "tiktok", limit = 50 },
+      { from, to, query, platform = "tiktok", by = "amount", limit = 50 },
     ) => {
       const range = { from: toMs(from), to: toMs(to) };
       if (range.from === null || range.to === null) {
@@ -249,12 +257,13 @@ export const tools: ToolDef<any>[] = [
       const dates = { from: range.from, to: range.to };
       const totals = await historyService.getTotals(dates);
       if (!totals) return changedProfile();
-      const gifters = await historyService.getGifters({ ...dates, query });
-      if (!gifters) return changedProfile();
+      const lists = await historyService.getGifters({ ...dates, query });
+      if (!lists) return changedProfile();
       return ok({
         platform,
+        by,
         totals: platformTotals(totals.platforms),
-        gifters: gifters
+        gifters: lists[by === "subs" ? "subGifters" : "gifters"]
           .filter(on(platform))
           .slice(0, limit)
           .map((g) => ({ rank: g.rank, ...gifterRow(g) })),

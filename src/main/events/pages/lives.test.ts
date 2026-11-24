@@ -38,8 +38,15 @@ const totals = {
     twitch: { amount: 300, gifts: 0, giftSubs: 4 },
   },
 };
-const history: LiveHistory = { lives: [summary], gifters: [gifter] };
-const empty: LiveHistory = { lives: [], gifters: [] };
+const history: LiveHistory = {
+  lives: [summary],
+  gifters: [gifter],
+  subGifters: [],
+};
+const empty: LiveHistory = { lives: [], gifters: [], subGifters: [] };
+// A sub gifter, ranked in the other list
+const subber = { ...gifter, userId: "twitch:7", coins: 0, giftSubs: 5 };
+const none = { gifters: [], subGifters: [] };
 
 const notice = (fields: object) => ["notice", expect.objectContaining(fields)];
 
@@ -119,13 +126,17 @@ describe("lives events", () => {
   });
 
   describe("GET_GIFTERS", () => {
-    it("replies the dates' totals first, then again with their gifters", async () => {
+    it("replies the dates' totals first, then again with both rankings", async () => {
       const found = [{ ...gifter, rank: 1 }];
+      const subs = [{ ...subber, rank: 1 }];
       const getTotals = vi.fn(
         async (_range: { from?: number; to?: number }) => totals,
       );
       const h = createHandler({
-        historyService: { getTotals, getGifters: async () => found },
+        historyService: {
+          getTotals,
+          getGifters: async () => ({ gifters: found, subGifters: subs }),
+        },
       });
 
       await h.invoke(lives, APP_EVENTS.GET_GIFTERS, { from: 1000, to: 2000 });
@@ -136,7 +147,14 @@ describe("lives events", () => {
       });
       expect(h.replies(APP_EVENTS_RESPONSE.GIFTERS)).toEqual([
         { success: true, from: 1000, to: 2000, totals },
-        { success: true, from: 1000, to: 2000, totals, data: found },
+        {
+          success: true,
+          from: 1000,
+          to: 2000,
+          totals,
+          data: found,
+          subGifters: subs,
+        },
       ]);
     });
 
@@ -148,7 +166,7 @@ describe("lives events", () => {
           to?: number;
           query?: string;
           signal?: AbortSignal;
-        }) => found,
+        }) => ({ gifters: found, subGifters: [] }),
       );
       const h = createHandler({ historyService: { getGifters } });
 
@@ -165,7 +183,13 @@ describe("lives events", () => {
       expect(h.sent()).toEqual([
         [
           APP_EVENTS_RESPONSE.GIFTERS,
-          { success: true, from: 1000, query: "ana", data: found },
+          {
+            success: true,
+            from: 1000,
+            query: "ana",
+            data: found,
+            subGifters: [],
+          },
         ],
       ]);
     });
@@ -177,7 +201,7 @@ describe("lives events", () => {
           getTotals: async () => totals,
           getGifters: async ({ signal }) => {
             if (signal) signals.push(signal);
-            return [];
+            return none;
           },
         },
       });
@@ -204,7 +228,7 @@ describe("lives events", () => {
       const before = createHandler({
         historyService: {
           getTotals: async () => null,
-          getGifters: async () => [],
+          getGifters: async () => none,
         },
       });
 

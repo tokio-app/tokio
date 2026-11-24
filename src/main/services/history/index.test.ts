@@ -3,6 +3,7 @@ import {
   KicksEvent,
   LiveRecord,
   LiveSummary,
+  RankedGifter,
   SuperChatEvent,
   TOKIO_EVENTS,
   UserData,
@@ -165,6 +166,7 @@ describe("HistoryService", () => {
           giftedAt: 1300,
         },
       ],
+      subGifters: [],
     });
   });
 
@@ -177,7 +179,11 @@ describe("HistoryService", () => {
     history.end(2000);
 
     expect(history.top()).toEqual({ live: [], allTime: [] });
-    expect(history.getHistory()).toEqual({ lives: [], gifters: [] });
+    expect(history.getHistory()).toEqual({
+      lives: [],
+      gifters: [],
+      subGifters: [],
+    });
   });
 
   it("takes a gifter's name, handle and picture from their latest gift", async () => {
@@ -363,7 +369,7 @@ describe("HistoryService", () => {
     const all = ["kick:b", "a", "kick:a", "b"];
     expect(history.getHistory().gifters.map((g) => g.userId)).toEqual(all);
     const places = async (range: { from?: number; query?: string }) =>
-      (await history.getGifters(range))?.map((g) => [g.userId, g.rank]);
+      (await history.getGifters(range))?.gifters.map((g) => [g.userId, g.rank]);
     const ranked = await places({});
     expect(ranked).toEqual([
       ["kick:b", 1],
@@ -792,7 +798,7 @@ describe("HistoryService", () => {
       gifts: 4,
       platforms: { tiktok: { amount: 111, gifts: 4, giftSubs: 0 } },
     });
-    expect(await history.getGifters(since)).toEqual([
+    expect((await history.getGifters(since))?.gifters).toEqual([
       expect.objectContaining({ userId: "2", coins: 101, gifts: 2, rank: 1 }),
       expect.objectContaining({ userId: "1", coins: 7, gifts: 1, rank: 2 }),
     ]);
@@ -804,7 +810,7 @@ describe("HistoryService", () => {
       gifts: 1,
       platforms: { tiktok: { amount: 5, gifts: 1, giftSubs: 0 } },
     });
-    expect(await history.getGifters(until)).toEqual([
+    expect((await history.getGifters(until))?.gifters).toEqual([
       expect.objectContaining({ userId: "1", coins: 5, rank: 1 }),
     ]);
 
@@ -823,7 +829,7 @@ describe("HistoryService", () => {
       platforms: { tiktok: { amount: 116, gifts: 5, giftSubs: 0 } },
     });
     expect(
-      await history.getGifters({ from: start, to: start + 120_000 }),
+      (await history.getGifters({ from: start, to: start + 120_000 }))?.gifters,
     ).toEqual([
       expect.objectContaining({ userId: "2", coins: 100, rank: 1 }),
       expect.objectContaining({ userId: "1", coins: 12, rank: 2 }),
@@ -849,24 +855,24 @@ describe("HistoryService", () => {
     history.end(4000);
     await history.save();
 
-    expect(await history.getGifters({})).toEqual([
+    expect((await history.getGifters({}))?.gifters).toEqual([
       expect.objectContaining({ userId: "a", handle: "a_new", coins: 150 }),
       expect.objectContaining({ userId: "b", coins: 20 }),
     ]);
     // From included, to left out
-    expect(await history.getGifters({ from: 3000 })).toEqual([
+    expect((await history.getGifters({ from: 3000 }))?.gifters).toEqual([
       expect.objectContaining({ userId: "a", coins: 50, gifts: 1, rank: 1 }),
     ]);
-    expect(await history.getGifters({ to: 3000 })).toEqual([
+    expect((await history.getGifters({ to: 3000 }))?.gifters).toEqual([
       expect.objectContaining({ userId: "a", handle: "fana", coins: 100 }),
       expect.objectContaining({ userId: "b", coins: 20, rank: 2 }),
     ]);
-    expect(await history.getGifters({ from: 5000 })).toEqual([]);
+    expect((await history.getGifters({ from: 5000 }))?.gifters).toEqual([]);
 
     await writeFile(join(dir, "a", "1000.json"), "{ broken");
-    expect(await history.getGifters({ to: 3000 })).toEqual([]);
+    expect((await history.getGifters({ to: 3000 }))?.gifters).toEqual([]);
     // A range of every LIVE is all time's list, read from no file
-    expect(await history.getGifters({ from: 0 })).toEqual([
+    expect((await history.getGifters({ from: 0 }))?.gifters).toEqual([
       expect.objectContaining({ userId: "a", coins: 150, rank: 1 }),
       expect.objectContaining({ userId: "b", coins: 20, rank: 2 }),
     ]);
@@ -886,14 +892,16 @@ describe("HistoryService", () => {
     history.end(4000);
 
     // Any case, a leading @ ignored
-    expect(await history.getGifters({ query: " @BETO " })).toEqual([
+    expect((await history.getGifters({ query: " @BETO " }))?.gifters).toEqual([
       expect.objectContaining({ userId: "b", rank: 2 }),
     ]);
     // Names too ("caro name"), and within a range
-    expect(await history.getGifters({ from: 3000, query: "o na" })).toEqual([
-      expect.objectContaining({ userId: "c", rank: 1 }),
-    ]);
-    expect(await history.getGifters({ query: "nobody" })).toEqual([]);
+    expect(
+      (await history.getGifters({ from: 3000, query: "o na" }))?.gifters,
+    ).toEqual([expect.objectContaining({ userId: "c", rank: 1 })]);
+    expect((await history.getGifters({ query: "nobody" }))?.gifters).toEqual(
+      [],
+    );
   });
 
   it("gives null for dates still read when another profile loads", async () => {
@@ -919,7 +927,10 @@ describe("HistoryService", () => {
       gifts: 0,
       platforms: {},
     });
-    expect(await service().getGifters(range)).toEqual([]);
+    expect(await service().getGifters(range)).toEqual({
+      gifters: [],
+      subGifters: [],
+    });
   });
 
   it("stops reading dates when their signal aborts", async () => {
@@ -940,7 +951,7 @@ describe("HistoryService", () => {
 
     expect(await gifters).toBeNull();
     expect(loadFile).toHaveBeenCalledOnce();
-    expect(await history.getGifters({ to: 5000 })).toEqual([]);
+    expect((await history.getGifters({ to: 5000 }))?.gifters).toEqual([]);
   });
 
   it("reads a LIVE that just ended once its save is written", async () => {
@@ -973,7 +984,7 @@ describe("HistoryService", () => {
     open();
 
     expect(await saved).toBe(true);
-    expect(await gifters).toEqual([
+    expect((await gifters)?.gifters).toEqual([
       expect.objectContaining({ userId: "a", coins: 150, rank: 1 }),
     ]);
     expect(await live).toEqual(
@@ -1114,6 +1125,7 @@ describe("HistoryService", () => {
         gifters: [
           expect.objectContaining({ userId: "a", coins: 50, gifts: 1 }),
         ],
+        subGifters: [],
       });
       expect(existsSync(join(dir, "a", "1000.json"))).toBe(false);
       expect(await read<unknown>("index.json")).toEqual({
@@ -1234,7 +1246,11 @@ describe("HistoryService", () => {
     await history.save();
 
     expect(await history.clear()).toBe(true);
-    expect(history.getHistory()).toEqual({ lives: [], gifters: [] });
+    expect(history.getHistory()).toEqual({
+      lives: [],
+      gifters: [],
+      subGifters: [],
+    });
     expect(history.top().allTime.map((g) => g.userId)).toEqual(["b"]);
     expect(await readdir(dir)).toEqual(["a"]);
     expect(await readdir(join(dir, "a"))).toEqual(["3000.json", "index.json"]);
@@ -1457,17 +1473,68 @@ describe("HistoryService", () => {
         "twitch:c",
       ]);
       history.end(10);
-      expect(
-        (await history.getGifters({}))?.map((g) => [g.userId, g.rank]),
-      ).toEqual([
-        ["twitch:b", 1],
-        ["twitch:a", 2],
-        ["t", 1],
-        ["twitch:c", 3],
+      // LIVE history ranks who sent an amount, and who gifted subs apart
+      const places = (list: RankedGifter[] = []) =>
+        list.map((g) => [g.userId, g.rank]);
+      for (const range of [{}, { from: 1 }]) {
+        const lists = await history.getGifters(range);
+        expect(places(lists?.gifters)).toEqual([
+          ["twitch:b", 1],
+          ["twitch:a", 2],
+          ["t", 1],
+        ]);
+        expect(places(lists?.subGifters)).toEqual([
+          ["twitch:c", 1],
+          ["twitch:b", 2],
+        ]);
+      }
+      expect(ids(history.getHistory().gifters)).toEqual([
+        "twitch:b",
+        "twitch:a",
+        "t",
       ]);
+      expect(ids(history.getHistory().subGifters)).toEqual([
+        "twitch:c",
+        "twitch:b",
+      ]);
+    });
+
+    it("ranks gifted subs by count, then the earliest, and searches them", async () => {
+      const history = await loaded();
+      history.start("kai", 0);
+      const subs = (user: UserData, count: number) =>
+        history.record(TOKIO_EVENTS.GIFT_SUB, { user, count, tier: "" });
+      vi.setSystemTime(1);
+      subs(kicker("kick:a", "ana"), 5);
+      vi.setSystemTime(2);
+      subs(kicker("kick:b", "beto"), 5);
+      vi.setSystemTime(3);
+      subs(kicker("kick:c", "caro"), 20);
+      history.end(10);
+      history.start("kai", 20);
+      vi.setSystemTime(21);
+      subs(kicker("kick:b", "beto"), 1);
+      history.end(30);
+
+      const places = (list: RankedGifter[] = []) =>
+        list.map((g) => [g.userId, g.giftSubs, g.rank]);
+      expect(places((await history.getGifters({}))?.subGifters)).toEqual([
+        ["kick:c", 20, 1],
+        ["kick:b", 6, 2],
+        ["kick:a", 5, 3],
+      ]);
+      // The first LIVE alone: a and b tie, the earlier first
       expect(
-        (await history.getGifters({ from: 1 }))?.map((g) => g.userId),
-      ).toEqual(["twitch:b", "twitch:a", "t", "twitch:c"]);
+        places((await history.getGifters({ to: 20 }))?.subGifters),
+      ).toEqual([
+        ["kick:c", 20, 1],
+        ["kick:a", 5, 2],
+        ["kick:b", 5, 3],
+      ]);
+      // A search keeps the places, in both lists
+      const found = await history.getGifters({ to: 20, query: "beto" });
+      expect(places(found?.subGifters)).toEqual([["kick:b", 5, 3]]);
+      expect(found?.gifters).toEqual([]);
     });
 
     it(`keeps ${MAX_GIFTERS} of each platform's in all time`, async () => {
@@ -1484,9 +1551,9 @@ describe("HistoryService", () => {
       gifts(history, [1, gift(viewer("old"), 1)]);
       history.end(100);
 
-      const ids = history.getHistory().gifters.map((g) => g.userId);
-      expect(ids).not.toContain("old");
-      expect(ids).toContain("twitch:1");
+      const { gifters, subGifters } = history.getHistory();
+      expect(gifters.map((g) => g.userId)).not.toContain("old");
+      expect(subGifters.map((g) => g.userId)).toContain("twitch:1");
     });
 
     it("gives overlays TikTok's gifters only, as before", async () => {
@@ -1571,7 +1638,7 @@ describe("HistoryService", () => {
         gifts: 1,
         platforms: { tiktok: { amount: 2, gifts: 1, giftSubs: 0 } },
       });
-      expect(await history.getGifters({ from: MINUTE })).toEqual([
+      expect((await history.getGifters({ from: MINUTE }))?.gifters).toEqual([
         expect.objectContaining({ userId: "1", coins: 2, giftSubs: 0 }),
       ]);
     });
@@ -1604,7 +1671,7 @@ describe("HistoryService", () => {
       subs(3);
       history.end(30);
       await history.deleteLive(0);
-      expect(history.getHistory().gifters).toEqual([
+      expect(history.getHistory().subGifters).toEqual([
         expect.objectContaining({ userId: "twitch:1", giftSubs: 3 }),
       ]);
       await history.deleteLive(20);

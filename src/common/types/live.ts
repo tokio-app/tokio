@@ -149,10 +149,15 @@ export type LiveRecord = LiveSummary & {
   minutes: GiftMinute[];
 };
 
-// A gifter found by a search, with their place among their platform's
-// gifters (1, the most)
+// A gifter in some dates or found by a search, with their place in their
+// ranking among their platform's gifters (1, the most)
 export type RankedGifter = Gifter & { rank: number };
 
 // For LIVE history: the finished LIVEs, newest first, and all time's top
-// gifters
-export type LiveHistory = { lives: LiveSummary[]; gifters: Gifter[] };
+// gifters: by amount those who sent some, and by gifted subs those who
+// gifted some
+export type LiveHistory = {
+  lives: LiveSummary[];
+  gifters: Gifter[];
+  subGifters: Gifter[];
+};
