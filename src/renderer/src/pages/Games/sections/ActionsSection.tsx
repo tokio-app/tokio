@@ -17,6 +17,7 @@ import {
   COUNTED_HAZARDS,
   countedVariables,
   createAction,
+  newRowTrigger,
   createStep,
   rowVariables,
   samplePlatform,
@@ -94,6 +95,7 @@ export function ActionsSection({
   update,
 }: Props) {
   const t = useT();
+  const platforms = usePlatforms();
   // Asked once here, not by each action
   const translation = useTranslationLanguage();
   // Collapsed, the overlay below gets the room. Only while on the page.
@@ -180,7 +182,7 @@ export function ActionsSection({
           className={styles.add}
           onClick={() =>
             update((s) => {
-              s.actions.push(createAction(tab));
+              s.actions.push(createAction(tab, newRowTrigger(platforms)));
             })
           }
         >

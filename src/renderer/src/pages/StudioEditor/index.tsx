@@ -519,7 +519,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
 
   const add = (kind: StudioElementKind) => {
     if (elements.length >= STUDIO_MAX_ELEMENTS) return;
-    const added = newStudioElement(kind, overlay.size);
+    const added = newStudioElement(kind, overlay.size, platforms);
     // In front in its group, which unfolds to show it, else in front of all
     if (target) {
       changeGroup(target.id, (g) => ({

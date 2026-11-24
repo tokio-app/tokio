@@ -8,6 +8,7 @@ import type {
 } from "@/common/schemas";
 import {
   ALERT_TRIGGER_LABELS,
+  AlertTrigger,
   CustomGift,
   EMOTE_TRIGGER,
   GameOverlayRow,
@@ -388,13 +389,17 @@ export const createStep = (kind: StepKind): GameStep => ({
 });
 
 // A new game action: a follow spawns a zombie
-export function createAction(edition: MinecraftEdition): GameAction {
+// type: the event it starts on, newRowTrigger's for the profile
+export function createAction(
+  edition: MinecraftEdition,
+  type: AlertTrigger = TOKIO_EVENTS.FOLLOW,
+): GameAction {
   return {
     id: crypto.randomUUID(),
     enabled: true,
     edition,
     trigger: {
-      type: TOKIO_EVENTS.FOLLOW,
+      type,
       gifts: [],
       every_gift: false,
       emotes: [],

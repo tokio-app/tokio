@@ -16,6 +16,7 @@ import {
 } from "../schemas/studio";
 import {
   EMOTE_TRIGGER,
+  PLATFORMS,
   TOKIO_EVENTS,
   type AlertTrigger,
   type AppEvents,
@@ -42,6 +43,7 @@ import {
 import { formatDuration, formatMoney, formatStat, NO_MONEY } from "./format";
 import {
   giftCurrencies,
+  newRowTrigger,
   PLATFORM_CURRENCY,
   rowPlatforms,
   triggersFor,
@@ -510,6 +512,9 @@ const NEW_BOXES: Record<StudioElementKind, { width: number; height: number }> =
 export function newStudioElement(
   kind: StudioElementKind,
   size: StudioSize,
+  // The profile's: what it reacts to and whose gifters a list ranks start
+  // on one of them
+  platforms: readonly Platform[] = ["tiktok"],
 ): StudioElement {
   const box = NEW_BOXES[kind];
   const canvas = STUDIO_SIZES[size];
@@ -519,6 +524,10 @@ export function newStudioElement(
     ...box,
     x: Math.round((canvas.width - box.width) / 2),
     y: Math.round((canvas.height - box.height) / 2),
+    trigger: { type: newRowTrigger(platforms), gifts: [] },
+    ...(kind === "list" && {
+      platform: PLATFORMS.find((p) => platforms.includes(p)) ?? "tiktok",
+    }),
     ...(kind === "viewer" && { when: "event" }),
     ...(kind === "gift" && {
       when: "event",

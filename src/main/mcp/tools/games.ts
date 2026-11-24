@@ -9,6 +9,7 @@ import {
 import {
   countedVariables,
   createAction,
+  newRowTrigger,
   gameStepsText,
   getMinecraftOverlayURL,
   JAVA_ONLY_HAZARDS,
@@ -213,12 +214,16 @@ export const kinds: Kinds = {
     },
     save: async (handler, id, changes) => {
       const changed = guardProfile(handler);
-      const { games } = await profileOf(handler);
+      const { games, platforms } = await profileOf(handler);
       const stored = id === undefined ? undefined : findAction(games, id);
       if (id !== undefined && !stored) return noAction(id);
       const edition = GameActionSchema.shape.edition.safeParse(changes.edition);
       const base =
-        stored ?? createAction(edition.success ? edition.data : "bedrock");
+        stored ??
+        createAction(
+          edition.success ? edition.data : "bedrock",
+          newRowTrigger(platforms),
+        );
       const parsed = GameActionSchema.safeParse(
         deepMerge(base, { ...changes, id: base.id }),
       );

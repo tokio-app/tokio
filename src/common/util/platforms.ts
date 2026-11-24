@@ -144,3 +144,13 @@ export const triggersFor = (platforms: readonly Platform[]): AlertTrigger[] =>
     const from = platformsOf(trigger);
     return from.length === 0 || from.some((p) => platforms.includes(p));
   });
+
+/**
+ * The event a new alert, game action or Studio element starts on: Follow
+ * where the profile's platforms send follows, else a subscription, which
+ * YouTube's memberships and Kick's subs are. Never one they can't send.
+ */
+export const newRowTrigger = (platforms: readonly Platform[]): AlertTrigger =>
+  triggersFor(platforms).includes(TOKIO_EVENTS.FOLLOW)
+    ? TOKIO_EVENTS.FOLLOW
+    : TOKIO_EVENTS.SUBSCRIBE;

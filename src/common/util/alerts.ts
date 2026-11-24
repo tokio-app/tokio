@@ -167,13 +167,17 @@ export function formatAlertMessage(
 export const defaultAlertName = (index: number) => `alert-${index + 1}`;
 
 // A new alert, named by its place in the list
-export function createAlert(index = 0): Alert {
+// type: the event it starts on, newRowTrigger's for the profile
+export function createAlert(
+  index = 0,
+  type: AlertTrigger = TOKIO_EVENTS.FOLLOW,
+): Alert {
   return {
     id: crypto.randomUUID(),
     name: defaultAlertName(index),
     enabled: true,
     trigger: {
-      type: TOKIO_EVENTS.FOLLOW,
+      type,
       gifts: [],
       every_gift: false,
       emotes: [],

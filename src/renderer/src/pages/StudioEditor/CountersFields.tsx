@@ -4,7 +4,8 @@ import {
   StudioCounter,
   TriggerSchema,
 } from "@/common/schemas";
-import { CustomGift, TOKIO_EVENTS } from "@/common/types";
+import { CustomGift, Platform, TOKIO_EVENTS } from "@/common/types";
+import { newRowTrigger, triggersFor } from "@/common/util";
 import {
   Btn,
   EmoteOption,
@@ -13,6 +14,7 @@ import {
   TriggerFilter,
   TriggerSelect,
 } from "@/components";
+import { usePlatforms } from "@/context/platforms";
 import { useOptions, useT } from "@/ui/i18n";
 import { useId } from "react";
 import { FiAlertTriangle, FiPlus, FiX } from "react-icons/fi";
@@ -26,10 +28,16 @@ type Props = {
   onChange: (counters: StudioCounter[]) => void;
 };
 
-// What a new counter counts, the schema's default
-const newCounter = (): StudioCounter => ({
+// What a new counter counts: gifts, the schema's default, where the
+// profile's platforms send them, else what a new row starts on
+const newCounter = (platforms: readonly Platform[]): StudioCounter => ({
   name: "",
-  trigger: TriggerSchema.parse({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
+  trigger: TriggerSchema.parse({
+    type: triggersFor(platforms).includes(TOKIO_EVENTS.GIFT)
+      ? TOKIO_EVENTS.GIFT
+      : newRowTrigger(platforms),
+    gifts: [],
+  }),
 });
 
 /**
@@ -39,6 +47,7 @@ const newCounter = (): StudioCounter => ({
  */
 export function CountersFields({ counters, gifts, emotes, onChange }: Props) {
   const t = useT();
+  const platforms = usePlatforms();
   const title = useId();
   const triggers = useOptions(TRIGGER_OPTIONS);
   const set = (index: number, changed: StudioCounter) =>
@@ -127,7 +136,7 @@ export function CountersFields({ counters, gifts, emotes, onChange }: Props) {
       <Btn
         className={styles.add_trigger}
         disabled={counters.length >= STUDIO_MAX_COUNTERS}
-        onClick={() => onChange([...counters, newCounter()])}
+        onClick={() => onChange([...counters, newCounter(platforms)])}
       >
         <FiPlus size={16} aria-hidden />
         {t("studio.counters.add")}

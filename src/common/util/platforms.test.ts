@@ -10,6 +10,7 @@ import {
   platformOf,
   platformsOf,
   rowPlatforms,
+  newRowTrigger,
   triggersFor,
 } from "./platforms";
 
@@ -132,5 +133,14 @@ describe("rowPlatforms", () => {
       "tiktok",
     ]);
     expect(rowPlatforms(row(TOKIO_EVENTS.MUSIC_CHANGE), PLATFORMS)).toEqual([]);
+  });
+});
+
+describe("newRowTrigger", () => {
+  it("starts a new row on Follow where follows come, else a subscription", () => {
+    expect(newRowTrigger(["tiktok"])).toBe(TOKIO_EVENTS.FOLLOW);
+    expect(newRowTrigger(["kick", "twitch"])).toBe(TOKIO_EVENTS.FOLLOW);
+    expect(newRowTrigger(["youtube"])).toBe(TOKIO_EVENTS.SUBSCRIBE);
+    expect(newRowTrigger(["kick"])).toBe(TOKIO_EVENTS.SUBSCRIBE);
   });
 });

@@ -547,6 +547,21 @@ describe("newStudioElement", () => {
     expect(StudioElementSchema.parse(a)).toEqual(a);
   });
 
+  it("starts on the profile's platforms: their event, and a list their gifters", () => {
+    expect(newStudioElement("text", "portrait")).toMatchObject({
+      trigger: { type: TOKIO_EVENTS.FOLLOW },
+    });
+    expect(newStudioElement("text", "portrait", ["kick"])).toMatchObject({
+      trigger: { type: TOKIO_EVENTS.SUBSCRIBE },
+    });
+    expect(
+      newStudioElement("list", "portrait", ["twitch", "kick"]),
+    ).toMatchObject({ platform: "twitch" });
+    expect(newStudioElement("list", "portrait")).toMatchObject({
+      platform: "tiktok",
+    });
+  });
+
   it("makes a viewer's picture and a gift wait for an event", () => {
     expect(newStudioElement("viewer", "landscape")).toMatchObject({
       when: "event",

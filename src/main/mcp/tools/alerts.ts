@@ -18,6 +18,7 @@ import {
 import {
   ALERT_MESSAGE_VARIABLES,
   createAlert,
+  newRowTrigger,
   formatError,
   getAlertOverlayURL,
   samplePlatform,
@@ -295,7 +296,7 @@ export const kinds: Kinds = {
         id === undefined ? items.length : items.findIndex((a) => a.id === id);
       if (index === -1) return fail(`No alert has the id ${id}.`);
       const { error: refused, alert } = mergeAlert(
-        items[index] ?? createAlert(index),
+        items[index] ?? createAlert(index, newRowTrigger(profile.platforms)),
         changes,
         storeManagerService.getSounds(),
         storeManagerService.getMedia(),
