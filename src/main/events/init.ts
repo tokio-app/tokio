@@ -1120,6 +1120,7 @@ const registerHistory = ({
     if (win.isDestroyed()) return;
     win.webContents.send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
       byPlatform: history.topByPlatform(),
+      subsByPlatform: history.topSubGifters(),
     });
   }, GIFTERS_PUSH_MS);
   history.onChange(push);

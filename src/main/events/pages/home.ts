@@ -328,6 +328,7 @@ events.push(
   ({ historyService }, e) => {
     e.reply(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
       byPlatform: historyService.topByPlatform(),
+      subsByPlatform: historyService.topSubGifters(),
     });
   },
   { notify: false },

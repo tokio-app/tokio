@@ -418,6 +418,9 @@ function setup() {
     topByPlatform: vi.fn(
       (): ReturnType<HistoryService["topByPlatform"]> => ({}),
     ),
+    topSubGifters: vi.fn(
+      (): ReturnType<HistoryService["topSubGifters"]> => ({}),
+    ),
     getHistory: vi.fn((): LiveHistory => ({ lives: [], gifters: [] })),
     save: vi.fn(async () => true),
     onChange: vi.fn((_listener: () => void) => {}),
@@ -2467,6 +2470,7 @@ describe("init events", () => {
       change(s);
       s.historyService.top.mockReturnValue(top([gifter]));
       s.historyService.topByPlatform.mockReturnValue({ tiktok: [record] });
+      s.historyService.topSubGifters.mockReturnValue({ kick: [record] });
       change(s);
       change(s);
       expect(s.serverService.sendToAll.mock.calls).toEqual([[message()]]);
@@ -2477,10 +2481,14 @@ describe("init events", () => {
         [message()],
         [message(top([gifter]))],
       ]);
-      // Home gets each platform's in this LIVE with each push
+      // Home gets each platform's in this LIVE with each push, gifted subs
+      // topped apart
       expect(s.h.pushed(APP_EVENTS_RESPONSE.LIVE_GIFTERS)).toEqual([
-        { byPlatform: {} },
-        { byPlatform: { tiktok: [record] } },
+        { byPlatform: {}, subsByPlatform: {} },
+        {
+          byPlatform: { tiktok: [record] },
+          subsByPlatform: { kick: [record] },
+        },
       ]);
     });
 

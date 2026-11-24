@@ -843,14 +843,21 @@ describe("home events", () => {
         giftSubs: 0,
         giftedAt: 1000,
       };
+      const subber = { ...gifter, userId: "kick:2", platform: "kick" as const };
       const h = createHandler({
-        historyService: { topByPlatform: () => ({ tiktok: [gifter] }) },
+        historyService: {
+          topByPlatform: () => ({ tiktok: [gifter] }),
+          topSubGifters: () => ({ kick: [subber] }),
+        },
       });
 
       await h.invoke(home, APP_EVENTS.GET_LIVE_GIFTERS);
 
       expect(h.replies(APP_EVENTS_RESPONSE.LIVE_GIFTERS)).toEqual([
-        { byPlatform: { tiktok: [gifter] } },
+        {
+          byPlatform: { tiktok: [gifter] },
+          subsByPlatform: { kick: [subber] },
+        },
       ]);
       expect(h.notices).toEqual([]);
     });

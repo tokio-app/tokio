@@ -1,13 +1,28 @@
-import { LiveSession, Platform } from "@/common/types";
+import { MessageKey } from "@/common/i18n";
+import { Gifter, LiveSession, Platform } from "@/common/types";
+import { Currency } from "@/common/util";
 import { Avatar, Section } from "@/components";
+import { amountLabel } from "@/helper/gifts";
 import { useLanguage, useT } from "@/ui/i18n";
 import styles from "../home.module.css";
-import { LiveGifters, liveView, HomeTab, sentLabel, Views } from "../helper";
+import { LiveGifters, liveView, HomeTab, Views } from "../helper";
 import { StatValue } from "./StatValue";
 import { ViewersChart } from "./ViewersChart";
 
 // The tiles in a row, as home.module.css's .stats sets it
 const STATS_ROW = 6;
+
+// Each currency's top, named by what it ranks: TikTok's gifts, Kick's Kicks,
+// Twitch's Bits, YouTube's Super Chats
+const MONEY_TOPS: Record<Currency, { title: MessageKey; empty: MessageKey }> = {
+  coins: { title: "home.gifters.title", empty: "home.gifters.empty" },
+  kicks: { title: "home.gifters.kicks", empty: "home.gifters.emptyKicks" },
+  bits: { title: "home.gifters.bits", empty: "home.gifters.emptyBits" },
+  usd: {
+    title: "home.gifters.superChats",
+    empty: "home.gifters.emptySuperChats",
+  },
+};
 
 interface Props {
   // The tab picked above: a platform in the LIVE, or all of them
@@ -26,7 +41,7 @@ interface Props {
 export function LiveSection({ tab, platforms, ...numbers }: Props) {
   const t = useT();
   const language = useLanguage();
-  const { viewers, minutes, stats, gifters } = liveView(
+  const { viewers, minutes, stats, gifters, subGifters } = liveView(
     tab,
     platforms,
     numbers,
@@ -66,38 +81,66 @@ export function LiveSection({ tab, platforms, ...numbers }: Props) {
       </div>
 
       {gifters && (
-        <Section title={t("home.gifters.title")}>
-          {gifters.list.length === 0 ? (
-            <p className={styles.quiet}>{t("home.gifters.empty")}</p>
-          ) : (
-            <ol className={styles.gifters} aria-label={t("home.gifters.title")}>
-              {gifters.list.slice(0, 3).map((gifter, i) => {
-                const name = gifter.username || gifter.handle;
-                return (
-                  <li key={gifter.userId} className={styles.gifter}>
-                    {/* The list's order already says it to screen readers */}
-                    <span className={styles.rank} aria-hidden="true">
-                      {i + 1}
-                    </span>
-                    <Avatar name={name} picture={gifter.picture} />
-                    <span className={styles.gifter_body}>
-                      <span
-                        className={styles.gifter_name}
-                        title={`@${gifter.handle}`}
-                      >
-                        {name}
-                      </span>
-                      <span className={styles.gifter_coins}>
-                        {sentLabel(gifter, gifters.currency, language)}
-                      </span>
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-        </Section>
+        <TopList
+          title={t(MONEY_TOPS[gifters.currency].title)}
+          empty={t(MONEY_TOPS[gifters.currency].empty)}
+          list={gifters.list}
+          label={(g) => amountLabel(g.coins, gifters.currency, language)}
+        />
+      )}
+      {subGifters && (
+        <TopList
+          title={t("home.gifters.subs")}
+          empty={t("home.gifters.emptySubs")}
+          list={subGifters}
+          label={(g) => t("gifts.giftSubs", { count: g.giftSubs })}
+        />
       )}
     </div>
+  );
+}
+
+interface TopProps {
+  title: string;
+  // Said while no one is on it
+  empty: string;
+  // The most first
+  list: Gifter[];
+  // What each one sent, in the top's unit
+  label: (gifter: Gifter) => string;
+}
+
+// A top's first three, in a row
+function TopList({ title, empty, list, label }: TopProps) {
+  return (
+    <Section title={title}>
+      {list.length === 0 ? (
+        <p className={styles.quiet}>{empty}</p>
+      ) : (
+        <ol className={styles.gifters} aria-label={title}>
+          {list.slice(0, 3).map((gifter, i) => {
+            const name = gifter.username || gifter.handle;
+            return (
+              <li key={gifter.userId} className={styles.gifter}>
+                {/* The list's order already says it to screen readers */}
+                <span className={styles.rank} aria-hidden="true">
+                  {i + 1}
+                </span>
+                <Avatar name={name} picture={gifter.picture} />
+                <span className={styles.gifter_body}>
+                  <span
+                    className={styles.gifter_name}
+                    title={`@${gifter.handle}`}
+                  >
+                    {name}
+                  </span>
+                  <span className={styles.gifter_coins}>{label(gifter)}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </Section>
   );
 }

@@ -13,7 +13,6 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import { Currency, PLATFORM_CURRENCY, triggersFor } from "@/common/util";
-import { amountLabel } from "@/helper/gifts";
 
 // Until main answers
 export const NO_SESSION: LiveSession = {
@@ -154,9 +153,10 @@ export type LiveGifters =
   AppEventsResponseMap[APP_EVENTS_RESPONSE.LIVE_GIFTERS];
 
 // What a tab shows. All adds up the LIVE's platforms; likes, total views and
-// shares are TikTok's alone, so they're the same on both. Top gifters show
-// on each platform's tab, in its currency, never on All, which would rank
-// one currency against another.
+// shares are TikTok's alone, so they're the same on both. Each platform's tab
+// tops who sent the most in its currency, and on Twitch, YouTube and Kick who
+// gifted the most subs, apart (the user's call). Never on All, which would
+// rank one currency against another.
 export function liveView(
   tab: HomeTab,
   platforms: readonly Platform[],
@@ -171,6 +171,7 @@ export function liveView(
   minutes: number[];
   stats: Stat[];
   gifters: { currency: Currency; list: Gifter[] } | null;
+  subGifters: Gifter[] | null;
 } {
   const { session, views, likes, gifters } = numbers;
   const all = tab === "all";
@@ -190,22 +191,14 @@ export function liveView(
       ? null
       : {
           currency: PLATFORM_CURRENCY[tab],
-          list: gifters.byPlatform[tab] ?? [],
+          // Their money alone: gifted subs have their own top
+          list: (gifters.byPlatform[tab] ?? []).filter((g) => g.coins > 0),
         },
+    subGifters:
+      all || !triggersFor([tab]).includes(TOKIO_EVENTS.GIFT_SUB)
+        ? null
+        : (gifters.subsByPlatform[tab] ?? []),
   };
-}
-
-// "500 Bits · 3 gifted subs": what a top gifter sent, only their subs when
-// they sent nothing else
-export function sentLabel(
-  { coins, giftSubs }: Pick<Gifter, "coins" | "giftSubs">,
-  currency: Currency,
-  language: string,
-): string {
-  const subs = translate(language, "gifts.giftSubs", { count: giftSubs });
-  if (giftSubs > 0 && coins === 0) return subs;
-  const amount = amountLabel(coins, currency, language);
-  return giftSubs > 0 ? `${amount} · ${subs}` : amount;
 }
 
 // The chart's points, x and y from 0 to 100 with y down, as the SVG's viewBox

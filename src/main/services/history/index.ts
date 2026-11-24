@@ -131,6 +131,10 @@ type Waiting = { user: UserData; currency: string; value: number; at: number };
 const byAmount = (a: Gifter, b: Gifter) =>
   b.coins - a.coins || b.giftSubs - a.giftSubs || a.giftedAt - b.giftedAt;
 
+// Home's top sub gifters: the most gifted subs first
+const bySubs = (a: Gifter, b: Gifter) =>
+  b.giftSubs - a.giftSubs || a.giftedAt - b.giftedAt;
+
 // Overlays' order, as before gifted subs counted
 const byCoins = (a: Gifter, b: Gifter) =>
   b.coins - a.coins || a.giftedAt - b.giftedAt;
@@ -459,8 +463,25 @@ export class HistoryService extends Service {
    * record has an amount or gifted subs.
    */
   public topByPlatform(): Partial<Record<Platform, Gifter[]>> {
+    return this._tops([...this._liveGifters.values()].sort(byAmount));
+  }
+
+  /**
+   * This LIVE's top sub gifters on each platform, for Home's own top of
+   * gifted subs: only who gifted some, the most first.
+   */
+  public topSubGifters(): Partial<Record<Platform, Gifter[]>> {
+    return this._tops(
+      [...this._liveGifters.values()]
+        .filter((g) => g.giftSubs > 0)
+        .sort(bySubs),
+    );
+  }
+
+  // Each platform's first TOP_GIFTERS of the sorted gifters
+  private _tops(sorted: Gifter[]): Partial<Record<Platform, Gifter[]>> {
     const tops: Partial<Record<Platform, Gifter[]>> = {};
-    for (const gifter of [...this._liveGifters.values()].sort(byAmount)) {
+    for (const gifter of sorted) {
       // Missing means TikTok
       const top = (tops[gifter.platform ?? "tiktok"] ??= []);
       if (top.length < TOP_GIFTERS) top.push({ ...gifter });

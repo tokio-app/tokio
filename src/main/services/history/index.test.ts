@@ -237,6 +237,38 @@ describe("HistoryService", () => {
     expect(history.topByPlatform()).toEqual({});
   });
 
+  it("tops each platform's sub gifters apart, by their gifted subs", async () => {
+    const history = await loaded();
+    history.start("kai", 0);
+    const sub = (userId: string, count: number) =>
+      history.record(TOKIO_EVENTS.GIFT_SUB, {
+        user: kicker(userId),
+        count,
+        tier: "",
+      });
+    // Kicks alone: on the Kicks top, not the subs one
+    gifts(history, [1, kicked(kicker("kick:1"), 500)]);
+    vi.setSystemTime(2);
+    sub("kick:2", 3);
+    vi.setSystemTime(3);
+    sub("kick:3", 10);
+    vi.setSystemTime(4);
+    sub("kick:1", 1);
+
+    const subs = history.topSubGifters();
+    expect(subs.kick?.map((g) => [g.userId, g.giftSubs])).toEqual([
+      ["kick:3", 10],
+      ["kick:2", 3],
+      ["kick:1", 1],
+    ]);
+    expect(subs.tiktok).toBeUndefined();
+    // The money top keeps its order: the most Kicks first
+    expect(history.topByPlatform().kick?.[0].userId).toBe("kick:1");
+
+    history.end(10);
+    expect(history.topSubGifters()).toEqual({});
+  });
+
   it("counts a gift without a price in the totals only, with no gifter", async () => {
     const history = await loaded();
     history.start("kai", 0);

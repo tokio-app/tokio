@@ -366,9 +366,11 @@ export interface AppEventsResponseMap {
   };
   // The reply to GET_LIVE_GIFTERS, pushed again as they change: each
   // platform's top gifters in this LIVE, the most first, none outside a LIVE.
-  // Their numbers are this LIVE's.
+  // Their numbers are this LIVE's. subsByPlatform ranks who gifted subs, by
+  // their count.
   [APP_EVENTS_RESPONSE.LIVE_GIFTERS]: {
     byPlatform: Partial<Record<Platform, Gifter[]>>;
+    subsByPlatform: Partial<Record<Platform, Gifter[]>>;
   };
   // The reply to GET_SONGS, pushed again as the request queue changes, as
   // overlays get it

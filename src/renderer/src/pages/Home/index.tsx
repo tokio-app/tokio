@@ -66,7 +66,10 @@ export function Home() {
     platformViewers: {},
   });
   const [session, setSession] = useState(NO_SESSION);
-  const [gifters, setGifters] = useState<LiveGifters>({ byPlatform: {} });
+  const [gifters, setGifters] = useState<LiveGifters>({
+    byPlatform: {},
+    subsByPlatform: {},
+  });
   const [songs, setSongs] = useState<MusicInfo[]>([]);
   const [paused, setPaused] = useState(false);
   // The tab picked over the connection and the numbers, null for the first
