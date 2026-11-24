@@ -14,6 +14,7 @@ import {
 } from "@/common/util";
 import { connectionState, createStack } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
+import { refreshTikTokGifts, usesTikTok } from "@/helper/gifts";
 import { t } from "@/helper/i18n";
 import { ConnectorFailure } from "@/services/connector/common";
 import { normalizeUsername } from "@tokioapp/connector";
@@ -222,11 +223,8 @@ events.push(
 // The profile's platforms, picked on Home. No notice: the toggles show them.
 events.push(
   APP_EVENTS.SET_PLATFORMS,
-  async (
-    { storeManagerService, connectorService, timerService },
-    e,
-    { platforms },
-  ) => {
+  async (services, e, { platforms }) => {
+    const { storeManagerService, connectorService, timerService } = services;
     // Known ones once each, in Home's order. One that's on stays: it's
     // disconnected first.
     const on = connectorService.status();
@@ -242,6 +240,8 @@ events.push(
     });
     // The countdown's overlay lists only what they send
     timerService.setPlatforms(picked);
+    // TikTok's gifts, once TikTok is added
+    if (usesTikTok(picked)) void refreshTikTokGifts(services);
   },
   {
     failure: {

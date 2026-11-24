@@ -3976,6 +3976,36 @@ describe("init events", () => {
       });
     });
 
+    describe("on a profile without TikTok", () => {
+      const kickOnly = (s: ReturnType<typeof setup>) =>
+        s.storeManagerService.getProfileData.mockResolvedValue({
+          ...profile,
+          platforms: ["kick"],
+        });
+
+      it("never asks TikTok, and loads the gifts saved last time", async () => {
+        const s = setup();
+        kickOnly(s);
+        s.overlayService.getGifts.mockResolvedValue([lion]);
+
+        await load(s);
+
+        expect(s.overlayService.load).toHaveBeenCalledExactlyOnceWith([lion]);
+        expect(s.connectorService.fetchGifts).not.toHaveBeenCalled();
+      });
+
+      it("loads none without saved ones, and doesn't warn", async () => {
+        const s = setup();
+        kickOnly(s);
+
+        await load(s);
+
+        expect(s.overlayService.load).toHaveBeenCalledExactlyOnceWith([]);
+        expect(s.connectorService.fetchGifts).not.toHaveBeenCalled();
+        expect(noticesFor(s, FEEDBACK_CODES.GIFTS_FETCH_FAILED)).toEqual([]);
+      });
+    });
+
     it("starts the server as saved", async () => {
       const s = setup();
 

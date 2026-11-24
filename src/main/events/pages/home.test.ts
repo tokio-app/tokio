@@ -553,13 +553,33 @@ describe("home events", () => {
         getProfileData: async () => profile,
       };
       const timerService = { setPlatforms: vi.fn((_p: Platform[]) => {}) };
+      // TikTok out of reach: nothing to refresh, and no notice
+      const connectorService = {
+        status: () => on,
+        fetchGifts: vi.fn(async () => ({ success: false, data: [] })),
+      };
       const h = createHandler({
-        connectorService: { status: () => on },
+        connectorService,
         storeManagerService,
         timerService,
       });
-      return { h, storeManagerService, timerService };
+      return { h, storeManagerService, timerService, connectorService };
     };
+
+    it("asks TikTok for its gifts once TikTok is added, never without it", async () => {
+      const { h, connectorService } = setup();
+
+      await h.invoke(home, APP_EVENTS.SET_PLATFORMS, { platforms: ["kick"] });
+      expect(connectorService.fetchGifts).not.toHaveBeenCalled();
+
+      await h.invoke(home, APP_EVENTS.SET_PLATFORMS, {
+        platforms: ["kick", "tiktok"],
+      });
+      await vi.waitFor(() =>
+        expect(connectorService.fetchGifts).toHaveBeenCalledOnce(),
+      );
+      expect(h.notices).toEqual([]);
+    });
 
     it("saves the known ones in Home's order, with no notice", async () => {
       const { h, storeManagerService, timerService } = setup();

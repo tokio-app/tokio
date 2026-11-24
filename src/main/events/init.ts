@@ -11,7 +11,6 @@ import {
   APP_EVENTS_RESPONSE,
   AppEvents,
   ChatEvent,
-  CustomGift,
   EMOTE_TRIGGER,
   FEEDBACK_CODES,
   GiftEvent,
@@ -44,6 +43,12 @@ import { globalShortcut, systemPreferences } from "electron";
 import { connectionState, createStack, replyFailure } from "@/helper/events";
 import { AppFailure, REPEAT_NOTICE_MS, saveFailure } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
+import {
+  fetchOverlayGifts,
+  giftsFetched,
+  refreshTikTokGifts,
+  usesTikTok,
+} from "@/helper/gifts";
 import { language, onLanguage, setLanguage, t } from "@/helper/i18n";
 import {
   liveNumbers,
@@ -58,7 +63,6 @@ import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
 import { createMcpRoutes } from "@/mcp";
 import type { AlertAudio } from "@/services/alerts";
-import { ConnectorService } from "@/services/connector";
 import { FAN_EVENTS } from "@/services/fans";
 import { MAX_BACKLOG } from "@/services/games";
 import { HISTORY_EVENTS } from "@/services/history";
@@ -104,20 +108,6 @@ const eventName = (
     type,
     platform: data && "user" in data ? data.user?.platform : undefined,
   });
-
-// Gifts in the shape overlays use, none when TikTok can't be reached.
-const fetchOverlayGifts = async (
-  conn: ConnectorService,
-): Promise<CustomGift[]> => {
-  const gifts = await conn.fetchGifts();
-  if (!gifts.success) return [];
-  return gifts.data.map((g) => ({
-    value: g.id,
-    label: g.name,
-    img: g.image,
-    coins: g.coins,
-  }));
-};
 
 // Updates are found in the background, so main tells the user about them.
 const initUpdater = async ({
@@ -1388,29 +1378,13 @@ const startApp = async (handler: AppHandlerVariables) => {
 
   // Before the server starts, so it serves the overlays right away. The
   // gifts saved last time are used when there are any, so startup doesn't
-  // wait for TikTok, and fresh ones replace them once they arrive.
+  // wait for TikTok, and fresh ones replace them once they arrive. A profile
+  // without TikTok never asks TikTok for them.
+  const tiktok = usesTikTok(profile?.platforms ?? ["tiktok"]);
   const cachedGifts = await overlayService.getGifts();
-  if (cachedGifts.length > 0) {
+  if (cachedGifts.length > 0 || !tiktok) {
     await overlayService.load(cachedGifts);
-    void fetchOverlayGifts(connectorService)
-      .then(async (gifts) => {
-        if (gifts.length === 0) return;
-        await overlayService.refreshGifts(gifts);
-        // Gift pictures may have changed. Before this, the games and studio
-        // overlays get the saved ones when they connect.
-        await sendGamesOverlay(handler);
-        await sendStudioOverlays(handler);
-      })
-      .catch((error) => {
-        notifier.report({
-          source: "overlays",
-          error: new AppFailure(
-            FEEDBACK_CODES.GIFTS_FETCH_FAILED,
-            t("main.init.giftsRefreshFailed"),
-            { level: "warning", cause: error },
-          ),
-        });
-      });
+    if (tiktok) void refreshTikTokGifts(handler);
   } else {
     const gifts = await fetchOverlayGifts(connectorService);
     if (gifts.length === 0) {
@@ -1419,6 +1393,8 @@ const startApp = async (handler: AppHandlerVariables) => {
         FEEDBACK_CODES.GIFTS_FETCH_FAILED,
         t("main.init.giftsFetchFailed"),
       );
+    } else {
+      giftsFetched(handler);
     }
     await overlayService.load(gifts);
   }
