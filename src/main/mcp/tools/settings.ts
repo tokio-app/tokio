@@ -143,7 +143,7 @@ export const sections: Sections = {
       return error ?? ok("Saved.");
     },
     notes:
-      "The kinds of events Home's activity feed keeps, for every profile. Hiding one drops its items already in the feed; they still count toward the LIVE's totals. sub, giftsub, cheer, raid and redeem come from Twitch.",
+      "The kinds of events Home's activity feed keeps, for every profile. Hiding one drops its items already in the feed; they still count toward the LIVE's totals. sub and giftsub come from Twitch, YouTube (its memberships) and Kick, raid and redeem from Twitch and Kick, cheer from Twitch, superchat from YouTube and kicks from Kick.",
   }),
 
   app: defineSection({

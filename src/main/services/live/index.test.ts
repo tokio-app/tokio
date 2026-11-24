@@ -214,9 +214,10 @@ describe("LiveService", () => {
     live.record(TOKIO_EVENTS.FOLLOW, {
       user: viewer("kai", { platform: "twitch" }),
     });
-    live.record(TOKIO_EVENTS.GIFT, {
-      ...gift({ comboCount: 2, coins: 5 }),
+    live.record(TOKIO_EVENTS.KICKS, {
       user: viewer("mia", { platform: "kick" }),
+      kicks: 10,
+      message: "",
     });
     live.record(TOKIO_EVENTS.GIFT, gift());
 
@@ -225,7 +226,7 @@ describe("LiveService", () => {
       ...noTotals,
       followers: 2,
       shares: 1,
-      gifts: 3,
+      gifts: 1,
       coins: 1,
       kicks: 10,
     });
@@ -235,12 +236,32 @@ describe("LiveService", () => {
         viewers: [],
       },
       twitch: { totals: { ...noTotals, followers: 1 }, viewers: [] },
-      kick: { totals: { ...noTotals, gifts: 2, kicks: 10 }, viewers: [] },
+      // Kicks, never gifts
+      kick: { totals: { ...noTotals, kicks: 10 }, viewers: [] },
     });
-    // The feed keeps the name overlays read
-    expect(session.activity[1]).toMatchObject({
-      gift: { count: 2, coins: 10 },
-    });
+  });
+
+  it("lists Kick's Kicks with their message, and counts them while the feed hides them", () => {
+    const user = viewer("mia", { platform: "kick" });
+
+    live.record(TOKIO_EVENTS.KICKS, { user, kicks: 100, message: "gg" });
+
+    expect(live.getSession().activity).toEqual([
+      {
+        id: 1,
+        type: "kicks",
+        user: { ...shown("mia"), platform: "kick" },
+        kicks: 100,
+        text: "gg",
+      },
+    ]);
+
+    live.setFeed({ ...defaultStoreData.settings.activityFeed, kicks: false });
+    expect(
+      live.record(TOKIO_EVENTS.KICKS, { user, kicks: 5, message: "" }),
+    ).toBe(true);
+    expect(live.getSession().activity).toEqual([]);
+    expect(live.getSession().totals).toEqual({ ...noTotals, kicks: 105 });
   });
 
   it("counts YouTube's Gifts without a price", () => {

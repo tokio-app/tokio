@@ -12,12 +12,7 @@ import {
   PlatformStatus,
   TOKIO_EVENTS,
 } from "@/common/types";
-import {
-  Currency,
-  giftCurrencies,
-  PLATFORM_CURRENCY,
-  triggersFor,
-} from "@/common/util";
+import { Currency, PLATFORM_CURRENCY, triggersFor } from "@/common/util";
 import { amountLabel } from "@/helper/gifts";
 
 // Until main answers
@@ -70,6 +65,7 @@ const FEED_KINDS: {
     label: "home.feed.superchat",
     trigger: TOKIO_EVENTS.SUPER_CHAT,
   },
+  { kind: "kicks", label: "home.feed.kicks", trigger: TOKIO_EVENTS.KICKS },
 ];
 
 // The kinds the platforms send
@@ -87,7 +83,6 @@ function liveStats(
 ): Stat[] {
   const tiktok = platforms.includes("tiktok");
   const sent = triggersFor(platforms);
-  const currencies = giftCurrencies(platforms);
   const stats: (Stat | false)[] = [
     tiktok && { label: "home.stats.likes", value: values.likes },
     // Only TikTok counts a LIVE's total views; Twitch sends 0
@@ -107,11 +102,11 @@ function liveStats(
       label: "home.totals.giftSubs",
       value: values.giftSubs,
     },
-    currencies.includes("coins") && {
+    tiktok && {
       label: "home.totals.coins",
       value: values.coins,
     },
-    currencies.includes("kicks") && {
+    sent.includes(TOKIO_EVENTS.KICKS) && {
       label: "home.totals.kicks",
       value: values.kicks,
     },

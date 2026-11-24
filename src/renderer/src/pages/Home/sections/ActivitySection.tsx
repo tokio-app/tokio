@@ -163,6 +163,7 @@ function Action({
       );
     case "sub":
     case "cheer":
+    case "kicks":
     case "redeem":
       return (
         <>
@@ -173,7 +174,9 @@ function Action({
                 : t("home.activity.sub")
               : item.type === "cheer"
                 ? t("home.activity.cheer", { count: item.bits })
-                : t("home.activity.redeem", { reward: item.reward }),
+                : item.type === "kicks"
+                  ? t("home.activity.kicks", { count: item.kicks })
+                  : t("home.activity.redeem", { reward: item.reward }),
             { name },
           )}
           {/* What the viewer wrote, as a chat's message */}

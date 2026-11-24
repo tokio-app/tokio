@@ -22,18 +22,19 @@ export type Activity =
       emotes: string[];
       translation?: ChatTranslation;
     }
-  // `coins` is what the whole combo cost, in the sender's platform's gift
-  // currency: TikTok's coins or Kick's Kicks
+  // `coins` is what the whole combo cost, in TikTok's coins (YouTube's Gifts
+  // have no price)
   | {
       type: "gift";
       user: ActivityUser;
       gift: { name: string; image: string; count: number; coins: number };
     }
   | { type: "follow" | "share" | "superfan"; user: ActivityUser }
-  // text is a resub's or cheer's message, or a redeem's input
+  // text is a resub's, cheer's or Kicks' message, or a redeem's input
   | { type: "sub"; user: ActivityUser; months: number; text: string }
   | { type: "giftsub"; user: ActivityUser; count: number }
   | { type: "cheer"; user: ActivityUser; bits: number; text: string }
+  | { type: "kicks"; user: ActivityUser; kicks: number; text: string }
   | { type: "raid"; user: ActivityUser; viewers: number }
   | { type: "redeem"; user: ActivityUser; reward: string; text: string }
   // amount as YouTube shows it, sticker a Super Sticker's picture or ""

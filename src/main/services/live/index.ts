@@ -49,6 +49,7 @@ export const ACTIVITY_EVENTS = [
   TOKIO_EVENTS.RAID,
   TOKIO_EVENTS.REDEEM,
   TOKIO_EVENTS.SUPER_CHAT,
+  TOKIO_EVENTS.KICKS,
 ] as const;
 
 type ActivityEvent = (typeof ACTIVITY_EVENTS)[number];
@@ -146,7 +147,7 @@ export class LiveService extends Service {
       const { added, total } = this._streaks.add(event);
       const { user, gift } = event;
       const unit = Math.max(0, gift.coins);
-      // A Kick gift's coins are Kicks, and YouTube's Gifts have no price
+      // YouTube's Gifts have no price
       const currency = GIFT_CURRENCY[platformOf(user)];
       this._count(user, "gifts", added);
       if (currency) this._count(user, currency, unit * added);
@@ -197,6 +198,17 @@ export class LiveService extends Service {
         type: "cheer",
         user: activityUser(user),
         bits,
+        text: message,
+      });
+      return true;
+    },
+    // True even when the feed hides Kicks, since they count
+    [TOKIO_EVENTS.KICKS]: ({ user, kicks, message }) => {
+      this._count(user, "kicks", Math.max(0, kicks));
+      this._add({
+        type: "kicks",
+        user: activityUser(user),
+        kicks,
         text: message,
       });
       return true;

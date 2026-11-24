@@ -47,7 +47,7 @@ describe("ActivitySection", () => {
   it("shows a gift's price in its sender's platform's currency", () => {
     const gift = (
       id: number,
-      platform: "tiktok" | "kick" | "youtube",
+      platform: "tiktok" | "youtube",
       coins: number,
     ): ActivityItem => ({
       id,
@@ -55,22 +55,33 @@ describe("ActivitySection", () => {
       user: { ...user(platform), platform },
       gift: { name: "Rose", image: "", count: 1, coins },
     });
-    renderWithProviders(
-      section([
-        gift(3, "youtube", 5),
-        gift(2, "kick", 200),
-        gift(1, "tiktok", 1),
-      ]),
-    );
+    renderWithProviders(section([gift(3, "youtube", 5), gift(1, "tiktok", 1)]));
 
     expect(
       screen.getAllByRole("listitem").map((item) => item.textContent),
     ).toEqual([
       // YouTube's Gifts have no price
       "Yyoutube sent Rose ",
-      "Kkick sent Rose 200 Kicks",
       "Ttiktok sent Rose 1 coin",
     ]);
+  });
+
+  it("shows Kicks with the message pinned with them", () => {
+    renderWithProviders(
+      section([
+        {
+          id: 1,
+          type: "kicks",
+          user: { ...user("mia"), platform: "kick" },
+          kicks: 100,
+          text: "gg",
+        },
+      ]),
+    );
+
+    expect(screen.getByRole("listitem")).toHaveTextContent(
+      "Mmia sent 100 Kicksgg",
+    );
   });
 
   it("shows a chat's translation under it, led for screen readers", () => {

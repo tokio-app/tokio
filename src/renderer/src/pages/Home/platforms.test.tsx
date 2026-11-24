@@ -666,5 +666,17 @@ describe("Home's platforms", () => {
       "Gifted subs",
       "Super Chats",
     ]);
+
+    await usingPlatforms(["kick"]);
+
+    // Kicks, never gifts
+    expect(await open()).toEqual([
+      "Chats",
+      "New subs",
+      "Gifted subs",
+      "Raids",
+      "Channel points",
+      "Kicks",
+    ]);
   });
 });

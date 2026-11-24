@@ -909,6 +909,7 @@ describe("home events", () => {
       raid: true,
       redeem: true,
       superchat: true,
+      kicks: true,
     };
 
     it("saves the feed and replies with the events it still shows", async () => {
