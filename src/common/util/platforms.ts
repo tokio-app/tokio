@@ -43,11 +43,12 @@ export const PLATFORM_TRIGGERS: Record<Platform, readonly AlertTrigger[]> = {
     TOKIO_EVENTS.GIFT_SUB,
     TOKIO_EVENTS.SUPER_CHAT,
   ],
-  // Gifts are Kick's Kicks, raids its hosts; its chat feed carries no follows
+  // Kicks are its money, like Twitch's Bits, and raids its hosts; its chat
+  // feed carries no follows
   kick: [
     TOKIO_EVENTS.CHAT,
     EMOTE_TRIGGER,
-    TOKIO_EVENTS.GIFT,
+    TOKIO_EVENTS.KICKS,
     TOKIO_EVENTS.SUBSCRIBE,
     TOKIO_EVENTS.GIFT_SUB,
     TOKIO_EVENTS.RAID,

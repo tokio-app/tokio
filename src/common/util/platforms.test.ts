@@ -38,10 +38,12 @@ describe("platforms", () => {
   });
 
   it("joins the triggers of several platforms in the triggers' order", () => {
-    const all = triggersFor(["youtube", "twitch", "tiktok"]);
+    const all = triggersFor(["youtube", "kick", "twitch", "tiktok"]);
     expect(all).toEqual(ALERT_TRIGGERS);
     expect(triggersFor(["twitch", "tiktok"])).toEqual(
-      ALERT_TRIGGERS.filter((t) => t !== TOKIO_EVENTS.SUPER_CHAT),
+      ALERT_TRIGGERS.filter(
+        (t) => t !== TOKIO_EVENTS.SUPER_CHAT && t !== TOKIO_EVENTS.KICKS,
+      ),
     );
     expect(triggersFor(["twitch"])).toEqual([
       TOKIO_EVENTS.CHAT,
@@ -63,14 +65,15 @@ describe("platforms", () => {
       TOKIO_EVENTS.SUPER_CHAT,
       TOKIO_EVENTS.MUSIC_CHANGE,
     ]);
+    // Kicks, never gifts
     expect(triggersFor(["kick"])).toEqual([
       TOKIO_EVENTS.CHAT,
       EMOTE_TRIGGER,
-      TOKIO_EVENTS.GIFT,
       TOKIO_EVENTS.SUBSCRIBE,
       TOKIO_EVENTS.GIFT_SUB,
       TOKIO_EVENTS.RAID,
       TOKIO_EVENTS.REDEEM,
+      TOKIO_EVENTS.KICKS,
       TOKIO_EVENTS.MUSIC_CHANGE,
     ]);
   });

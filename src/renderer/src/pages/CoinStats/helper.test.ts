@@ -214,9 +214,9 @@ describe("readout", () => {
       { label: "coinStats.stats.gifts", value: 2 },
       { label: "coinStats.stats.giftSubs", value: 1 },
     ]);
+    // Kicks, never gifts
     expect(readout("kick", [], {})).toEqual([
       { label: "coinStats.stats.kicks", value: 0, currency: "kicks" },
-      { label: "coinStats.stats.gifts", value: 0 },
       { label: "coinStats.stats.giftSubs", value: 0 },
     ]);
   });

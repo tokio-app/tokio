@@ -18,6 +18,20 @@ const box = { x: 10, y: 20, width: 300, height: 100 };
 const element = (fields: object) => ({ id: "a", ...box, ...fields });
 
 describe("StudioElementSchema", () => {
+  it("loads a Kick gift row, saved while Kicks were gifts, as a Kicks row", () => {
+    const kickGift = { type: TOKIO_EVENTS.GIFT, platform: "kick", gifts: [] };
+
+    const parsed = StudioElementSchema.parse(
+      element({ kind: "text", trigger: kickGift, also_triggers: [kickGift] }),
+    );
+
+    expect(parsed.trigger).toMatchObject({
+      type: TOKIO_EVENTS.KICKS,
+      platform: "kick",
+    });
+    expect(parsed.also_triggers[0]).toMatchObject({ type: TOKIO_EVENTS.KICKS });
+  });
+
   it("fills a text with Tokio's look and a Follow trigger", () => {
     expect(StudioElementSchema.parse(element({ kind: "text" }))).toEqual({
       id: "a",

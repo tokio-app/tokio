@@ -3,6 +3,7 @@ import { PLATFORMS, TOKIO_EVENTS } from "../types/connector";
 import {
   CUT,
   GAMES_OVERLAY_MAX_COLUMNS,
+  kicksRow,
   MAX_TRIGGERS,
   TriggerSchema,
 } from "./profile";
@@ -178,14 +179,14 @@ export const StudioTriggerSchema = z.discriminatedUnion("type", [
 const REACTION = {
   when: z.enum(STUDIO_WHEN).default("always"),
   // Its type and gifts have no defaults
-  trigger: StudioTriggerSchema.prefault({
+  trigger: z.preprocess(kicksRow, StudioTriggerSchema).prefault({
     type: TOKIO_EVENTS.FOLLOW,
     gifts: [],
   }),
   // The others it reacts to as well, kept apart from trigger so an older
   // Tokio still reacts to the first
   also_triggers: z
-    .array(StudioTriggerSchema)
+    .array(z.preprocess(kicksRow, StudioTriggerSchema))
     .max(MAX_TRIGGERS - 1)
     .default([]),
   // Seconds between a trigger and what it plays
@@ -524,7 +525,9 @@ const StudioGuidesSchema = z.object({
 // autosave while it's typed.
 const StudioCounterSchema = z.object({
   name: NumberNameSchema.default(""),
-  trigger: TriggerSchema.prefault({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
+  trigger: z
+    .preprocess(kicksRow, TriggerSchema)
+    .prefault({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
 });
 
 // A studio overlay, served at getStudioOverlayURL(id). The strict schema,

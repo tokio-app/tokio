@@ -73,8 +73,8 @@ describe("liveView", () => {
     expect(liveView("kick", ["tiktok", "kick"], numbers)).toEqual({
       viewers: 20,
       minutes: [20],
+      // Kicks, never gifts
       stats: [
-        { label: "home.totals.gifts", value: 3 },
         { label: "home.totals.giftSubs", value: 0 },
         { label: "home.totals.kicks", value: 30 },
       ],

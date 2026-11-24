@@ -175,6 +175,14 @@ export interface CheerEvent {
   message: string;
 }
 
+// Kick's KICKs: how many a viewer sent, like Twitch's Bits, with the
+// message they pinned, "" for none
+export interface KicksEvent {
+  user: UserData;
+  kicks: number;
+  message: string;
+}
+
 // Another channel sending its viewers over: the user is its streamer
 export interface RaidEvent {
   user: UserData;
@@ -237,6 +245,7 @@ export enum TOKIO_EVENTS {
   RAID = "tokio:event:raid",
   REDEEM = "tokio:event:redeem",
   SUPER_CHAT = "tokio:event:superchat",
+  KICKS = "tokio:event:kicks",
 
   // EXTERNAL - MUSIC
   MUSIC_CHANGE = "tokio:event:music:change",
@@ -276,6 +285,7 @@ export interface TokioEventMap {
   [TOKIO_EVENTS.RAID]: RaidEvent;
   [TOKIO_EVENTS.REDEEM]: RedeemEvent;
   [TOKIO_EVENTS.SUPER_CHAT]: SuperChatEvent;
+  [TOKIO_EVENTS.KICKS]: KicksEvent;
 
   // EXTERNAL - MUSIC
   [TOKIO_EVENTS.MUSIC_CHANGE]: MusicInfo[];
@@ -326,6 +336,7 @@ export const ALERT_TRIGGER_LABELS: Record<AlertTrigger, MessageKey> = {
   [TOKIO_EVENTS.RAID]: "triggers.raid",
   [TOKIO_EVENTS.REDEEM]: "triggers.redeem",
   [TOKIO_EVENTS.SUPER_CHAT]: "triggers.superChat",
+  [TOKIO_EVENTS.KICKS]: "triggers.kicks",
   [TOKIO_EVENTS.MUSIC_CHANGE]: "triggers.musicChange",
 };
 

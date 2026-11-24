@@ -97,6 +97,8 @@ export const ALERT_MESSAGE_VARIABLES: Record<AlertTrigger, string[]> = {
   [TOKIO_EVENTS.REDEEM]: [...USER, "reward", "comment"],
   // What it cost as YouTube shows it, and what the viewer wrote
   [TOKIO_EVENTS.SUPER_CHAT]: [...USER, "amount", "comment"],
+  // The Kicks, as a cheer's Bits, and the message pinned with them
+  [TOKIO_EVENTS.KICKS]: [...USER, "count", "comment"],
   [TOKIO_EVENTS.MUSIC_CHANGE]: ["song"],
 };
 
@@ -136,11 +138,12 @@ export function messageValues(payload: TokioEventMap[AppEvents]) {
     values.set("count", String(payload.gift.comboCount));
   }
   if ("likeCount" in payload) values.set("count", String(payload.likeCount));
-  // Subscribe, Cheer and Super Chat write a message, Redeem an input
+  // Subscribe, Cheer, Kicks and Super Chat write a message, Redeem an input
   if ("message" in payload) values.set("comment", payload.message);
   if ("amount" in payload) values.set("amount", payload.amount);
   if ("months" in payload) values.set("count", String(payload.months));
   if ("bits" in payload) values.set("count", String(payload.bits));
+  if ("kicks" in payload) values.set("count", String(payload.kicks));
   if ("tier" in payload && "count" in payload) {
     values.set("count", String(payload.count));
   }

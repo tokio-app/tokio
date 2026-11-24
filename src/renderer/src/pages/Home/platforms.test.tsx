@@ -292,8 +292,16 @@ describe("Home's platforms", () => {
     ],
     [
       ["kick"],
-      ["Gifts", "Gifted subs", "Kicks"],
-      ["New followers", "Likes", "Total views", "Shares", "Coins", "Bits"],
+      ["Gifted subs", "Kicks"],
+      [
+        "New followers",
+        "Likes",
+        "Total views",
+        "Shares",
+        "Gifts",
+        "Coins",
+        "Bits",
+      ],
     ],
   ] as [Platform[], string[], string[]][])(
     "shows the stats %j has",

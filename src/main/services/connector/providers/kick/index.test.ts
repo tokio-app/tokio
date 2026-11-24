@@ -215,7 +215,7 @@ describe("KickConnector", () => {
       const stage = vi.fn(() => null);
       connector.setChatStage(stage);
       const onChat = capture(TOKIO_EVENTS.CHAT);
-      const onGift = capture(TOKIO_EVENTS.GIFT);
+      const onKicks = capture(TOKIO_EVENTS.KICKS);
       await connector.connect("streamer");
 
       publish("chatrooms.20.v2", "App\\Events\\ChatMessageEvent", {
@@ -227,13 +227,10 @@ describe("KickConnector", () => {
         gift: { gift_id: "hype", name: "Hype", amount: 50 },
       });
 
-      await vi.waitFor(() => expect(onGift).toHaveBeenCalled());
+      await vi.waitFor(() => expect(onKicks).toHaveBeenCalled());
       expect(stage).toHaveBeenCalledOnce();
       expect(onChat.mock.calls[0][0].comment.content).toBe("secret words");
-      expect(onGift.mock.calls[0][0].gift).toMatchObject({
-        id: "kick:hype",
-        coins: 50,
-      });
+      expect(onKicks.mock.calls[0][0]).toMatchObject({ kicks: 50 });
       expect(debug).toHaveBeenCalledWith(
         "<Kick> Feed App\\Events\\ChatMessageEvent",
         expect.anything(),

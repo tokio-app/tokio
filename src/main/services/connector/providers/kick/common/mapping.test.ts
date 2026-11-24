@@ -198,7 +198,7 @@ describe("Kick mapping", () => {
     }
   });
 
-  it("maps a Kick to a gift worth its amount, ended at once", () => {
+  it("maps Kicks to their amount and pinned message, never a gift", () => {
     expect(
       fromPublication("KicksGifted", {
         gift_transaction_id: "made-up",
@@ -218,7 +218,7 @@ describe("Kick mapping", () => {
         },
       }),
     ).toEqual({
-      event: TOKIO_EVENTS.GIFT,
+      event: TOKIO_EVENTS.KICKS,
       data: {
         user: {
           username: "Kicker",
@@ -228,16 +228,22 @@ describe("Kick mapping", () => {
           userId: "kick:77",
           platform: "kick",
         },
-        gift: {
-          id: "kick:rage_quit",
-          name: "Rage Quit",
-          coins: 100,
-          image: "",
-          type: 0,
-          comboCount: 1,
-          repeatEnd: true,
-        },
+        kicks: 100,
+        message: "for you",
       },
+    });
+  });
+
+  it("gives Kicks sent without a message an empty one", () => {
+    const kicks = fromPublication("KicksGifted", {
+      sender: { id: 77, username: "Kicker" },
+      gift: { gift_id: "hype", name: "Hype", amount: 50 },
+      message: null,
+    });
+
+    expect(kicks).toMatchObject({
+      event: TOKIO_EVENTS.KICKS,
+      data: { kicks: 50, message: "" },
     });
   });
 

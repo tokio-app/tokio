@@ -45,6 +45,45 @@ describe("ProfileSchema", () => {
     );
   });
 
+  it("loads a Kick gift row, saved while Kicks were gifts, as a Kicks row", () => {
+    const saved = structuredClone(defaultProfile);
+    const kickGift = {
+      type: TOKIO_EVENTS.GIFT,
+      platform: "kick",
+      gifts: [],
+      min_coins: 100,
+    };
+    const tiktokGift = { type: TOKIO_EVENTS.GIFT, gifts: [5655] };
+    const alert = {
+      id: "a1",
+      enabled: true,
+      trigger: kickGift,
+      also_triggers: [tiktokGift, kickGift],
+      sound: null,
+      volume: 100,
+    };
+    const action = { id: "g1", enabled: true, trigger: kickGift, steps: [] };
+    Object.assign(saved.alerts, { items: [alert] });
+    Object.assign(saved.games, { actions: [action] });
+
+    const parsed = ProfileSchema.parse(saved);
+
+    const kicks = {
+      type: TOKIO_EVENTS.KICKS,
+      platform: "kick",
+      min_coins: 100,
+    };
+    expect(parsed.alerts.items[0].trigger).toMatchObject({
+      ...kicks,
+      gifts: [],
+    });
+    expect(parsed.alerts.items[0].also_triggers).toMatchObject([
+      { type: TOKIO_EVENTS.GIFT, gifts: [5655] },
+      kicks,
+    ]);
+    expect(parsed.games.actions[0].trigger).toMatchObject(kicks);
+  });
+
   it("loads permissions saved before other platforms' rules with none", () => {
     const saved = structuredClone(defaultProfile);
     const permissions: Partial<Profile["tts"]["permissions"]> =

@@ -515,13 +515,14 @@ describe("LIVE history", () => {
   it("counts a history of Kick's LIVEs alone in Kicks, with no tabs", async () => {
     renderWithProviders(<CoinStats />);
 
+    // Kicks, like Bits, are never gifts
     await lives([
       liveSummary(SATURDAY, {
-        gifts: 3,
-        platforms: { kick: { amount: 300, gifts: 3, giftSubs: 2 } },
+        gifts: 0,
+        platforms: { kick: { amount: 300, gifts: 0, giftSubs: 2 } },
       }),
     ]);
-    await record(saturday, [{ ...kicker("Bea", 300, 3), giftSubs: 2 }]);
+    await record(saturday, [{ ...kicker("Bea", 300, 0), giftSubs: 2 }]);
 
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(options()).toEqual([
@@ -529,12 +530,10 @@ describe("LIVE history", () => {
       expect.stringMatching(/^Saturday.*, 300 Kicks$/),
     ]);
     expect(stat("Kicks")).toHaveTextContent("300");
-    expect(stat("Gifts")).toHaveTextContent("3");
+    expect(screen.queryByText("Gifts")).not.toBeInTheDocument();
     expect(stat("Gifted subs")).toHaveTextContent("2");
     expect(screen.queryByText("Coins")).not.toBeInTheDocument();
-    expect(gifterRows("Gifters")).toEqual([
-      "1BBea@bea300 Kicks3 gifts2 gifted subs",
-    ]);
+    expect(gifterRows("Gifters")).toEqual(["1BBea@bea300 Kicks2 gifted subs"]);
   });
 
   it("gives each platform in the history its tab, in its currency, then All", async () => {

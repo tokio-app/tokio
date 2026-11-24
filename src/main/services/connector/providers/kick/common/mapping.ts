@@ -25,9 +25,12 @@ type GiftedSubscriptions = {
   gifted_usernames: string[];
 };
 
+// Kick's feed names it a gift, but viewers only pick how many KICKs to send
+// and may pin a message: the gift is Kick's name for the amount's tier
 type KicksGifted = {
   sender: { id: number; username: string; profile_picture?: string | null };
   gift: { gift_id: string | number; name: string; amount: number };
+  message?: string | null;
 };
 
 type StreamHost = { host_username: string; number_viewers: number };
@@ -45,7 +48,7 @@ type RewardRedeemed = {
 
 type Mappable =
   | TOKIO_EVENTS.CHAT
-  | TOKIO_EVENTS.GIFT
+  | TOKIO_EVENTS.KICKS
   | TOKIO_EVENTS.SUBSCRIBE
   | TOKIO_EVENTS.GIFT_SUB
   | TOKIO_EVENTS.RAID
@@ -170,7 +173,7 @@ export function fromPublication(event: string, data: any): Mapped | null {
       if (!e.sender || !e.gift) return null;
       const picture = e.sender.profile_picture;
       return {
-        event: TOKIO_EVENTS.GIFT,
+        event: TOKIO_EVENTS.KICKS,
         data: {
           user: {
             username: e.sender.username,
@@ -180,16 +183,9 @@ export function fromPublication(event: string, data: any): Mapped | null {
             userId: `kick:${e.sender.id}`,
             platform: "kick",
           },
-          // Each Kick its own, its price as coins (the user's call)
-          gift: {
-            id: `kick:${e.gift.gift_id}`,
-            name: e.gift.name,
-            coins: e.gift.amount,
-            image: "",
-            type: 0,
-            comboCount: 1,
-            repeatEnd: true,
-          },
+          // KICKs like Twitch's Bits, never a gift (the user's call)
+          kicks: e.gift.amount,
+          message: e.message?.trim() ?? "",
         },
       };
     }

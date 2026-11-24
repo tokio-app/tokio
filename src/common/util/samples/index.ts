@@ -6,6 +6,7 @@ import {
   Fan,
   GiftEvent,
   GiftSubEvent,
+  KicksEvent,
   LikeEvent,
   MusicInfo,
   RaidEvent,
@@ -161,6 +162,26 @@ const youtubeUserFactory = (): UserData => {
   };
 };
 
+// A Kick viewer: the channel's slug for a handle, a namespaced id, and no
+// picture in chat
+const kickUserFactory = (): UserData => {
+  const username = `${pickRandom(ADJECTIVES)}${pickRandom(NOUNS)}${randomInt(1, 999)}`;
+  return {
+    username,
+    handle: username.toLowerCase(),
+    profilePictures: [],
+    follower: false,
+    userId: `kick:${randomInt(1e6, 9e7)}`,
+    platform: "kick",
+  };
+};
+
+const kicksEventFactory = (user = kickUserFactory()): KicksEvent => ({
+  user,
+  kicks: pickRandom([1, 10, 50, 100, 500, 1000, 2000]),
+  message: randomBool(0.5) ? pickRandom(CHAT_MESSAGES) : "",
+});
+
 const SUPER_CHAT_AMOUNTS = [
   "$2.00",
   "$5.00",
@@ -295,6 +316,7 @@ const TIKTOK_EVENT_SAMPLES: {
   [TOKIO_EVENTS.RAID]: raidEventFactory,
   [TOKIO_EVENTS.REDEEM]: redeemEventFactory,
   [TOKIO_EVENTS.SUPER_CHAT]: superChatEventFactory,
+  [TOKIO_EVENTS.KICKS]: kicksEventFactory,
   [TOKIO_EVENTS.MUSIC_CHANGE]: musicFactory,
 };
 
@@ -346,6 +368,7 @@ export const createTestLive = () => {
   // Twitch's events come from a few viewers of their own
   const twitch = Array.from({ length: 3 }, twitchUserFactory);
   const youtube = Array.from({ length: 3 }, youtubeUserFactory);
+  const kick = Array.from({ length: 3 }, kickUserFactory);
   let viewers = randomInt(20, 200);
   let views = viewers + randomInt(50, 2000);
   let totalLikes = randomInt(500, 20000);
@@ -497,6 +520,7 @@ export const createTestLive = () => {
         type: TOKIO_EVENTS.SUPER_CHAT,
         data: superChatEventFactory(pickRandom(youtube)),
       },
+      { type: TOKIO_EVENTS.KICKS, data: kicksEventFactory(pickRandom(kick)) },
       { type: TOKIO_EVENTS.MUSIC_CHANGE, data: musicFactory() },
       { type: TOKIO_EVENTS.ROOM_USER, data: { viewers, views, ranks } },
       {

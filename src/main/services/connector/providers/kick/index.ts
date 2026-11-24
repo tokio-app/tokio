@@ -237,7 +237,7 @@ export class KickConnector extends ConnectorProvider {
     if (!mapped) return;
     if (
       mapped.event === TOKIO_EVENTS.CHAT ||
-      mapped.event === TOKIO_EVENTS.GIFT
+      mapped.event === TOKIO_EVENTS.KICKS
     ) {
       const { username, userId } = mapped.data.user;
       if (userId) conn.ids.set(username.toLowerCase(), Promise.resolve(userId));

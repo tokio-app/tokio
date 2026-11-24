@@ -19,16 +19,16 @@ const TIMER_TRIGGERS = {
   sub: TOKIO_EVENTS.SUBSCRIBE,
   gift_sub: TOKIO_EVENTS.GIFT_SUB,
   bit: TOKIO_EVENTS.CHEER,
-  kick: TOKIO_EVENTS.GIFT,
+  kick: TOKIO_EVENTS.KICKS,
   superchat: TOKIO_EVENTS.SUPER_CHAT,
 } as const satisfies Record<keyof TimerSettings["look"]["names"], AlertTrigger>;
 
-// The gift currency the coin and kick rows count
+// The gift currency the coin row counts
 const CURRENCY_OF: Partial<Record<keyof typeof TIMER_TRIGGERS, GiftCurrency>> =
-  { coin: "coins", kick: "kicks" };
+  { coin: "coins" };
 
-// Which timer triggers apply to the platforms: the ones they send, coins
-// only with TikTok and Kicks only with Kick
+// Which timer triggers apply to the platforms: the ones they send, and
+// coins only with TikTok
 export const timerTriggersOn = (platforms: readonly Platform[]) => {
   const sent = triggersFor(platforms);
   const currencies = giftCurrencies(platforms);

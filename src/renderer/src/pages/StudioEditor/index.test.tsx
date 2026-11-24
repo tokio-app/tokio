@@ -1634,13 +1634,13 @@ describe("StudioEditor", () => {
       trigger: TriggerSchema.parse({
         type: TOKIO_EVENTS.GIFT,
         gifts: [],
-        platform: "kick",
+        platform: "youtube",
       }),
     });
     const { user } = await open(scene(element));
     await user.click(row(/^Thanks/));
 
-    // Kicks come one at a time: no count to say
+    // YouTube's Gifts come one at a time: no count to say
     const event = within(page().getByText("From the event:").closest("p")!);
     expect(event.getByTitle("Insert {gift}")).toBeVisible();
     expect(event.queryByTitle("Insert {count}")).toBeNull();

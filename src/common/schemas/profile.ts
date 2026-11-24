@@ -157,6 +157,17 @@ export const TriggerSchema = z.object({
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
+/**
+ * A Kick row saved while Kicks were gifts, as a Kicks row: Kick sends no
+ * gifts since (the user's call), and its minimum was in Kicks already.
+ */
+export const kicksRow = (value: unknown): unknown =>
+  isRecord(value) &&
+  value.type === TOKIO_EVENTS.GIFT &&
+  value.platform === "kick"
+    ? { ...value, type: TOKIO_EVENTS.KICKS, gifts: [], every_gift: false }
+    : value;
+
 // Media saved before it had its own volume plays at the alert's, as it did.
 // A video saved before cuts stops where its duration ended it, unless it
 // matched the video's length (match_video, no longer saved).
@@ -183,11 +194,11 @@ export const AlertItemSchema = z.object({
   // To find it by, see alertName
   name: z.string().default(""),
   enabled: z.boolean(),
-  trigger: TriggerSchema,
+  trigger: z.preprocess(kicksRow, TriggerSchema),
   // The others it plays on too, any one of them (Or), kept apart from trigger
   // so an older Tokio still plays on the first
   also_triggers: z
-    .array(TriggerSchema)
+    .array(z.preprocess(kicksRow, TriggerSchema))
     .max(MAX_TRIGGERS - 1)
     .default([]),
   sound: AlertClipSchema.nullable(),
@@ -422,7 +433,7 @@ export const GameActionSchema = z.object({
   id: z.string(),
   enabled: z.boolean(),
   edition: z.enum(MINECRAFT_EDITIONS).default("bedrock"),
-  trigger: TriggerSchema,
+  trigger: z.preprocess(kicksRow, TriggerSchema),
   // On Like, it runs once every likes_every likes from all viewers, as the
   // countdown timer counts them
   likes_every: z.number().int().min(1).default(100),

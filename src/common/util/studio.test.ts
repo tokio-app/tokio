@@ -177,7 +177,7 @@ describe("studioNumbersFor", () => {
     ],
     [["twitch"], ["viewers", "followers", "bits", "giftsubs", "uptime"]],
     [["youtube"], ["viewers", "superchats", "gifts", "giftsubs", "uptime"]],
-    [["kick"], ["viewers", "kicks", "gifts", "giftsubs", "uptime"]],
+    [["kick"], ["viewers", "kicks", "giftsubs", "uptime"]],
   ] as const)("offers on %j only what it fills", (platforms, numbers) => {
     expect(studioNumbersFor(platforms)).toEqual(numbers);
   });
