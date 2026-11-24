@@ -11,6 +11,7 @@ import {
   CameraChunk,
   CameraFailure,
   FEEDBACK_CODES,
+  Platform,
   STUDIO_MESSAGE,
   StudioNumbers,
 } from "@/common/types";
@@ -56,7 +57,13 @@ const viewServices = () => ({
   studioService: {
     kept: () => null,
     forget: vi.fn(),
-    test: vi.fn((_overlay: StudioOverlay, _numbers: () => StudioNumbers) => {}),
+    test: vi.fn(
+      (
+        _overlay: StudioOverlay,
+        _numbers: () => StudioNumbers,
+        _platforms: readonly Platform[],
+      ) => {},
+    ),
   },
   serverService: { sendToClient: vi.fn((_id: string, _data: unknown) => true) },
 });
@@ -425,13 +432,19 @@ describe("studio events", () => {
       const services = viewServices();
       const h = createHandler({
         ...services,
-        storeManagerService: store([overlay()]),
+        storeManagerService: {
+          ...store([overlay()]),
+          getProfileData: async () => ({ platforms: ["kick"] }),
+        },
       });
 
       await h.invoke(studio, APP_EVENTS.TEST_STUDIO_OVERLAY, { id: ID });
 
-      const [[tested, numbers]] = services.studioService.test.mock.calls;
+      const [[tested, numbers, platforms]] =
+        services.studioService.test.mock.calls;
       expect(tested).toEqual(overlay());
+      // Samples from the profile's platforms
+      expect(platforms).toEqual(["kick"]);
       // Read when each react plays
       expect(numbers()).toEqual({
         likes: 0,

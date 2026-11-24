@@ -40,9 +40,18 @@ import {
   triggersOf,
 } from "./alerts";
 import { formatDuration, formatMoney, formatStat, NO_MONEY } from "./format";
-import { giftCurrencies, PLATFORM_CURRENCY, triggersFor } from "./platforms";
+import {
+  giftCurrencies,
+  PLATFORM_CURRENCY,
+  rowPlatforms,
+  triggersFor,
+} from "./platforms";
 import { rowVariables } from "./rows";
-import { generateEmoteChatSample, generateEventSample } from "./samples";
+import {
+  generateEventSample,
+  generateTriggerSample,
+  samplePlatform,
+} from "./samples";
 
 // The live numbers any text can show, as {likes}
 export const STUDIO_NUMBERS: (keyof StudioNumbers)[] = [
@@ -570,8 +579,27 @@ export const listInUsd = ({
 }: Pick<StudioElementOf<"list">, "source" | "platform">) =>
   source === "gifters" && PLATFORM_CURRENCY[platform] === "usd";
 
-// A made-up row of the source, the index-th from the top
-function sampleEntry(source: StudioListSource, index: number): StudioListEntry {
+// What a platform's gifters spend, whose senders a gifters list ranks
+const SPENT = {
+  tiktok: TOKIO_EVENTS.GIFT,
+  twitch: TOKIO_EVENTS.CHEER,
+  youtube: TOKIO_EVENTS.SUPER_CHAT,
+  kick: TOKIO_EVENTS.KICKS,
+} as const satisfies Record<Platform, AppEvents>;
+
+// The event each of the other sources lists
+const LISTED = {
+  followers: TOKIO_EVENTS.FOLLOW,
+  gifts: TOKIO_EVENTS.GIFT,
+  chat: TOKIO_EVENTS.CHAT,
+} as const;
+
+// A made-up row of the source from the platform, the index-th from the top
+function sampleEntry(
+  source: StudioListSource,
+  index: number,
+  platform?: Platform,
+): StudioListEntry {
   const row = (
     { profilePictures, username, handle }: UserData,
     fields: Partial<StudioListEntry> = {},
@@ -584,49 +612,69 @@ function sampleEntry(source: StudioListSource, index: number): StudioListEntry {
     ...fields,
   });
   if (source === "gifts") {
-    const { user, gift } = generateEventSample(TOKIO_EVENTS.GIFT).data;
+    const { user, gift } = generateEventSample(LISTED.gifts, platform).data;
     return row(user, { icon: gift.image, value: gift.comboCount });
   }
   if (source === "chat") {
-    const { user, comment } = generateEventSample(TOKIO_EVENTS.CHAT).data;
+    const { user, comment } = generateEventSample(LISTED.chat, platform).data;
     return row(user, { text: comment.content });
   }
-  const { user } = generateEventSample(TOKIO_EVENTS.FOLLOW).data;
-  // A leaderboard's falling coins: 12.4K, 4.4K, 2.4K…
-  return source === "gifters"
-    ? row(user, { value: Math.round(12_400 / (index + 1) ** 1.5) })
-    : row(user);
+  if (source === "followers") {
+    return row(generateEventSample(LISTED.followers, platform).data.user);
+  }
+  const spends = platform ?? "tiktok";
+  const { user } = generateEventSample(SPENT[spends], spends).data;
+  // A leaderboard's falling amounts: 12.4K, 4.4K, 2.4K…, or $124, $43.84…
+  const value = Math.round(12_400 / (index + 1) ** 1.5);
+  return row(user, {
+    value: PLATFORM_CURRENCY[spends] === "usd" ? value / 100 : value,
+  });
 }
 
 /**
- * Each trigger's sample, made the first time an element asks for it, so its
- * names don't change on every render. Test starts a new one.
+ * Each trigger's sample, on the platform its row would come from among the
+ * profile's, made the first time an element asks for it, so its names don't
+ * change on every render. Test starts a new one.
  */
 export class Samples {
-  private made = new Map<AlertTrigger, Sample>();
-  private lists = new Map<StudioListSource, StudioListEntry[]>();
+  private made = new Map<string, Sample>();
+  private lists = new Map<string, StudioListEntry[]>();
+  private platforms: readonly Platform[];
 
-  of(type: AlertTrigger): Sample {
-    let sample = this.made.get(type);
+  constructor(platforms: readonly Platform[] = ["tiktok"]) {
+    this.platforms = platforms;
+  }
+
+  of(row: { type: AlertTrigger; platform?: Platform }): Sample {
+    const platform = samplePlatform(row, this.platforms);
+    const key = `${row.type} ${platform}`;
+    let sample = this.made.get(key);
     if (!sample) {
-      // An emote comes in a chat message
-      sample =
-        type === EMOTE_TRIGGER
-          ? generateEmoteChatSample()
-          : generateEventSample(type).data;
-      this.made.set(type, sample);
+      sample = generateTriggerSample(row.type, platform);
+      this.made.set(key, sample);
     }
     return sample;
   }
 
-  /** The most rows a list of the source shows, made up. */
-  list(source: StudioListSource): StudioListEntry[] {
-    let entries = this.lists.get(source);
+  /**
+   * The most rows a list shows, made up: a gifters list's from its
+   * platform, the others' from each of the profile's that sends them.
+   */
+  list({
+    source,
+    platform,
+  }: Pick<StudioElementOf<"list">, "source" | "platform">) {
+    const key = source === "gifters" ? `${source} ${platform}` : source;
+    let entries = this.lists.get(key);
     if (!entries) {
+      const from =
+        source === "gifters"
+          ? [platform]
+          : rowPlatforms({ type: LISTED[source] }, this.platforms);
       entries = Array.from({ length: STUDIO_MAX_LIST_ROWS }, (_, i) =>
-        sampleEntry(source, i),
+        sampleEntry(source, i, from[i % from.length]),
       );
-      this.lists.set(source, entries);
+      this.lists.set(key, entries);
     }
     return entries;
   }
@@ -644,7 +692,7 @@ function sampleViewer(sample: Sample) {
 // Its first trigger's sample; a goal sends none
 const sampleOf = (element: StudioElement, samples: Samples) =>
   reactsToEvents(element) && element.trigger.type !== GOAL_TRIGGER
-    ? samples.of(element.trigger.type)
+    ? samples.of(element.trigger)
     : null;
 
 /** The picture of the gift or emote its trigger's sample sent, "" for none. */
@@ -673,7 +721,7 @@ const sampleText = (
 const sampleViewerOf = (element: StudioElement, samples: Samples) =>
   element.trigger.type === GOAL_TRIGGER
     ? { src: "", name: "" }
-    : sampleViewer(samples.of(element.trigger.type));
+    : sampleViewer(samples.of(element.trigger));
 
 /** What Test plays on the stage for an element that reacts to an event. */
 export function sampleReact(
@@ -714,6 +762,6 @@ export const sampleDeps = (
   fill: () => SAMPLE_FILL,
   rows: (element) =>
     samples
-      .list(element.source)
+      .list(element)
       .map((entry) => listRow(entry, language, listInUsd(element))),
 });

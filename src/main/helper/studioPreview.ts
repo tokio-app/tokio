@@ -4,7 +4,10 @@ import { AppHandlerVariables } from "@/types";
 import { BrowserWindow, screen, session } from "electron";
 import { studioSampleView } from "./studio";
 
-type Services = Pick<AppHandlerVariables, "overlayService" | "serverService">;
+type Services = Pick<
+  AppHandlerVariables,
+  "overlayService" | "serverService" | "storeManagerService"
+>;
 
 export type StudioPreview = {
   png: Buffer;
@@ -68,11 +71,14 @@ export function previewStudioOverlay(
 }
 
 async function capture(
-  { overlayService, serverService }: Services,
+  { overlayService, serverService, storeManagerService }: Services,
   overlay: StudioOverlay,
   scale: number,
 ): Promise<StudioPreview> {
-  const view = await studioSampleView({ overlayService }, overlay);
+  const view = await studioSampleView(
+    { overlayService, storeManagerService },
+    overlay,
+  );
   const width = Math.round(view.width * scale);
   const height = Math.round(view.height * scale);
 

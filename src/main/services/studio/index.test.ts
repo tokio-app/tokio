@@ -418,7 +418,9 @@ describe("StudioService", () => {
     // On the viewer's trigger, as a follow alert's picture and text are
     const thanks = element("f", { kind: "text", text: "{username}" });
 
-    studio.test(overlayOf(text, viewer, always, thanks), () => NUMBERS);
+    studio.test(overlayOf(text, viewer, always, thanks), () => NUMBERS, [
+      "tiktok",
+    ]);
     const reacts = onReact.mock.calls.map(([, react]) => react);
 
     expect(onReact.mock.calls.every(([id]) => id === "o1")).toBe(true);
@@ -440,6 +442,19 @@ describe("StudioService", () => {
     expect(studio.kept("o1", always)).toBeNull();
   });
 
+  it("tests with samples from the profile's platforms", () => {
+    const { studio, onReact } = setup();
+    const viewer = element("v", { kind: "viewer" });
+
+    studio.test(overlayOf(viewer), () => NUMBERS, ["kick", "twitch"]);
+
+    // Kick has no follows: Twitch's
+    expect(studio.kept("o1", viewer)?.values).toMatchObject({
+      user: { platform: "twitch" },
+    });
+    expect(onReact).toHaveBeenCalledOnce();
+  });
+
   it("keeps a Test's sample for its seconds and exit, until a real event", () => {
     const { studio, onReact, numbers } = setup();
     const now = vi.spyOn(performance, "now").mockReturnValue(1000);
@@ -454,7 +469,7 @@ describe("StudioService", () => {
       );
     follow("Ana");
 
-    studio.test(overlay, () => NUMBERS);
+    studio.test(overlay, () => NUMBERS, ["tiktok"]);
     const [, sample] = onReact.mock.lastCall!;
     expect(studio.kept("o1", viewer)).toMatchObject({ name: sample.name });
     // A second past its seconds, for its exit
@@ -464,18 +479,18 @@ describe("StudioService", () => {
     expect(studio.kept("o1", viewer)).toMatchObject({ name: "Ana" });
 
     // A real event wins over it
-    studio.test(overlay, () => NUMBERS);
+    studio.test(overlay, () => NUMBERS, ["tiktok"]);
     follow("Bea");
     expect(studio.kept("o1", viewer)).toMatchObject({ name: "Bea" });
 
     // Not once its trigger changed, nor once its overlay is gone
-    studio.test(overlay, () => NUMBERS);
+    studio.test(overlay, () => NUMBERS, ["tiktok"]);
     const shared = StudioElementSchema.parse({
       ...viewer,
       trigger: { ...viewer.trigger, type: TOKIO_EVENTS.SHARE },
     });
     expect(studio.kept("o1", shared)).toBeNull();
-    studio.test(overlay, () => NUMBERS);
+    studio.test(overlay, () => NUMBERS, ["tiktok"]);
     studio.forget("o1");
     expect(studio.kept("o1", viewer)).toBeNull();
   });
@@ -569,7 +584,7 @@ describe("StudioService", () => {
       items: [always, reacting, loop, mover, element("e", {})],
     };
 
-    studio.test(overlay, () => NUMBERS);
+    studio.test(overlay, () => NUMBERS, ["tiktok"]);
 
     expect(onReact.mock.calls).toEqual([
       ["o1", { element: "R" }],
@@ -786,7 +801,7 @@ describe("StudioService's delay", () => {
     const viewer = element("v", { kind: "viewer", seconds: 5, delay: 2 });
     const overlay = overlayOf(viewer);
 
-    s.studio.test(overlay, () => NUMBERS);
+    s.studio.test(overlay, () => NUMBERS, ["tiktok"]);
     expect(s.onReact).not.toHaveBeenCalled();
     expect(s.studio.kept("o1", viewer)).toBeNull();
 

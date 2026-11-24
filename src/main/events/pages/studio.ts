@@ -187,8 +187,13 @@ events.push(
     const { storeManagerService, studioService } = handler;
     const overlay = storeManagerService.getStudio().find((o) => o.id === id);
     if (!overlay) throw missing();
+    const profile = await storeManagerService.getProfileData();
     // Its reacts go out through onReact, each after its delay
-    studioService.test(overlay, () => liveNumbers(handler));
+    studioService.test(
+      overlay,
+      () => liveNumbers(handler),
+      profile?.platforms ?? ["tiktok"],
+    );
     replyStudio(e, handler);
   },
   { ...options("main.failure.testOverlay"), notify: false },

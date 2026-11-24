@@ -4387,7 +4387,7 @@ describe("StudioEditor", () => {
       );
       // YouTube's in US dollars
       expect(drawn(list.id).querySelector(".studio-number")!.textContent).toBe(
-        "$12.4K",
+        "$124.00",
       );
 
       // A profile without YouTube keeps it shown, to change

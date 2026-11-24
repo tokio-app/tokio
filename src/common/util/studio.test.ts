@@ -13,6 +13,7 @@ import {
   AlertTrigger,
   ChatEvent,
   EMOTE_TRIGGER,
+  Platform,
   TOKIO_EVENTS,
 } from "../types/connector";
 import { NO_MONEY } from "./format";
@@ -629,18 +630,40 @@ const made = <K extends StudioElement["kind"]>(
 describe("Samples", () => {
   it("makes each trigger's sample once, an emote's from chat", () => {
     const samples = new Samples();
+    const follow = { type: TOKIO_EVENTS.FOLLOW } as const;
 
-    expect(samples.of(TOKIO_EVENTS.FOLLOW)).toBe(
-      samples.of(TOKIO_EVENTS.FOLLOW),
+    expect(samples.of(follow)).toBe(samples.of(follow));
+    expect(samples.of({ type: EMOTE_TRIGGER })).toMatchObject({
+      comment: { emotes: expect.arrayContaining([expect.anything()]) },
+    });
+  });
+
+  it("samples each row on its platform, else the profile's first sending it", () => {
+    const samples = new Samples(["kick", "youtube", "twitch"]);
+    const platformOf = (row: { type: AlertTrigger; platform?: Platform }) => {
+      const sample = samples.of(row);
+      return sample && typeof sample === "object" && "user" in sample
+        ? sample.user.platform
+        : undefined;
+    };
+
+    expect(platformOf({ type: TOKIO_EVENTS.CHAT })).toBe("kick");
+    expect(platformOf({ type: TOKIO_EVENTS.GIFT })).toBe("youtube");
+    expect(platformOf({ type: TOKIO_EVENTS.FOLLOW })).toBe("twitch");
+    expect(platformOf({ type: TOKIO_EVENTS.CHAT, platform: "twitch" })).toBe(
+      "twitch",
     );
-    expect(samples.of(EMOTE_TRIGGER)).toHaveProperty("comment");
+    // Its own and the first row's are kept apart
+    expect(
+      samples.of({ type: TOKIO_EVENTS.CHAT, platform: "twitch" }),
+    ).not.toBe(samples.of({ type: TOKIO_EVENTS.CHAT }));
   });
 
   it("plays a text with its trigger's values and a viewer with its picture", () => {
     const samples = new Samples();
     const text = made("text", { text: "Hi {username}", when: "event" });
     const viewer = made("viewer");
-    const follow = samples.of(TOKIO_EVENTS.FOLLOW);
+    const follow = samples.of({ type: TOKIO_EVENTS.FOLLOW });
     const username =
       typeof follow === "object" && follow && "user" in follow
         ? follow.user.username
@@ -726,6 +749,23 @@ describe("Samples", () => {
     const [chat] = rows("chat");
     expect(chat.text).not.toBe("");
     expect(chat.value).toBe("");
+  });
+
+  it("ranks a gifters list's own platform's gifters, in its currency", () => {
+    const samples = new Samples(["kick", "youtube"]);
+    const rows = (platform: Platform) => {
+      const list = made("list", { source: "gifters", platform });
+      if (list.kind !== "list") throw new Error("made the wrong kind");
+      return sampleDeps(samples, "en", {}).rows(list);
+    };
+
+    expect(
+      rows("youtube")
+        .slice(0, 2)
+        .map((r) => r.value),
+    ).toEqual(["$124.00", "$43.84"]);
+    expect(rows("kick")[0].value).toBe("12.4K");
+    expect(rows("kick")).not.toEqual(rows("youtube"));
   });
 });
 

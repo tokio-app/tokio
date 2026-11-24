@@ -90,6 +90,7 @@ const setup = (
     storeManagerService: {
       getStudio: () => overlays,
       getLiveStats: () => ({ likes: 12_840, viewers: 30, views: 0 }),
+      getProfileData: async () => ({ platforms: ["tiktok"] }),
     },
     liveService: { getSession: () => session(startedAt) },
     overlayService: {

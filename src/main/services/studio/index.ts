@@ -11,7 +11,7 @@ import {
 import {
   AlertTrigger,
   AppEvents,
-  EMOTE_TRIGGER,
+  Platform,
   StudioListEntry,
   StudioNumbers,
   StudioReact,
@@ -21,10 +21,9 @@ import {
 import {
   fillStudioText,
   formatError,
-  generateEmoteChatSample,
-  generateEventSample,
   goalValue,
   reactsToEvents,
+  Samples,
   sentPicture,
   studioEventVariables,
   triggersOf,
@@ -272,12 +271,18 @@ export class StudioService extends Service {
    * its delay, with a sample of its first trigger's event (a goal's sends
    * none). Each element keeps its sample for its seconds and a second for
    * its exit (EXIT_MS, in the stage) from when it plays, unless a real event
-   * comes first, then shows its real last event again.
+   * comes first, then shows its real last event again. Samples come from
+   * the profile's platforms.
    */
-  public test(overlay: StudioOverlay, numbers: () => StudioNumbers) {
-    // One sample per trigger, so the elements one event sets off show the
-    // same viewer, as a real event does: a follow alert's picture and text
-    const samples = new Map<AlertTrigger, TokioEventMap[AppEvents]>();
+  public test(
+    overlay: StudioOverlay,
+    numbers: () => StudioNumbers,
+    platforms: readonly Platform[],
+  ) {
+    // One sample per trigger and platform, so the elements one event sets
+    // off show the same viewer, as a real event does: a follow alert's
+    // picture and text
+    const samples = new Samples(platforms);
     for (const item of itemsOf(overlay)) {
       if (!reactsToEvents(item)) continue;
       const { trigger } = item;
@@ -288,18 +293,9 @@ export class StudioService extends Service {
         );
         continue;
       }
-      const { type } = trigger;
-      let values = samples.get(type);
-      if (!values) {
-        // Emote triggers match chats with an emote
-        values =
-          type === EMOTE_TRIGGER
-            ? generateEmoteChatSample()
-            : generateEventSample(type).data;
-        samples.set(type, values);
-      }
+      const values = samples.of(trigger);
       const sample: StudioKept = {
-        trigger: type,
+        trigger: trigger.type,
         values,
         ...viewerOf(values),
       };

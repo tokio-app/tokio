@@ -195,8 +195,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   // every profile's
   const [platforms, setPlatforms] = useState<Platform[]>(["tiktok"]);
   const { giftChoices, emoteChoices, emotes, setEmotes } = useTriggerChoices();
-  // A new one per Test, so its samples are fresh
-  const [samples, setSamples] = useState(() => new Samples());
+  // A new one per Test, so its samples are fresh, and for other platforms
+  const [samples, setSamples] = useState(() => new Samples(platforms));
   // The element whose image or video is being picked
   const [mediaFor, setMediaFor] = useState<string | null>(null);
   // Width and height change together, in the fields and on the canvas, for
@@ -231,7 +231,11 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     if (!res?.success || !res.profile) return;
     setEmotes(res.profile.emotes);
     setProfile({ alerts: res.profile.alerts, games: res.profile.games });
-    setPlatforms(res.profile.platforms);
+    const next = res.profile.platforms;
+    if (next.join() !== platforms.join()) {
+      setPlatforms(next);
+      setSamples(new Samples(next));
+    }
   });
 
   const setItems = (change: (items: StudioItem[]) => StudioItem[]) =>
@@ -687,7 +691,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   // samples, each after its delay as on stream, here and on stream
   const test = () => {
     flushSettings();
-    const fresh = new Samples();
+    const fresh = new Samples(platforms);
     setSamples(fresh);
     for (const timer of delayed.current) clearTimeout(timer);
     delayed.current.clear();

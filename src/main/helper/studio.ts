@@ -240,9 +240,13 @@ export async function sendStudioOverlay(services: Services, id: string) {
  * values, for MCP's preview. No camera turns on for it.
  */
 export async function studioSampleView(
-  { overlayService }: Pick<Services, "overlayService">,
+  {
+    overlayService,
+    storeManagerService,
+  }: Pick<Services, "overlayService" | "storeManagerService">,
   overlay: StudioOverlay,
 ): Promise<StudioView> {
+  const profile = await storeManagerService.getProfileData();
   // As sendStudioOverlays takes them
   const gifts = [
     ...(await overlayService.getGifts()),
@@ -256,6 +260,10 @@ export async function studioSampleView(
     embedPath,
     camera: () => null,
     label: () => "",
-    ...sampleDeps(new Samples(), language(), sampleCounts(overlay)),
+    ...sampleDeps(
+      new Samples(profile?.platforms ?? ["tiktok"]),
+      language(),
+      sampleCounts(overlay),
+    ),
   });
 }
