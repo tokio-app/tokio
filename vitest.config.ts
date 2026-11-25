@@ -62,6 +62,10 @@ export default defineConfig({
         test: {
           name: "renderer",
           environment: "jsdom",
+          // One jsdom per worker instead of per file, which cost about 40%
+          // of the renderer's time. Each file still gets its own realm: see
+          // test/renderer/setup.ts for structuredClone.
+          pool: "vmThreads",
           include: ["src/{renderer,ui,music}/**/*.test.{ts,tsx}"],
           setupFiles: ["test/renderer/setup.ts"],
           // Tests that render the whole app outlast the 5s default on a busy machine, like a CI runner

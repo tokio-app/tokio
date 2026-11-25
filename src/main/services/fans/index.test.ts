@@ -290,7 +290,8 @@ describe("FansService", () => {
     expect(ids).not.toContain("0");
     expect(ids).toContain("new");
     expect(ids).not.toContain("kick:1");
-  });
+    // 20,000 records: about 3 s under coverage, more beside the whole suite
+  }, 15_000);
 
   it(`loads ${MAX_FANS} per platform, the last of each`, async () => {
     const tiktok = Array.from({ length: MAX_FANS + 1 }, (_, i) => ({
