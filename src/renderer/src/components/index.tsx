@@ -1,3 +1,4 @@
+export * from "./AddMenuButton";
 export * from "./AlertItem";
 export * from "./Avatar";
 export * from "./BackButton";

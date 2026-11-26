@@ -9,7 +9,7 @@ import {
 } from "@/common/schemas";
 import { CustomGift, TOKIO_EVENTS } from "@/common/types";
 import { triggersFor } from "@/common/util";
-import { Btn } from "@/components";
+import { AddMenuButton, Btn } from "@/components";
 import { usePlatforms } from "@/context/platforms";
 import { cx } from "@/helper/cx";
 import { useMenu } from "@/hooks";
@@ -29,7 +29,6 @@ import {
   FiEye,
   FiEyeOff,
   FiLock,
-  FiPlus,
   FiTrash2,
   FiUnlock,
 } from "react-icons/fi";
@@ -545,76 +544,62 @@ export function LayersPanel({
       <div className={styles.panel_header}>
         <h3 className={styles.panel_title}>{t("studio.editor.elementList")}</h3>
         <div className={styles.panel_actions}>
-          <div
+          <AddMenuButton
+            label={add}
+            menu={menu}
             className={styles.menu_anchor}
-            ref={menu.ref}
-            onKeyDown={menu.onKeyDown}
+            menuClassName={styles.menu}
           >
-            <Btn
-              ref={menu.toggleRef}
-              variant="icon"
-              title={add}
-              aria-label={add}
-              aria-haspopup="menu"
-              aria-expanded={menu.open}
-              onClick={menu.toggle}
+            <button
+              type="button"
+              role="menuitem"
+              className={styles.menu_item}
+              disabled={groupsFull}
+              onClick={() => {
+                menu.close();
+                onAddGroup();
+              }}
             >
-              <FiPlus size={20} />
-            </Btn>
-            {menu.open && (
-              <div className={styles.menu} role="menu" aria-label={add}>
+              {t("studio.editor.newGroup")}
+            </button>
+            <div
+              role="group"
+              aria-labelledby={caption}
+              className={styles.menu_group}
+            >
+              <span id={caption} className={styles.menu_caption}>
+                {target
+                  ? t("studio.editor.addTo", { group: groupName(target) })
+                  : t("studio.editor.addElement")}
+              </span>
+              {kinds.map((kind) => (
                 <button
+                  key={kind}
                   type="button"
                   role="menuitem"
                   className={styles.menu_item}
-                  disabled={groupsFull}
+                  disabled={elementsFull}
                   onClick={() => {
                     menu.close();
-                    onAddGroup();
+                    onAdd(kind);
                   }}
                 >
-                  {t("studio.editor.newGroup")}
+                  {t(KIND_NAMES[kind])}
                 </button>
-                <div
-                  role="group"
-                  aria-labelledby={caption}
-                  className={styles.menu_group}
-                >
-                  <span id={caption} className={styles.menu_caption}>
-                    {target
-                      ? t("studio.editor.addTo", { group: groupName(target) })
-                      : t("studio.editor.addElement")}
-                  </span>
-                  {kinds.map((kind) => (
-                    <button
-                      key={kind}
-                      type="button"
-                      role="menuitem"
-                      className={styles.menu_item}
-                      disabled={elementsFull}
-                      onClick={() => {
-                        menu.close();
-                        onAdd(kind);
-                      }}
-                    >
-                      {t(KIND_NAMES[kind])}
-                    </button>
-                  ))}
-                </div>
-                {(elementsFull || groupsFull) && (
-                  <p className={styles.menu_note}>
-                    {elementsFull
-                      ? t("studio.editor.fullElements", {
-                          max: String(STUDIO_MAX_ELEMENTS),
-                        })
-                      : t("studio.editor.full", {
-                          max: String(STUDIO_MAX_GROUPS),
-                        })}
-                  </p>
-                )}
-              </div>
+              ))}
+            </div>
+            {(elementsFull || groupsFull) && (
+              <p className={styles.menu_note}>
+                {elementsFull
+                  ? t("studio.editor.fullElements", {
+                      max: String(STUDIO_MAX_ELEMENTS),
+                    })
+                  : t("studio.editor.full", {
+                      max: String(STUDIO_MAX_GROUPS),
+                    })}
+              </p>
             )}
-          </div>
+          </AddMenuButton>
           <Btn
             variant="icon"
             title={remove}

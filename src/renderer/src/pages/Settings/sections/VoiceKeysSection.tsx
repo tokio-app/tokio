@@ -1,11 +1,18 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, VoiceEngine } from "@/common/types";
-import { Btn, Field, FormGrid, Input, Section } from "@/components";
+import {
+  AddMenuButton,
+  Btn,
+  Field,
+  FormGrid,
+  Input,
+  Section,
+} from "@/components";
 import { useAutosave, useIpcListener, useIpcRequest, useMenu } from "@/hooks";
 import { useT } from "@/ui/i18n";
 import { cx } from "@/helper";
 import { useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { FiKey, FiPlus, FiTrash2 } from "react-icons/fi";
+import { FiKey, FiTrash2 } from "react-icons/fi";
 import styles from "../settings.module.css";
 
 type EngineKey = VoiceEngine & { key: string };
@@ -63,46 +70,28 @@ export function VoiceKeysSection() {
       description={t("settings.voiceKeys.description")}
       actions={
         addable.length > 0 && (
-          <div
+          <AddMenuButton
+            label={add}
+            menu={menu}
             className={styles.menu_anchor}
-            ref={menu.ref}
-            onKeyDown={menu.onKeyDown}
+            menuClassName={cx(styles.menu, up && styles.menu_up)}
+            menuRef={menuEl}
           >
-            <Btn
-              ref={menu.toggleRef}
-              variant="icon"
-              title={add}
-              aria-label={add}
-              aria-haspopup="menu"
-              aria-expanded={menu.open}
-              onClick={menu.toggle}
-            >
-              <FiPlus size={20} />
-            </Btn>
-            {menu.open && (
-              <div
-                ref={menuEl}
-                className={cx(styles.menu, up && styles.menu_up)}
-                role="menu"
-                aria-label={add}
+            {addable.map((engine) => (
+              <button
+                key={engine.id}
+                type="button"
+                role="menuitem"
+                className={styles.menu_item}
+                onClick={() => {
+                  menu.close();
+                  setVisible((list) => [...list, engine.id]);
+                }}
               >
-                {addable.map((engine) => (
-                  <button
-                    key={engine.id}
-                    type="button"
-                    role="menuitem"
-                    className={styles.menu_item}
-                    onClick={() => {
-                      menu.close();
-                      setVisible((list) => [...list, engine.id]);
-                    }}
-                  >
-                    {engine.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+                {engine.label}
+              </button>
+            ))}
+          </AddMenuButton>
         )
       }
     >
