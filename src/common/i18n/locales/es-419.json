@@ -1089,7 +1089,7 @@
   "tts.voice.selection": "Selección de voz",
   "tts.voice.volume": "Volumen ({volume}%)",
   "tts.voice.test": "Probar voz",
-  "tts.voice.testPlaceholder": "Escribe un mensaje para probar cómo suena el TTS...",
+  "tts.voice.testPlaceholder": "Escribe un mensaje para escucharlo...",
   "tts.format.title": "Formato",
   "tts.format.description": "Qué mensajes del chat se leen.",
   "tts.format.any": "Todos los mensajes",

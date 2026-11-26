@@ -41,7 +41,7 @@ const field = (label: string | RegExp) =>
 
 const testButton = () => screen.getByRole("button", { name: "Test voice" });
 const testMessage = () =>
-  screen.getByPlaceholderText("Type a message to test how the TTS sounds...");
+  screen.getByPlaceholderText("Type a message to hear it...");
 const customTrigger = () => screen.getByPlaceholderText("!tts");
 const template = () => field("Message template").getByRole("textbox");
 const mode = (label: RegExp) => screen.getByRole("radio", { name: label });
@@ -148,6 +148,11 @@ describe("TTS", () => {
   it("tests the voice only with a message", async () => {
     const { user } = await setup();
     expect(testButton()).toBeDisabled();
+    // The field comes first, then the button that reads it
+    expect(
+      testMessage().compareDocumentPosition(testButton()) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
     await user.type(testMessage(), "Hi");
     expect(testButton()).toBeEnabled();
