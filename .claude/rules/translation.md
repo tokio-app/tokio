@@ -11,19 +11,20 @@ paths:
 ## The user's calls
 
 - Each chat message is translated once, as it arrives, before any listener gets it. Only that message waits; the others go on at once.
+- Only TikTok's chat is translated (the user's call: letting Google detect Twitch's messages would spend its rate limit on the streamer's own language).
 - Google's free endpoint only. DeepL was built and taken out (the user's call): its free API plan is now a one-time 1,000,000 characters, then a paid plan streamers wouldn't pay for.
 - One picker, **Settings → Chat translation** (`settings.translation.language`, `""` is off), for every feature. An English voice may end up reading Spanish.
-- `{comment}` stays as the viewer typed it. `comment.translation` and `{translation}` carry the translation, and the windows offer `{translation}` only while a language is picked and the profile has TikTok, whose chat alone is translated (`useVariables`, `shownVariables`). TTS's **Read translations** (`tts.format.translate`), shown only with TikTok, puts the translation in `{comment}`'s place.
+- `{comment}` stays as the viewer typed it. `comment.translation` and `{translation}` carry the translation, and the windows offer `{translation}` only while a language is picked and the profile has TikTok (`useVariables`, `shownVariables`). TTS's **Read translations** (`tts.format.translate`), shown only with TikTok, puts the translation in `{comment}`'s place.
 - Commands stay as typed: music controls' (the song name after one too), overlays' (registered in their own files), and the keywords of chat triggers. The TTS trigger stays at the start and the rest is translated.
 - Mentions never reach the engine.
 - A tester in Settings (`TEST_TRANSLATION`).
 
 ## The pipe
 
-- `ConnectorProvider.emitChat` runs the stage `init.ts` sets (`setChatStage`, `TranslationService.forChat`). Chat must go through `emitChat`, never `emit(CHAT)`.
+- `ConnectorProvider.emitChat` runs the stage `init.ts` sets (`setChatStage`, `TranslationService.forChat`).
 - `forChat` returns null synchronously for a chat it won't translate, which then goes out in the same tick, keeping its order with the batch's other events. Keep that null synchronous.
 - A staged chat goes out alone when its promise settles, if its connection is still current: a stopped connection's is dropped, like a combo's end (`.claude/rules/connector.md`). The promise never rejects; a failure gives back the chat as typed.
-- Fake chats emitted on the connector's inner emitter (drive-app's RECIPES) skip the stage, so the real app's tester is the end-to-end check.
+- Fake chats on the connector's inner emitter (drive-app's RECIPES) skip the stage, so the real app's tester is the end-to-end check.
 
 ## What's translated
 
@@ -35,15 +36,15 @@ paths:
 
 ## Google
 
-- Its endpoint is undocumented, like Edge's Read Aloud. The URL, the 3 s timeout and the code map sit in `providers/google/config`; the reply's shape is checked.
+- Its endpoint is undocumented, like Edge's Read Aloud. The URL, the timeout and the code map sit in `providers/google/config`; the reply's shape is checked.
 - A failure pauses translation for `PAUSE_MS`, and chat goes on as typed meanwhile. `test()` skips the language gate, the cache, the pause and the turns.
-- Requests take turns (the user asked for a delay when there are too many): `RATE_PER_SECOND` after a burst of `RATE_BURST`, and a message that would wait over `MAX_WAIT_MS` goes on as typed, with no request and no notice. Measured on 2026-11-15: Google answered 429 ("Sorry...") to 3 requests a second after about 60, recovered within 20 s, and took 1 a second for minutes, bursts of 10 included. Measure again before raising them (`rate-test.mjs`'s method: rising steady rates, stopping at the first refusal).
-- `TRANSLATION_LANGUAGES` are the languages the picker offers, all of them Google's.
+- Requests take turns (the user asked for a delay when there are too many): `RATE_PER_SECOND` after a burst of `RATE_BURST`, and a message that would wait over `MAX_WAIT_MS` goes on as typed, with no request and no notice. Measured on 2026-11-15: Google answered 429 ("Sorry...") to 3 requests a second after about 60, recovered within 20 s, and took 1 a second for minutes, bursts of 10 included. Measure again before raising them, with rising steady rates, stopping at the first refusal.
+- The picker offers only Google's languages (`TRANSLATION_LANGUAGES`).
 
 ## Errors and notices
 
 - `TranslationError` holds only the status and a code: never a cause, the request or the chat text, which Google's URL carries.
-- `init.ts` warns under `translation` once per `REPEAT_NOTICE_MS`, logging to `translation.log` only when the notice goes out.
+- `init.ts` warns under `translation` once per `REPEAT_NOTICE_MS`, to `translation.log`.
 
 ## Contract
 

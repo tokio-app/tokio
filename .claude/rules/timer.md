@@ -16,7 +16,7 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
 
 - Statuses (`TIMER_STATUSES`): `idle` shows the starting time and follows `start`; `running` counts down; `paused` holds and still takes time from live events; `stopped` holds and takes none, after Stop or reaching 0.
 - Time is `performance.now()`: `_endsAt` while running, `_remaining` otherwise.
-  - The end is a `setTimeout` capped at `MAX_TIMEOUT_MS` (2³¹−1 ms, the platform's limit), scheduled again when it fires early.
+  - The end is a `setTimeout` capped at `MAX_TIMEOUT_MS` (the platform's limit), scheduled again when it fires early.
   - `_settle()` ends an overdue clock first in every method, so a gift right after 0 can't bring it back.
 - `adjust(ms)` (Add and Remove, not while idle) is exact, without the multiplier. Removing down to 0 while running ends the clock.
 - `cap` (minutes) stops added time, from events or Add, at that much on the clock. It never cuts time already there, or the starting time.
@@ -26,18 +26,18 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
 
 - `TIMER_EVENTS` turns each live event into seconds × `multiplier`, kept in ms.
 - Gifts go through a `GiftStreaks` even while the clock doesn't count, so a streak begun before Start adds only what comes after. A gift adds `added × max(0, coins)` times `coin`, and a gift without a currency (YouTube's) adds nothing, as `LiveService` counts them.
-- Twitch adds `sub` (seconds per subscription), `gift_sub` (per gifted sub) and `bit` (per Bit, like per coin). YouTube's memberships use `sub` and `gift_sub`, and `superchat` adds the same seconds per Super Chat or Super Sticker whatever it cost, since currencies differ. Kick's `KICKS` add `kick` per Kick, as cheers add `bit` per Bit. The `coin` row and its carousel item need TikTok (`timerTriggersOn`, `giftCurrencies`), and the `kick` row needs Kick. Which rows and carousel items apply follows the profile's platforms through `TIMER_TRIGGERS` and `triggersFor` (`.claude/rules/platforms.md`): `TimerService` gets them from `load(timer, file, platforms)` and `setPlatforms`, which sends the overlay again, and the page gets them from one page-level `GET_PROFILE`.
+- Twitch adds `sub` (per subscription), `gift_sub` (per gifted sub) and `bit` (per Bit). YouTube's memberships use `sub` and `gift_sub`, and `superchat` adds the same seconds per Super Chat or Super Sticker whatever it cost, since currencies differ. Kick's `KICKS` add `kick` per Kick.
+- The rows and carousel items follow the profile's platforms (`TIMER_TRIGGERS`, `triggersFor`, `.claude/rules/platforms.md`): `TimerService` gets them from `load(timer, file, platforms)` and `setPlatforms`, which sends the overlay again, and the page from one page-level `GET_PROFILE`.
 - Chat adds time only for messages with `chat.keyword` (`hasKeyword`, like chat alerts), once per viewer (by handle) in `chat.cooldown` seconds. A message without the keyword doesn't start the cooldown.
 - There are no join, envelope or Super Fan box triggers: a Super Fan box comes with a new Super Fan, which already counts.
 - `disconnected()` forgets the cooldowns and the streaks, and pauses a running clock when `pause_on_end` is on.
 
 ## Saving
 
-- Each profile has its own timer (`Profile.timer`, `TimerProfileSchema`, `.prefault({})` so older profiles load). `load(timer, file)` turns `running` into `paused`. It holds the profile's data in memory as Persistence in `AGENTS.md` describes.
+- Each profile has its own timer (`Profile.timer`, `TimerProfileSchema`). `load(timer, file)` turns `running` into `paused`. It holds the profile's data in memory as Persistence in `AGENTS.md` describes.
 - `startApp` loads it only when the profile reads. Until one loads, each tick reads the active profile again (`_read`, one at a time, `getProfileData` rereading at most every `LOAD_RETRY_MS`), and a switch's load wins. Unloaded, `save()` writes nothing, so a countdown left on the defaults would drop its changes.
 - The handlers save after each change and throw `saveFailure()` when that fails. The interval saves while running, or after a change no request saves: added time, the end, a pause on disconnect. A failed one warns once per `REPEAT_NOTICE_MS` (`TIMER_SAVE_FAILED`, key `timer`).
 - Never on quit: that would hold the quit the updater's install can't wait for (`.claude/rules/updates.md`).
-- `SET_PROFILE` switches run one at a time, and the profile lock is checked again after the saves, so a LIVE that connected meanwhile refuses the switch (`PROFILE_LOCKED`). Picking the profile that's already active does nothing, even during a LIVE.
 
 ## Pushes and the overlay
 
@@ -48,14 +48,13 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
 - `timer.html` inlines Archivo as a `data:` URL: main imports the woff2 with `?inline`, which needs `@fontsource-variable/archivo` in main's `externalizeDeps.exclude`.
 - The page anchors `remaining` to `performance.now()`. `--fit` shrinks everything when a wide font or a wrapped title wouldn't fit.
   - The halo is set on each text, since `em` in a `text-shadow` set on `body` resolves against the body's 16px.
-  - The title wraps instead of clipping, which would cut its halo into a box.
-  - The carousel is one line that a long name cuts short. The padding inside its clipping box, taken back by negative margins, keeps the halo from being cut into a box.
+  - The title wraps instead of clipping, and the carousel's clipping box has padding taken back by negative margins, since a clip would cut the halo into a box.
 - The slot under the clock shows `×N` or `added`, summed until `LABEL_MS` after the last change. Times read like `formatAdded` (`src/common/util/timer.ts`), which the page's `changeText` repeats in plain JS: keep them in step.
 - The page's preview (`TimerPreview`, `SLOT_MS`, `TURN_MS`) repeats the slot and the carousel, so keep the two in step. Its `bare` is for an embed in Overlay Studio's editor.
 
 ## The page
 
 - One `useAutosave(timer.settings)` feeds the three timer sections. Its delay keys on `prevSaved`, so main's pushes (a new but equal `settings` every 250 ms on a busy LIVE) don't keep restarting it.
-- The statuses' texts say how each treats time ("Paused, still adding time", "Stopped, adding no time"), and Tools' row shows them too. Add and Remove don't show while idle, when **Starting time** under them is what changes.
+- The statuses' texts say how each treats time, and Tools' row shows them too.
 - The controls call `flushSettings()` before `TIMER_CONTROL` or `ADJUST_TIMER`, so a setting still waiting to save, like the starting time, reaches main first.
-- The preview and Tools' timer row count down from the last push's `at` (`timeLeft`, `helper.ts`), ticking only while running. While idle, the preview shows the starting time as typed.
+- The preview and Tools' timer row count down from the last push's `at` (`timeLeft`, `helper.ts`), ticking only while running.

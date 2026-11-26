@@ -6,9 +6,9 @@ argument-hint: "<package>[@version]"
 
 # Add, upgrade or remove a dependency
 
-The source and the distributed app are MIT, with one LGPL file (see Licensing in `AGENTS.md`), so every package's license is checked before it goes in.
+Every package's license is checked before it goes in (Licensing in `AGENTS.md`).
 
-1. Before installing, read its license: `npm view <package>@<version> license repository`. When it's missing or unusual, read the LICENSE in its repository. For an upgrade, compare it with the installed version's, `node -p "require('<package>/package.json').license"`: licenses change between versions (tiktok-live-connector went MIT → AGPL in 2.4.1).
+1. Before installing, read its license: `npm view <package>@<version> license repository`. When it's missing or unusual, read the LICENSE in its repository. For an upgrade, compare it with the installed version's, `node -p "require('<package>/package.json').license"`: licenses change between versions.
 2. Copyleft (GPL, AGPL, LGPL, MPL, EUPL, CC BY-SA) or no license at all: stop and ask the user.
 3. Install with Yarn 1, never by editing `yarn.lock`: `yarn add <package>@<version>` (`-D` for build and test tools), `yarn upgrade <package>@<version>` or `yarn remove <package>`.
    - A transitive package (a security fix inside its parent's range) is different: `yarn upgrade` skips it, and a `yarn add` then `yarn remove` leaves the old version locked. Add a temporary `resolutions` entry in `package.json` (`"express/body-parser": "^2.4.0"`) and run `yarn install`. Remove the entry, delete `node_modules/.yarn-integrity`, and run it again, so the lockfile keeps the new version without the entry's pattern. `yarn install --frozen-lockfile` must pass after.
@@ -30,7 +30,7 @@ The source and the distributed app are MIT, with one LGPL file (see Licensing in
 
 - On Windows, VS Code's Fallow extension runs its language server from `node_modules/@fallow-cli/<platform>/fallow.exe`, which Yarn can't replace while it runs (EPERM). Before an install that changes `fallow`, ask the user to disable the extension; **Fallow: Restart Language Server** locks the new binary at once.
 - On Windows, VS Code's oxc extension runs the project's `oxlint --lsp`, which loads `node_modules/@oxlint/binding-win32-x64-msvc/oxlint.win32-x64-msvc.node`.
-  - A `yarn upgrade` of any package can relink that file and fail with EPERM before it writes `package.json` and `yarn.lock`, leaving the upgraded package's folder half done: Electron's new `package.json` over the old `dist`.
+  - A `yarn upgrade` of any package can relink that file and fail with EPERM before it writes `package.json` and `yarn.lock`, leaving the upgraded package half done (Electron's new `package.json` over the old `dist`).
   - Make the lockfile in a worktree instead: `yarn install --frozen-lockfile --ignore-scripts`, then the upgrade with `--ignore-scripts`. Copy `package.json` and `yarn.lock` back.
   - When the lockfile changed only that package, finish it in the checkout by hand. For Electron, `node node_modules/electron/install.js` fetches the `dist` that matches its `package.json`.
 - `yarn upgrade` can replace Electron's package folder without running the root `postinstall`, even when it upgrades another package, so the binary (`node_modules/electron/dist`) is missing until you run `yarn install`, which runs `install-electron`. Check that `dist` is there after any upgrade.

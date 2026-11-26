@@ -24,11 +24,16 @@ argument-hint: "[what to check]"
    };
    ```
 
-   The first start on a new data folder asks for the platform, the username and the profile's name, then opens the tour, as a first install does. Escape skips the one and closes the other. Fill the dialog instead to start from a set-up profile, or leave them open to check them.
+   Escape skips the first-start dialog and closes the tour. Fill the dialog instead to start from a set-up profile, or leave them open to check them.
 
-3. Run it from the repository root: `node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs>`. With `--home <dir>` it uses that data folder and keeps it, to look at what the app saved or to start the next run from there. One Tokio runs per data folder, so runs on the same `--home` go one after the other: a second one quits at once. With `--exe <app>` it starts a packaged build instead, made with `yarn build:unpack`: `dist/win-unpacked/tokio.exe`, or `dist/linux-unpacked/tokio` on Linux. With `--scale 2` it renders at twice the device scale, for sharp screenshots on any display. With `--lang <tag>` it runs as if the system's language were that one (`TOKIO_LANG`, `en` by default): `--lang es-419` shows Spanish, unless the data folder saved another language. With `--fake-camera`, Chromium's test camera (a moving pattern) is the only camera, for Overlay Studio's camera elements.
+3. Run it from the repository root: `node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs>`.
+   - `--home <dir>` uses that data folder and keeps it, to look at what the app saved or start the next run from there. One Tokio runs per data folder, so a second run on the same `--home` quits at once.
+   - `--exe <app>` starts a packaged build from `yarn build:unpack`: `dist/win-unpacked/tokio.exe`, or `dist/linux-unpacked/tokio`.
+   - `--scale 2` renders at twice the device scale, for sharp screenshots.
+   - `--lang <tag>` runs as if the system's language were that one (`TOKIO_LANG`, `en` by default), unless the data folder saved another.
+   - `--fake-camera` makes Chromium's test camera the only camera, for Overlay Studio's camera elements.
 4. It refuses to start while port 37891 is in use. Ask the user to quit Tokio or stop `yarn dev`; don't stop them yourself.
-5. Look at the screenshots, and at what the script printed: renderer errors come out as `[page]` and `[console]` lines, and it exits with 1 when a step throws.
+5. Look at the screenshots and the output: renderer errors print as `[page]` and `[console]` lines, and a step that throws exits with 1.
 
 `scripts/screenshots.mjs` is a steps file that retakes the README's screenshots into `.github/screenshots/` (the whole window, 1200×800) and the website docs' into `../tokio-web/src/assets/screenshots/` (crops of what each docs section describes), with made-up viewers: `node .claude/skills/drive-app/scripts/drive.mjs --scale 2 --fake-camera .claude/skills/drive-app/scripts/screenshots.mjs`. It needs the network for the official overlays, `--fake-camera` for Overlay Studio's camera, which it waits for, and Microsoft Edge for the phone remote's page (Playwright's `msedge` channel, as a phone shows it). A docs crop is named after its file, which the docs reference; a new one needs a line in the docs page that shows it.
 
@@ -38,7 +43,7 @@ The website is in English and Spanish, so retake both:
 - Every UI text the script looks for goes through `tr()`: the text is found in `en.json`, and its key is read in the run's language. A text with `{params}`, or one whose keys translate differently, passes its key.
 - What a streamer or viewer typed goes through `say()`, with its Spanish in `TYPED`. A new typed text that a picture shows needs a line there. The Spanish docs' alt texts name what the Spanish pictures show.
 
-A run rewrites every picture, and most differ only by chance: made-up IDs and keys, dates counted from today, sample names and photos, animation frames, a blinking caret. Compare each with the committed one and keep only the changes you meant; `git checkout` the rest, so a pull request shows only real changes.
+A run rewrites every picture, and most differ only by chance (made-up IDs, dates counted from today, sample photos, animation frames, a blinking caret). Keep only the changes you meant and `git checkout` the rest.
 
 ## Helpers
 
@@ -65,13 +70,12 @@ A run rewrites every picture, and most differ only by chance: made-up IDs and ke
 
 - `toggle(locator)` clicks a `Toggle`. Its input has no size, so Playwright's `check()` fails even with `force`.
 - `app.evaluate` runs code in main, which is how the e2e answers native dialogs: `app.evaluate(({ dialog }, folder) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] }); }, folder)`.
-- `home` is the data folder. The app's files are in `<home>/.tokio/` (`settings/tokio.json`, `profiles/`, `extra/`).
+- `home` is the data folder; the app's files are in `<home>/.tokio/`.
 
 ## Notes
 
-- `RECIPES.md` has the checks that need more than clicks: fake live events in main, counting what main sends, test media, minimized windows and overlay pages.
+- `RECIPES.md` has the checks that need more than clicks: fake live events in main, counting what main sends, test media, minimized windows and overlays, watching an overlay page among them.
 - Query by role and visible text, as the tests do (`.claude/rules/testing.md`).
-- To watch an overlay page (an alert's `/alerts/<id>/`, the timer's), turn the server on first: `toggle` **Enable server** in Settings, then click the confirm dialog's **Enable server**. Open the page in `app.evaluate` with `new BrowserWindow({ webPreferences: { partition: "obs", backgroundThrottling: false } })`: the app's own session cancels WebSockets, so the page couldn't connect there. Then find it with `windowWith("alerts/")`.
 - A real connector check needs a username that's LIVE right now: ask the user for one.
 
 ## Done when

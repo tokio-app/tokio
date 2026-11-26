@@ -63,28 +63,37 @@ Notes for one area live in `.claude/rules/`. Claude Code loads each one when it 
 - `testing.md`: Vitest and Playwright setup, fakes and helpers
 - `renderer.md`: pages, components, the look, keyboard, media elements and the CSP
 - `renderer-state.md`: profile autosaves, `useAutosave` and `AudioQueue`
+- `first-start.md`: the first-start dialog and the tour
 - `i18n.md`: the locale files, translating in the windows and main, and the language setting
 - `app-lifecycle.md`: single instance, tray, windows and quitting
 - `logging.md`: the log files, what goes at which level, Detailed logs and the export
-- `store.md`: the store and profile files
+- `store.md`: the store, the profile files and profile switches
 - `ci.md`: CI, packaging and releases
 - `updates.md`: the auto-updater
-- `connector.md`: the TikTok connector and its key
-- `platforms.md`: several platforms in one LIVE session, Twitch, YouTube, Kick, trigger platforms and namespaced ids
-- `live-session.md`: the LIVE session and activity feed on Home
+- `platforms.md`: several platforms in one LIVE session, each one's money, namespaced ids and what the window shows per platform
+- `connector.md`: TikTok's connector and its key
+- `twitch.md`: Twitch's provider and its sign-in
+- `youtube.md`: YouTube's provider, read from its public pages
+- `kick.md`: Kick's provider, its API and chat feed
+- `live-session.md`: the LIVE session and Home: its tabs, numbers and activity feed
 - `controls.md`: the live controls (skip song, stop TTS, replay alert, pause), their global shortcuts and the phone remote
 - `mcp.md`: the MCP server at `/mcp`, its tools and what it must never expose
 - `tts.md`: TTS engines and chat TTS
 - `music.md`: music requests and YouTube's ad blocker
 - `translation.md`: chat translation, its pipe and the commands it leaves as typed
-- `alerts.md`: alert triggers, gifts, sounds, media and spoken alerts
-- `games.md`: the Games page, the Minecraft connection and game actions
+- `triggers.md`: the trigger rows alerts, game actions and Overlay Studio share
+- `alerts.md`: alerts' gifts, sounds, media, cuts and spoken alerts
+- `games.md`: the Games page, game actions and their runs
+- `minecraft-connection.md`: the Minecraft socket and its protocol, both editions
+- `minecraft-commands.md`: the commands game actions send: mobs, hazards and helps
 - `games-overlay.md`: the games overlay and the Minecraft pictures library
-- `overlays.md`: overlay previews, imports and official overlays
+- `overlays.md`: overlay previews, imports, official overlays and the overlays repo
 - `timer.md`: the countdown timer, its overlay and its page in Tools
 - `fans.md`: the fans each profile keeps, sent to overlays and listed in Tools → Fans
 - `history.md`: each profile's past LIVEs and gifters, LIVE history in Tools, and the top gifters overlays get
-- `studio.md`: Overlay Studio's stage, data, reactions and served page
+- `studio.md`: Overlay Studio's data, reactions and live numbers
+- `studio-stage.md`: the stage that draws Overlay Studio's overlays, on stream and in the editor
+- `studio-camera.md`: Overlay Studio's cameras, from capture to the page
 - `studio-editor.md`: Overlay Studio's editor
 - `served-pages.md`: what every page the overlay server serves itself must follow
 
@@ -127,7 +136,7 @@ Tokio is in English and Spanish, following the system's language unless **Settin
 
 - Each service lives in `src/main/services/<name>/index.ts` and extends `Service` (or `ProviderService<T>`) from `src/main/services/shared`. It's created once in `src/main/index.ts`, added to `AppServices` (`src/main/types`) and injected into `AppHandler`.
 - Swappable backends (TikTok's connector, TTS, music) use providers: `addProvider(name, provider, start?)` / `setProvider(name, key?)` (without a key the provider keeps its own; `""` clears it). Providers live in `services/<name>/providers/<provider>/` with `common/` and `config/` subfolders. Each service starts a provider in its constructor, so `_current` is always set. TTS uses every provider at once, as engines (`.claude/rules/tts.md`).
-- Classes that send live events to listeners (`MusicProvider` in `services/music/common`, `MusicQueue`, `ConnectorProvider`) extend `TokioEmitter` (`services/shared/emitter`): a typed `on`/`off` and a protected `emit`. `createWindow(view)` places a provider's page under the music window's title bar.
+- Classes that send live events to listeners (`MusicProvider` in `services/music/common`, `MusicQueue`, `ConnectorProvider`) extend `TokioEmitter` (`services/shared/emitter`): a typed `on`/`off` and a protected `emit`.
 - Log through `Logger` (`@/logger`) with the service's `_logFile` and a `<ServiceName>` prefix, e.g. ``Logger.error(`<Connector> ...`, this._logFile)``. Format errors with `formatError` from `@/common/util`. Routine traffic goes to `Logger.debug`, which only Detailed logs writes (`.claude/rules/logging.md`).
 - Fallible service methods return `ServiceResult<T>` (`{ success, error?, data? }`, in `services/shared`) instead of throwing.
 
@@ -164,7 +173,6 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 
 - Settings and profiles are validated with the Zod schemas in `src/common/schemas` and persisted by `StoreManagerService` (`.claude/rules/store.md`).
 - When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load.
-- Store mutators return whether the store file was written (see Feedback for a false).
 - `updateProfileData` throws until the store has loaded. It writes the active profile unless given a file.
 - What a profile collects that isn't settings, like its fans or its LIVEs, goes in its own file or folder named after the profile's (`fans/<profile file>`, `history/<profile file without .json>/`), so a rename moves nothing: exports, clones and `GET_PROFILE` carry the whole profile.
 - Services that hold a profile's data in memory (the countdown timer, fans, history) take the file and the data before any `await`, so a save racing a profile switch lands in the file the data came from (the timer passes it to `updateProfileData`). They save on an interval and before a `SET_PROFILE` switch, which a failed save refuses, and never on quit (`shortcut:`): a quit or crash loses up to one interval. A later `load` wins over one still reading.
@@ -183,7 +191,7 @@ Tokio's source is MIT; treat license compliance as part of every change.
 - **react-icons:** only use the sets listed under Icons in `THIRD_PARTY_NOTICES.md`, and add a row for any new set.
 - **Keep the notices in sync** when licensed components or online services change: `THIRD_PARTY_NOTICES.md` and `LICENSES/`, the license banner in `electron.vite.config.ts` (the bundler strips header comments), and `COMPONENTS` and `SERVICES` in `src/renderer/src/pages/About/helper.ts`, which mirror the non-npm parts of `THIRD_PARTY_NOTICES.md`. `src/renderer/src/pages/About/notices.test.ts` fails when they drift; the `add-dependency` skill says what each change needs.
 - The About page shows the license notices; keep it reachable from the sidebar.
-- The MCP server SDK (`@modelcontextprotocol/server`) is Apache-2.0, with MIT for older contributions, and compiles other packages into its files. Their licenses are in `LICENSES/MCP-SDK-bundled.txt`, which an upgrade must check (`.claude/rules/mcp.md`).
+- The MCP server SDK (`@modelcontextprotocol/server`) is Apache-2.0, with MIT for older contributions, and compiles other packages into its files. Their licenses are in `LICENSES/MCP-SDK-bundled.txt`, which an upgrade must update (the `add-dependency` skill).
 - Keep `"license": "MIT"` in `package.json`; it describes the repository's own code.
 
 ## CI and releases
@@ -201,18 +209,15 @@ The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../
 - package file names (its `src/lib/release.ts` matches them)
 - the Services list in `THIRD_PARTY_NOTICES.md` or the licensing
 
-## Overlays repo
+## Other repos
 
-The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`), which has its own `AGENTS.md`.
+Each has its own `AGENTS.md`, and the `sync-docs` skill says what a change needs there.
 
-- Its `scripts/lib/schema.js` copies `OverlayMetaSchema`, `OverlayConfigSchema` and the setup block's `SCRIPT_REGEX` so its builds are checked the way `processOverlay` checks an import. Update that copy when any of them, or what `processOverlay` accepts, change.
-- Its releases publish the catalog Tokio installs from, `https://github.com/tokio-app/overlays/releases/latest/download/overlays.json` (format in its `README.md`, see `.claude/rules/overlays.md`). A new catalog schema (a renamed or removed field) needs `CatalogOverlaySchema` and `parseCatalog` to read both.
-- No official overlay can have the id `alerts`, `timer`, `games`, `studio`, `remote` or `mcp`, paths Tokio serves itself (`RESERVED_IDS`, `src/common/schemas/catalog.ts`): Tokio drops a catalog entry with any of them.
-- Tokio installs an overlay's new versions in the background, except one with a new first version number, a breaking update the user confirms (`catalogState`). Its `AGENTS.md` keeps that number for breaking changes.
-
-## Minecraft mod repo
-
-Java Edition connects through the Tokio mod, a Fabric mod in `tokio-app/minecraft-mod` (locally `../tokio-minecraft-mod`), which has its own `AGENTS.md`. Its `PROTOCOL.md` is the contract with `MinecraftConnection`: change both together. The Games page links to the website's `#java-edition` install steps (`MINECRAFT_MOD_DOCS_URL`), and the mod's README's commands must match the page's (see `.claude/rules/games.md`).
+- The official overlays, `tokio-app/overlays` (`../tokio-overlays`): their schema copy and catalog are in `.claude/rules/overlays.md`.
+- The Tokio mod, `tokio-app/minecraft-mod` (`../tokio-minecraft-mod`), Java Edition's way in: its `PROTOCOL.md` is in `.claude/rules/minecraft-connection.md`.
+- The overlay SDK, `@tokioapp/overlay` (`../tokio-event-loader`): the `live-event` skill.
+- The TikTok connector, `@tokioapp/connector` (`../tokio-connector`): `.claude/rules/connector.md`.
+- The ad blocker, `@tokioapp/adblock` (`../tokio-adblock`): `.claude/rules/music.md`.
 
 ## Conventions
 
@@ -226,7 +231,7 @@ Java Edition connects through the Tokio mod, a Fabric mod in `tokio-app/minecraf
   - the server port (`37891`), the Minecraft port (`MINECRAFT_PORT`, 37892) and its Java subprotocol (`MINECRAFT_JAVA_PROTOCOL`, `tokio.java.v1`)
   - the alerts' overlay path (`/alerts/<alert id>/`), the countdown timer's (`/timer/`), Minecraft's overlay (`/games/minecraft/` and `/games/minecraft/<column>/`, its pictures under `/games/minecraft/pictures/`), Overlay Studio's (`/studio/<id>/`, socket id `studio:<id>`), the phone remote's (`/remote/`) and its API's routes (`/remote/api/state`, `/remote/api/<action>`), which Stream Deck setups call, and the MCP server's (`/mcp`)
   - existing event names
-- The overlay server listens on every network interface on purpose, for streaming apps on other computers (`tokio-app.local`, `REMOTE_SOCKET`, see `.claude/rules/overlays.md`). Don't bind it to loopback or add Host/Origin checks. The Minecraft socket is the exception (`.claude/rules/games.md`). The remote's API is gated by its key instead (`.claude/rules/controls.md`), and `/mcp` also answers only on loopback and refuses an `Origin` (`.claude/rules/mcp.md`).
+- The overlay server listens on every network interface on purpose, for streaming apps on other computers (`tokio-app.local`, `REMOTE_SOCKET`, see `.claude/rules/overlays.md`). Don't bind it to loopback or add Host/Origin checks. The Minecraft socket is the exception (`.claude/rules/minecraft-connection.md`). The remote's API is gated by its key instead (`.claude/rules/controls.md`), and `/mcp` also answers only on loopback and refuses an `Origin` (`.claude/rules/mcp.md`).
 - Respect inline `NOTE: DO NOT CHANGE` markers.
 - A new setting or action users have needs its MCP section field, kind or tool, with a test (`.claude/rules/mcp.md`).
 - Inside a folder with a barrel `index` (`common/types`, `common/schemas`, `components`, `context`, `hooks`), import sibling files directly, never through the barrel, to avoid import cycles.

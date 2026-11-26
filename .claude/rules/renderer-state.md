@@ -12,8 +12,7 @@ paths:
 
 ## State
 
-- If `LOAD_APP` fails, `AppProvider` still sends `SHOW_WINDOW`, showing only the title bar and "Tokio couldn't start". Toasts still work, since `NotificationsProvider` sits outside it.
-- `useImmerState` returns an immer `Updater`; `scopeUpdater(update, key)` hands a section one field.
+- If `LOAD_APP` fails, `AppProvider` still sends `SHOW_WINDOW`, showing only the title bar and "Tokio couldn't start". Toasts still work.
 
 ## Saving profile sections
 
@@ -36,9 +35,8 @@ paths:
 
 Audio plays through named `AudioQueue`s (`helper/audio.ts`) from `useAudio().getQueue(name)`.
 
-- `enqueue(bytes or a loader, options)` adds a sound; `wait(seconds, options)` adds a silent place (speed changes don't stretch it). Both return a promise of whether the item got its place.
+- `enqueue` adds a sound, `wait` a silent place that speed changes don't stretch. Both resolve to whether the item got its place.
 - Items get their places in the order they came, however long each takes to decode; decoding starts at once.
-- An item's own speed and pitch are clamped to 0.5–2 like the queue's.
 - `onScheduled(delay, duration)` measures the delay until it's heard from `Tone.immediate()`: `Tone.now()` runs ahead by the look-ahead.
 - `onEnded` runs at Tone's stop, and doesn't run when a queue is stopped. Tone emits stop up to its look-ahead before the end is heard, so a finished item's nodes are disposed `lookAhead + CUT_FADE` later.
 - `maxQueueLength` counts playing items and decodes in flight, so a full queue never decodes, or fetches.
@@ -46,5 +44,4 @@ Audio plays through named `AudioQueue`s (`helper/audio.ts`) from `useAudio().get
 - A loader (`() => Promise<bytes>`, a library alert sound's `soundData`) runs only on a cache miss, and its entry is set first, so copies and concurrent items share one fetch and one decode.
 - Eviction never drops the sound just decoded or ones still decoding, and keeps evicted buffers weakly (`WeakRef`) for reuse while a player holds them.
 - `forgetDecoded(cacheKey)` drops one that won't come again soon, such as an alert message; players that have it play on.
-- `useAudio().decode(bytes, cacheKey)` decodes into the same cache, for a page that draws a sound.
 - `start` and `end` play a part of the sound, see Cuts in `.claude/rules/alerts.md`.

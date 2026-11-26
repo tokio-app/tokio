@@ -17,15 +17,15 @@ Run them from the repository root, the narrow ones first:
 2. `yarn typecheck` and `yarn lint`. Lint fails on any warning, so fix them all.
 3. Prettier on the files you touched: `npx prettier --check <files>`, and `--write` to fix them. CI checks the whole repo with `npx prettier --check .`.
 4. When the changed files call for them:
-   - `yarn test:e2e` for window setup, the preload or startup: `src/main/index.ts`, `src/main/handler/app.ts`, `src/main/config/`, `src/preload/`, `src/renderer/src/splash/`, the HTML entries (`src/renderer/index.html`, `src/renderer/splash.html`, `src/music/index.html`), `electron.vite.config.ts`, `e2e/` and `playwright.config.ts`. It builds the app first and needs port 37891, so ask the user to quit Tokio and stop `yarn dev`.
+   - `yarn test:e2e` for window setup, the preload or startup: `src/main/index.ts`, `src/main/handler/app.ts`, `src/main/config/`, `src/preload/`, `src/renderer/src/splash/`, the HTML entries (`src/renderer/index.html`, `src/renderer/splash.html`, `src/music/index.html`), `electron.vite.config.ts`, `e2e/` and `playwright.config.ts`. It needs port 37891: ask the user to quit Tokio and stop `yarn dev`.
    - `yarn build:unpack` for `electron-builder.yml`, or for files the app reads at runtime. `npx asar list dist/win-unpacked/resources/app.asar` should show, outside `node_modules`, only `out/`, `music-out/`, `resources/` and `package.json`, and for the window-only packages in `files`' `!node_modules/{…}` pattern only their `package.json` and license files. The packaged app should start (the `drive-app` skill's `--exe`). `src/main/packaging.test.ts` already catches main reaching a stripped package.
    - `yarn tts:edge:check` for `src/main/services/tts/providers/edge/`. It needs the network.
    - `npx fallow dead-code` after moving, renaming or deleting code.
    - The tests in WSL, on Windows, for code that can behave differently on Linux or macOS: file links, paths, case-sensitive names, permissions. Commit first: the WSL copy runs committed code (see Linux checks in WSL below).
    - `git ls-files --eol | grep w/crlf` after a script wrote files: the repo uses LF. `.commitlintrc`, `.editorconfig`, `.gitattributes` and `LICENSE` always show up and are fine. A Python script writes CRLF on Windows unless it opens files with `newline="\n"`.
 5. Before pushing a branch:
-   - `npx prettier --check .`: the commit hook runs only oxlint, so a file nobody formatted, such as one picked from an agent's branch, first fails in CI.
-   - `npx commitlint --from <base> --to HEAD`: CI checks every commit of a pull request, and the hook skipped cherry-picks and checkouts installed with `--ignore-scripts`. A long body line is fixed by rewrapping it at 72 columns, words unchanged.
+   - `npx prettier --check .`: the commit hook runs only oxlint, so an unformatted file (one picked from an agent's branch) first fails in CI.
+   - `npx commitlint --from <base> --to HEAD` (Conventions in `AGENTS.md`). A long body line is fixed by rewrapping it at 72 columns, words unchanged.
 
 ## Linux checks in WSL
 
@@ -44,7 +44,7 @@ wsl.exe -e bash -lc 'cd ~/tokio-wsl && export PATH=$HOME/.local/node24/bin:$PATH
 - "Vitest failed to find the runner" in every suite means the shell's working directory has a lowercase drive letter (`c:\`). Run from `C:\…`; it isn't a real failure. In PowerShell, run `Set-Location 'C:\Users\…\tokio'` first: a Git Bash `cd /c/…` can keep the lowercase drive.
 - While `.claude/worktrees/` holds agents' worktrees, `yarn lint` lints them too. Run `npx oxlint --type-aware --deny-warnings --ignore-pattern ".claude/worktrees/**"` instead.
 - An `it.fails` test that passes now means its bug is fixed: turn it into `it`.
-- The renderer tests that render the whole app (App, Home, Overlays, Official overlays, Layout) slow down when other test runs share the machine, which is why the renderer's timeout is 15s. If one still times out, rerun it alone before calling it a failure.
+- The renderer tests that render the whole app (App, Home, Overlays, Official overlays, Layout) slow down when other test runs share the machine. If one times out, rerun it alone before calling it a failure.
 
 ## Report
 
