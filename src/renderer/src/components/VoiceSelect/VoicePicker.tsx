@@ -85,6 +85,7 @@ export function VoicePicker({
         />
         <Select
           className={styles.filter}
+          aria-label={t("components.voicePicker.engine")}
           options={engineChoices}
           value={filter.engine}
           onChange={(engine) => setFilter({ ...filter, engine })}
@@ -92,6 +93,7 @@ export function VoicePicker({
         <Select
           searchable
           className={styles.filter}
+          aria-label={t("components.voicePicker.language")}
           options={languageChoices}
           value={filter.language}
           onChange={(language) => setFilter({ ...filter, language })}
@@ -108,6 +110,7 @@ export function VoicePicker({
             <button
               type="button"
               className={cx(styles.pick, key === selected && styles.current)}
+              aria-current={key === selected || undefined}
               title={voice.name}
               onClick={() => onSelect(voice)}
             >

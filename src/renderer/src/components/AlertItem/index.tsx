@@ -479,11 +479,12 @@ export function AlertItem({
         .join(ROWS) || undefined
     : undefined;
   const test = alertTest(alert, platforms);
+  const name = alertName(alert.name, index);
 
   return (
     <div className={cx(styles.row, !alert.enabled && styles.off)}>
       <Toggle
-        aria-label={t("common.enabled")}
+        aria-label={t("components.alertItem.enable", { name })}
         checked={alert.enabled}
         onChange={(e) => onChange({ ...alert, enabled: e.target.checked })}
       />
@@ -495,7 +496,7 @@ export function AlertItem({
         onClick={onEdit}
       >
         <span className={styles.part}>
-          <span className={styles.name}>{alertName(alert.name, index)}</span>
+          <span className={styles.name}>{name}</span>
           <span className={styles.trigger}>
             <span className={styles.event}>
               {triggerLabel(alert, t, language)}
@@ -592,7 +593,12 @@ export function AlertItem({
         disabled={!test}
         onClick={() => test && onTest(test)}
       />
-      <Btn variant="icon" title={t("common.remove")} onClick={onRemove}>
+      <Btn
+        variant="icon"
+        title={t("common.remove")}
+        aria-label={t("components.alertItem.remove", { name })}
+        onClick={onRemove}
+      >
         <FiTrash2 size={20} />
       </Btn>
     </div>

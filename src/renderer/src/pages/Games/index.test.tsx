@@ -63,7 +63,8 @@ const saves = () =>
 // An action's panel, by its Remove button
 const panelElements = () =>
   screen
-    .queryAllByRole("button", { name: "Remove action" })
+    .queryAllByRole("button")
+    .filter((button) => button.title === "Remove action")
     .map((button) => button.closest("li")!);
 const panels = () => panelElements().map((panel) => within(panel));
 
@@ -305,9 +306,14 @@ describe("Games", () => {
       },
     ]);
 
-    await user.click(
-      panels()[0].getByRole("button", { name: "Remove action" }),
-    );
+    await user.click(panels()[0].getByTitle("Remove action"));
+    // Its row names it for screen readers
+    expect(
+      panels()[0].getByRole("checkbox", { name: "Enable Follow: Zombie" }),
+    ).toBeChecked();
+    expect(
+      panels()[0].getByRole("button", { name: "Remove Follow: Zombie" }),
+    ).toBeInTheDocument();
     const dialog = screen.getByRole("dialog", { name: "Delete action?" });
     expect(dialog).toHaveTextContent(
       '"Follow: Zombie" and its steps will be deleted from this profile.',
@@ -325,15 +331,11 @@ describe("Games", () => {
   it("keeps an action when its delete is canceled, and focuses the next one", async () => {
     const { user } = await load([action("a1"), action("a2")]);
 
-    await user.click(
-      panels()[0].getByRole("button", { name: "Remove action" }),
-    );
+    await user.click(panels()[0].getByTitle("Remove action"));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(panels()).toHaveLength(2);
 
-    await user.click(
-      panels()[0].getByRole("button", { name: "Remove action" }),
-    );
+    await user.click(panels()[0].getByTitle("Remove action"));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(panels()).toHaveLength(1);
     expect(panels()[0].getAllByRole("checkbox")[0]).toHaveFocus();

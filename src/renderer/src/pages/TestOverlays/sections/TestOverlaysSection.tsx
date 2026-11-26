@@ -5,6 +5,7 @@ import {
   Btn,
   CopyField,
   EmptyState,
+  Field,
   Input,
   Section,
   useFocusAfterDelete,
@@ -49,29 +50,31 @@ export function TestOverlaysSection({
       title={t("tools.test.title")}
       description={t("tools.test.description")}
     >
-      <form
-        className={styles.row}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!name.trim()) return;
-          onCreate(name);
-          setName("");
-        }}
-      >
-        <Input
-          ref={nameRef}
-          placeholder={t("tools.test.name")}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <Btn
-          type="submit"
-          disabled={!name.trim()}
-          title={t("tools.test.create")}
+      <Field label={t("tools.test.name")}>
+        <form
+          className={styles.row}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!name.trim()) return;
+            onCreate(name);
+            setName("");
+          }}
         >
-          <LuPlus size={20} />
-        </Btn>
-      </form>
+          <Input
+            ref={nameRef}
+            aria-label={t("tools.test.name")}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <Btn
+            type="submit"
+            disabled={!name.trim()}
+            title={t("tools.test.create")}
+          >
+            <LuPlus size={20} />
+          </Btn>
+        </form>
+      </Field>
 
       {overlays.length > 0 ? (
         <div ref={list} className={styles.list}>
@@ -97,11 +100,15 @@ export function TestOverlaysSection({
               </div>
 
               {/* One a line: side by side they can't shrink and overflow */}
-              <CopyField value={overlay.id} title={t("tools.test.copyId")} />
-              <CopyField
-                value={getOverlaySocketURL(overlay.id)}
-                title={t("tools.test.copyUrl")}
-              />
+              <Field label={t("tools.test.id")}>
+                <CopyField value={overlay.id} title={t("tools.test.copyId")} />
+              </Field>
+              <Field label={t("tools.test.url")}>
+                <CopyField
+                  value={getOverlaySocketURL(overlay.id)}
+                  title={t("tools.test.copyUrl")}
+                />
+              </Field>
 
               {statuses[overlay.id] && (
                 <p className={styles.test_status}>

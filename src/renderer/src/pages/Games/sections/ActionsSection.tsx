@@ -300,6 +300,7 @@ function ActionItem({
     setResult({ results: res.results, error: res.error?.message });
   });
 
+  const name = actionName(action, gifts, language);
   const setSteps = (next: GameStep[]) => onChange({ ...action, steps: next });
   const setStep = (index: number, step: GameStep) =>
     setSteps(steps.map((s, i) => (i === index ? step : s)));
@@ -308,7 +309,7 @@ function ActionItem({
     <li className={styles.action}>
       <div className={styles.action_header}>
         <Toggle
-          aria-label={t("common.enabled")}
+          aria-label={t("games.actions.enable", { name })}
           checked={action.enabled}
           onChange={(e) => onChange({ ...action, enabled: e.target.checked })}
         />
@@ -384,6 +385,7 @@ function ActionItem({
           <Btn
             variant="icon"
             title={t("games.actions.remove")}
+            aria-label={t("games.actions.removeNamed", { name })}
             onClick={onRemove}
           >
             <FiTrash2 size={20} />

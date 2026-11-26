@@ -46,6 +46,7 @@ export function VoiceSelect({ value, filters, onChange }: Props) {
     <>
       <button
         type="button"
+        aria-haspopup="dialog"
         className={cx(elements.select_display, styles.field)}
         title={value.name}
         onClick={() => setOpen(true)}

@@ -89,7 +89,7 @@ const saves = () =>
 // An alert's row, where its Remove button sits
 const rows = () =>
   screen
-    .queryAllByRole("button", { name: "Remove" })
+    .queryAllByTitle("Remove")
     .filter((button) => !button.closest("[role=dialog]"))
     .map((button) => within(button.parentElement!));
 // What a row says about its alert, which opens its editor
@@ -101,7 +101,11 @@ const top = () => within(screen.getAllByRole("dialog").at(-1)!);
 const dialogs = () => screen.queryAllByRole("dialog");
 
 // Opens the editor of the alert in the row, on one of its tabs
-async function edit(user: UserEvent, row: number, tab?: "Sound" | "Image or video") {
+async function edit(
+  user: UserEvent,
+  row: number,
+  tab?: "Sound" | "Image or video",
+) {
   await user.click(summary(row));
   if (tab) await user.click(editor().getByRole("tab", { name: tab }));
   return editor();
@@ -371,7 +375,7 @@ describe("Alerts", () => {
     const { user } = await load([alert("alert-1"), alert("alert-2")]);
 
     await user.click(rows()[0].getByRole("checkbox"));
-    await user.click(rows()[1].getByRole("button", { name: "Remove" }));
+    await user.click(rows()[1].getByRole("button", { name: /^Remove / }));
     const dialog = screen.getByRole("dialog", { name: "Delete alert?" });
     expect(dialog).toHaveTextContent(
       '"alert-2" will be deleted from this profile. Its sound and its image or video stay in the library.',
@@ -388,7 +392,7 @@ describe("Alerts", () => {
   it("keeps an alert when its delete is canceled", async () => {
     const { user } = await load([alert("alert-1")]);
 
-    await user.click(rows()[0].getByRole("button", { name: "Remove" }));
+    await user.click(rows()[0].getByRole("button", { name: /^Remove / }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(rows()).toHaveLength(1);
@@ -399,7 +403,7 @@ describe("Alerts", () => {
   it("focuses the add button once the last alert is deleted", async () => {
     const { user } = await load([alert("alert-1")]);
 
-    await user.click(rows()[0].getByRole("button", { name: "Remove" }));
+    await user.click(rows()[0].getByRole("button", { name: /^Remove / }));
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
     expect(rows()).toHaveLength(0);
