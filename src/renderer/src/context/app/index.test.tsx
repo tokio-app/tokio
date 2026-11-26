@@ -105,7 +105,7 @@ describe("AppProvider", () => {
     const welcome = screen.getByRole("dialog", { name: "Set up your stream" });
 
     await send(APP_EVENTS_RESPONSE.GET_SETTINGS, settingsReply());
-    await user.click(within(welcome).getByRole("tab", { name: "Twitch" }));
+    await user.click(within(welcome).getByRole("radio", { name: "Twitch" }));
     await send(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT, {
       success: true,
       login: "streamer_tv",

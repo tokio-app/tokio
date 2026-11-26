@@ -346,6 +346,8 @@
   "components.welcome.profileName": "Nombre del perfil",
   "components.welcome.profileNote": "Cada perfil guarda su propia configuración.",
   "components.welcome.skip": "Omitir",
+  "components.welcome.skipTitle": "¿Omitir la configuración?",
+  "components.welcome.skipDescription": "Lo que escribiste no se guardará.",
   "settings.language.title": "Idioma",
   "settings.language.description": "Los menús y mensajes de Tokio.",
   "settings.language.system": "Idioma del sistema",

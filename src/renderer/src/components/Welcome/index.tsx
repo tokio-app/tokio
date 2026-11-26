@@ -6,14 +6,17 @@ import {
   PLATFORMS,
 } from "@/common/types";
 import { EULER_SIGNUP_URL, PLATFORM_LABELS } from "@/common/util";
+import { cx } from "@/helper/cx";
 import { PLATFORM_ICONS } from "@/helper/platforms";
 import { useIpcListener } from "@/hooks";
 import { rich, useT } from "@/ui/i18n";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Btn, Input, Tabs } from "../Elements";
+import { Btn, Input } from "../Elements";
+import elements from "../Elements/elements.module.css";
 import { Modal } from "../Modal";
 import { Field } from "../Page";
+import page from "../Page/page.module.css";
 import { TwitchSignIn } from "../TwitchSignIn";
 import styles from "./welcome.module.css";
 
@@ -42,7 +45,8 @@ const FIELDS = {
 /**
  * The first start's questions: the platform, its channel (TikTok's Euler key
  * too, or Twitch's sign-in) and the profile's name. Save sends only what was
- * changed; Skip, Escape and the close button send nothing.
+ * changed; Skip, Escape and the close button send nothing, and ask first
+ * when something was typed.
  */
 export function Welcome({ onClose }: { onClose: () => void }) {
   const t = useT();
@@ -57,6 +61,8 @@ export function Welcome({ onClose }: { onClose: () => void }) {
   // Until Layout's GET_SETTINGS reply, which names the profile and provider
   const [loaded, setLoaded] = useState<Loaded>();
   const saveRef = useRef<HTMLButtonElement>(null);
+  const [leaving, setLeaving] = useState(false);
+  const platformLabel = useId();
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {
     if (!res?.success) return;
@@ -81,6 +87,12 @@ export function Welcome({ onClose }: { onClose: () => void }) {
 
   const trimmed = name.trim();
   const ready = !!loaded && trimmed.length >= MIN_NAME;
+  // What Skip would drop: a channel, the key or a new name
+  const typed =
+    Object.values(channels).some((c) => c.trim()) ||
+    key.trim() !== "" ||
+    (!!loaded && trimmed !== loaded.profile.name);
+  const skip = () => (typed ? setLeaving(true) : onClose());
 
   const save = () => {
     if (!loaded || !ready) return;
@@ -175,52 +187,102 @@ export function Welcome({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal
-      title={t("components.welcome.title")}
-      description={t("components.welcome.description")}
-      onClose={onClose}
-      closeButton
-      maxWidth="500px"
-      // Its height changes with the platform: from the top, only its foot
-      // moves, never the tabs under the pointer
-      top
-      footer={
-        <>
-          <Btn onClick={onClose}>{t("components.welcome.skip")}</Btn>
-          <Btn ref={saveRef} variant="accent" disabled={!ready} onClick={save}>
-            {t("common.save")}
-          </Btn>
-        </>
-      }
-    >
-      <Field label={t("components.welcome.platform")}>
-        <Tabs
-          variant="pill"
-          className={styles.platforms}
-          label={t("components.welcome.platform")}
-          value={platform}
-          onChange={setPlatform}
-          tabs={PLATFORMS.map((p) => {
-            const Icon = PLATFORM_ICONS[p];
-            return {
-              value: p,
-              label: PLATFORM_LABELS[p],
-              icon: <Icon size={16} aria-hidden />,
-            };
-          })}
-        />
-      </Field>
+    <>
+      {/* A form, so Enter in a field saves as Save does: a disabled Save
+          stops it too */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+      >
+        <Modal
+          title={t("components.welcome.title")}
+          description={t("components.welcome.description")}
+          onClose={skip}
+          closeButton
+          maxWidth="500px"
+          // Its height changes with the platform: from the top, only its foot
+          // moves, never the platforms under the pointer
+          top
+          footer={
+            <>
+              <Btn onClick={skip}>{t("components.welcome.skip")}</Btn>
+              <Btn
+                ref={saveRef}
+                type="submit"
+                variant="accent"
+                disabled={!ready}
+              >
+                {t("common.save")}
+              </Btn>
+            </>
+          }
+        >
+          {/* A choice of one: native radios, whose arrow keys pick, drawn as
+              the pill switch's segments */}
+          <Field>
+            <span id={platformLabel} className={page.field_label}>
+              {t("components.welcome.platform")}
+            </span>
+            <div
+              role="radiogroup"
+              aria-labelledby={platformLabel}
+              className={cx(
+                elements.tabs,
+                elements.tabs_pill,
+                styles.platforms,
+              )}
+            >
+              {PLATFORMS.map((p) => {
+                const Icon = PLATFORM_ICONS[p];
+                return (
+                  <label
+                    key={p}
+                    className={cx(
+                      elements.tab,
+                      p === platform && elements.tab_active,
+                      styles.platform,
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="welcome-platform"
+                      className={styles.radio}
+                      checked={p === platform}
+                      onChange={() => setPlatform(p)}
+                    />
+                    <Icon size={16} aria-hidden />
+                    {PLATFORM_LABELS[p]}
+                  </label>
+                );
+              })}
+            </div>
+          </Field>
 
-      {fieldsOf(platform)}
+          {fieldsOf(platform)}
 
-      <Field label={t("components.welcome.profileName")}>
-        <Input
-          aria-label={t("components.welcome.profileName")}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          <Field label={t("components.welcome.profileName")}>
+            <Input
+              aria-label={t("components.welcome.profileName")}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <p className={styles.note}>{t("components.welcome.profileNote")}</p>
+          </Field>
+        </Modal>
+      </form>
+
+      {/* Outside the form: its buttons and Enter are its own */}
+      {leaving && (
+        <Modal
+          title={t("components.welcome.skipTitle")}
+          description={t("components.welcome.skipDescription")}
+          confirmText={t("components.welcome.skip")}
+          onClose={() => setLeaving(false)}
+          onConfirm={onClose}
         />
-        <p className={styles.note}>{t("components.welcome.profileNote")}</p>
-      </Field>
-    </Modal>
+      )}
+    </>
   );
 }

@@ -1,14 +1,30 @@
-/* The four platforms split the dialog's width. [role] outranks the pill
-   switch's own fit-content and padding, whichever stylesheet loads last. */
-.platforms[role="tablist"] {
+/* The four platforms split the dialog's width. The class pair outranks the
+   pill switch's own fit-content and padding, whichever stylesheet loads last. */
+.platforms.platforms {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   width: 100%;
 }
 
-.platforms[role="tablist"] > [role="tab"] {
+.platforms > .platform.platform {
   min-width: 0;
   padding-inline: var(--space-2);
+}
+
+/* The radio is there for the keyboard and screen readers; its segment shows
+   the choice and the focus */
+.radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.platform:has(.radio:focus-visible) {
+  outline: 2px solid var(--accent-primary-hover);
+  outline-offset: 2px;
 }
 
 /* The account signed in to, in place of Twitch's sign-in */
