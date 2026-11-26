@@ -310,12 +310,41 @@ describe("Games", () => {
     await user.click(
       panels()[0].getByRole("button", { name: "Remove action" }),
     );
+    const dialog = screen.getByRole("dialog", { name: "Delete action?" });
+    expect(dialog).toHaveTextContent(
+      '"Follow: Zombie" and its steps will be deleted from this profile.',
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
     await wait(300);
     expect(panels()).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Add action" })).toHaveFocus();
     expect(saves().at(-1)).toEqual({
       actions: [],
       overlay: defaultProfile.games.overlay,
     });
+  });
+
+  it("keeps an action when its delete is canceled, and focuses the next one", async () => {
+    const { user } = await load([action("a1"), action("a2")]);
+
+    await user.click(
+      panels()[0].getByRole("button", { name: "Remove action" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(panels()).toHaveLength(2);
+
+    await user.click(
+      panels()[0].getByRole("button", { name: "Remove action" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(panels()).toHaveLength(1);
+    expect(panels()[0].getAllByRole("checkbox")[0]).toHaveFocus();
+    await wait(300);
+    expect(
+      saves()
+        .at(-1)
+        ?.actions.map((a) => a.id),
+    ).toEqual(["a2"]);
   });
 
   it("adds, changes and removes steps", async () => {

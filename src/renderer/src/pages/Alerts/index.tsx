@@ -194,6 +194,7 @@ export function Alerts() {
           onTest={test.toggle}
           update={update}
           onEdit={setEditing}
+          addRef={headerAdd}
         />
 
         {!headerAddShown && (

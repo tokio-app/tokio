@@ -7,9 +7,10 @@ import {
   EmptyState,
   Input,
   Section,
+  useFocusAfterDelete,
 } from "@/components";
 import { useT } from "@/ui/i18n";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
 import { LuPlus } from "react-icons/lu";
 import { PiShootingStarThin } from "react-icons/pi";
@@ -20,7 +21,8 @@ interface Props {
   overlays: TestOverlay[];
   statuses: Record<string, TestStatus>;
   onCreate: (name: string) => void;
-  onRemove: (id: string) => void;
+  // Asks first
+  onRemove: (overlay: TestOverlay) => void;
   onTest: (id: string) => void;
 }
 
@@ -33,6 +35,13 @@ export function TestOverlaysSection({
 }: Props) {
   const t = useT();
   const [name, setName] = useState("");
+  const list = useRef<HTMLDivElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const deleted = useFocusAfterDelete(
+    overlays.map((overlay) => overlay.id),
+    list,
+    nameRef,
+  );
 
   return (
     <Section
@@ -50,6 +59,7 @@ export function TestOverlaysSection({
         }}
       >
         <Input
+          ref={nameRef}
           placeholder={t("tools.test.name")}
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -64,8 +74,8 @@ export function TestOverlaysSection({
       </form>
 
       {overlays.length > 0 ? (
-        <div className={styles.list}>
-          {overlays.map((overlay) => (
+        <div ref={list} className={styles.list}>
+          {overlays.map((overlay, at) => (
             <div key={overlay.id} className={styles.item}>
               <div className={styles.item_header}>
                 <h3 className={styles.item_name}>{overlay.name}</h3>
@@ -76,7 +86,10 @@ export function TestOverlaysSection({
                   </Btn>
                   <Btn
                     title={t("common.delete")}
-                    onClick={() => onRemove(overlay.id)}
+                    onClick={() => {
+                      deleted(overlay.id, at);
+                      onRemove(overlay);
+                    }}
                   >
                     <FiTrash2 size={18} />
                   </Btn>

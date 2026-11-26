@@ -86,13 +86,32 @@ describe("TestOverlays", () => {
     expect(nameInput()).toHaveValue("   ");
   });
 
-  it("deletes a test overlay", async () => {
+  it("deletes a test overlay once asked, and keeps the focus in the list", async () => {
     const { user } = renderWithProviders(<TestOverlays />);
     await testOverlays(CLOCK, GOAL);
 
     await user.click(item("Goal").getByRole("button", { name: "Delete" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete test overlay?" });
+    expect(dialog).toHaveTextContent(
+      '"Goal" and its ID will be deleted. Overlays and streaming apps using the ID will stop getting test events.',
+    );
+    expect(sent(APP_EVENTS.REMOVE_TEST_OVERLAY)).toEqual([]);
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 
     expect(sent(APP_EVENTS.REMOVE_TEST_OVERLAY)).toEqual([{ id: GOAL.id }]);
+    await testOverlays(CLOCK);
+    expect(item("Clock").getByRole("button", { name: "Test" })).toHaveFocus();
+  });
+
+  it("keeps a test overlay when its delete is canceled", async () => {
+    const { user } = renderWithProviders(<TestOverlays />);
+    await testOverlays(CLOCK);
+
+    await user.click(item("Clock").getByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(sent(APP_EVENTS.REMOVE_TEST_OVERLAY)).toEqual([]);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("sends test events to a test overlay", async () => {

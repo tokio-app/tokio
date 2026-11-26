@@ -10,6 +10,7 @@ import {
   DeletePictureModal,
   DeleteStudioOverlayModal,
 } from ".";
+import { DeleteActionModal, DeleteAlertModal } from ".";
 
 describe("DeleteStudioOverlayModal", () => {
   const item = { id: "1b4e28ba-2fa1-41d2-883f-0016d3cca427", name: "Main" };
@@ -119,5 +120,50 @@ describe("DeletePictureModal", () => {
 
     expect(sent(APP_EVENTS.REMOVE_MINECRAFT_PICTURE)).toEqual([]);
     expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+describe("DeleteAlertModal", () => {
+  it("names the alert, and deletes it only once confirmed", async () => {
+    const onDelete = vi.fn();
+    const onClose = vi.fn();
+    const { user } = renderWithProviders(
+      <DeleteAlertModal
+        item={{ name: "Rose" }}
+        onClose={onClose}
+        onDelete={onDelete}
+      />,
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "Delete alert?" }),
+    ).toHaveTextContent('"Rose" will be deleted from this profile.');
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onDelete).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(onDelete).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("DeleteActionModal", () => {
+  it("names the action, and deletes it once confirmed", async () => {
+    const onDelete = vi.fn();
+    const { user } = renderWithProviders(
+      <DeleteActionModal
+        item={{ name: "Rose: Zombie" }}
+        onClose={vi.fn()}
+        onDelete={onDelete}
+      />,
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "Delete action?" }),
+    ).toHaveTextContent(
+      '"Rose: Zombie" and its steps will be deleted from this profile.',
+    );
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(onDelete).toHaveBeenCalledOnce();
   });
 });

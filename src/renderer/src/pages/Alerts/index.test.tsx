@@ -367,15 +367,43 @@ describe("Alerts", () => {
     expect(saves()[0].items[0].volume).toBe(30);
   });
 
-  it("turns an alert off and removes another", async () => {
+  it("turns an alert off and removes another once asked", async () => {
     const { user } = await load([alert("alert-1"), alert("alert-2")]);
 
     await user.click(rows()[0].getByRole("checkbox"));
     await user.click(rows()[1].getByRole("button", { name: "Remove" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete alert?" });
+    expect(dialog).toHaveTextContent(
+      '"alert-2" will be deleted from this profile. Its sound and its image or video stay in the library.',
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    expect(rows()).toHaveLength(1);
+    // On the row now last, as the deleted one's trash left with it
+    expect(rows()[0].getByRole("checkbox")).toHaveFocus();
+    await wait(300);
+    expect(saves()[0].items).toEqual([alert("alert-1", { enabled: false })]);
+  });
+
+  it("keeps an alert when its delete is canceled", async () => {
+    const { user } = await load([alert("alert-1")]);
+
+    await user.click(rows()[0].getByRole("button", { name: "Remove" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(rows()).toHaveLength(1);
     await wait(300);
-    expect(saves()[0].items).toEqual([alert("alert-1", { enabled: false })]);
+    expect(saves()).toEqual([]);
+  });
+
+  it("focuses the add button once the last alert is deleted", async () => {
+    const { user } = await load([alert("alert-1")]);
+
+    await user.click(rows()[0].getByRole("button", { name: "Remove" }));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(rows()).toHaveLength(0);
+    expect(addAlert()).toHaveFocus();
   });
 
   it("plays alerts simultaneously and limits their queue", async () => {
