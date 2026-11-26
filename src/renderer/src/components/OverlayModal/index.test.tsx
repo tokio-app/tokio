@@ -52,9 +52,12 @@ const title = () => screen.getByPlaceholderText("Type a title");
 const size = () => screen.getByRole("slider");
 const show = () => screen.getByRole("checkbox", { name: "Show count" });
 
-// The field's own reset button, beside its name
+// The field's own reset button, beside its name (a slider's has its value)
 const resetOf = (name: string) =>
-  within(screen.getByText(name).parentElement!).getByRole("button", {
+  within(
+    screen.getByText((text) => text === name || text.startsWith(`${name} (`))
+      .parentElement!,
+  ).getByRole("button", {
     name: "Reset to default",
   });
 

@@ -311,11 +311,3 @@
 .volume > div {
   flex: 1;
 }
-
-.volume_value {
-  min-width: 3ch;
-  font-size: var(--font-sm);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  color: var(--font-primary);
-}

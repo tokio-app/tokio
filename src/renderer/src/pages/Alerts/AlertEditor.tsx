@@ -318,7 +318,8 @@ function Volume({
 }) {
   const t = useT();
   return (
-    <Field label={t("alerts.editor.volume")}>
+    // The value in the label, as TTS's sliders show theirs
+    <Field label={t("alerts.editor.volume", { volume: value })}>
       <div className={styles.volume}>
         <FiVolume2 size={18} aria-hidden />
         <Slider
@@ -328,7 +329,6 @@ function Volume({
           value={value}
           onChange={onChange}
         />
-        <span className={styles.volume_value}>{value}</span>
       </div>
     </Field>
   );
