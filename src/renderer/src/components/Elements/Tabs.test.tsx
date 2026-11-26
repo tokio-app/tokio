@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { Tabs } from "./Tabs";
+import { tabPanel, Tabs } from "./Tabs";
 
 const TABS = [
   { value: "YouTube", label: "YouTube" },
@@ -114,6 +114,24 @@ describe("Tabs", () => {
     for (const tab of screen.getAllByRole("tab")) {
       expect(tab).toHaveAttribute("aria-controls", "panel");
     }
+  });
+
+  it("gives each tab an id its panel is named by", () => {
+    render(
+      <>
+        <Tabs tabs={TABS} value="Spotify" onChange={vi.fn()} panelId="panel" />
+        <div {...tabPanel("panel", "Spotify")} />
+      </>,
+    );
+
+    expect(screen.getByRole("tab", { name: "YouTube" })).toHaveAttribute(
+      "id",
+      "panel-tab-YouTube",
+    );
+    expect(screen.getByRole("tabpanel", { name: "Spotify" })).toHaveAttribute(
+      "id",
+      "panel",
+    );
   });
 
   it("closes a tab from its ×, the open tab's the one in the Tab order", async () => {

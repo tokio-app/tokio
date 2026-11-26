@@ -13,6 +13,14 @@
   min-height: 0;
 }
 
+/* A tab's panel, which the list scrolls inside */
+.panel {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .loading {
   display: flex;
   justify-content: center;

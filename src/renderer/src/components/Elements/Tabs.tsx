@@ -43,6 +43,20 @@ const MOVES: Record<string, (at: number, count: number) => number> = {
   End: (_, count) => count - 1,
 };
 
+const tabId = (panelId: string, value: string) => `${panelId}-tab-${value}`;
+
+/**
+ * The props of the panel the Tabs with this `panelId` show, named by the
+ * selected tab.
+ */
+export function tabPanel(panelId: string, value: string | null) {
+  return {
+    role: "tabpanel",
+    id: panelId,
+    "aria-labelledby": value === null ? undefined : tabId(panelId, value),
+  } as const;
+}
+
 /**
  * Tabs with one stop in the Tab order, the selected tab's, and the arrow
  * keys, Home and End moving the selection.
@@ -94,6 +108,7 @@ export function Tabs<T extends string>({
             key={tab.value}
             type="button"
             role="tab"
+            id={panelId ? tabId(panelId, tab.value) : undefined}
             aria-selected={active}
             aria-controls={panelId}
             tabIndex={tab.value === stop ? 0 : -1}

@@ -33,6 +33,7 @@ import {
   NumberInput,
   Section,
   Select,
+  tabPanel,
   Tabs,
   Toggle,
   TriggerFilter,
@@ -119,6 +120,7 @@ export function ActionsSection({
   // Collapsed, the overlay below gets the room. Only while on the page.
   const [open, setOpen] = useState(true);
   const body = useId();
+  const panelId = useId();
   // The edition whose actions show, which new ones take: the connected
   // game's, else Bedrock unless only Java has actions. A game that connects
   // turns to its own; one that leaves changes nothing.
@@ -153,63 +155,66 @@ export function ActionsSection({
       description={t("games.actions.description")}
     >
       <div id={body} className={styles.actions_body} hidden={!open}>
-        <Tabs tabs={EDITIONS} value={tab} onChange={setTab} />
-        {shown.length === 0 ? (
-          <EmptyState>{t("games.actions.empty")}</EmptyState>
-        ) : (
-          <ul ref={list} className={styles.actions}>
-            {shown.map((action, at) => (
-              <ActionItem
-                key={action.id}
-                action={action}
-                translation={translation}
-                gifts={gifts}
-                emotes={emotes}
-                onChange={(changed) => {
-                  update((s) => {
-                    const index = s.actions.findIndex(
-                      (a) => a.id === changed.id,
-                    );
-                    if (index !== -1) s.actions[index] = changed;
-                  });
-                  // Its new edition's tab, so the action stays in view
-                  if (changed.edition !== tab) setTab(changed.edition);
-                }}
-                onDuplicate={() =>
-                  update((s) => {
-                    const index = s.actions.findIndex(
-                      (a) => a.id === action.id,
-                    );
-                    const copy = structuredClone(action);
-                    s.actions.splice(index + 1, 0, {
-                      ...copy,
-                      id: crypto.randomUUID(),
+        <Tabs tabs={EDITIONS} value={tab} onChange={setTab} panelId={panelId} />
+        {/* The edition's actions and its add button, spaced as the body */}
+        <div {...tabPanel(panelId, tab)} className={styles.actions_body}>
+          {shown.length === 0 ? (
+            <EmptyState>{t("games.actions.empty")}</EmptyState>
+          ) : (
+            <ul ref={list} className={styles.actions}>
+              {shown.map((action, at) => (
+                <ActionItem
+                  key={action.id}
+                  action={action}
+                  translation={translation}
+                  gifts={gifts}
+                  emotes={emotes}
+                  onChange={(changed) => {
+                    update((s) => {
+                      const index = s.actions.findIndex(
+                        (a) => a.id === changed.id,
+                      );
+                      if (index !== -1) s.actions[index] = changed;
                     });
-                  })
-                }
-                onRemove={() =>
-                  setDeleting({
-                    id: action.id,
-                    name: actionName(action, gifts, language),
-                    at,
-                  })
-                }
-              />
-            ))}
-          </ul>
-        )}
-        <Btn
-          ref={addRef}
-          className={styles.add}
-          onClick={() =>
-            update((s) => {
-              s.actions.push(createAction(tab, newRowTrigger(platforms)));
-            })
-          }
-        >
-          <FiPlus size={20} />
-          {t("games.actions.add")}
-        </Btn>
+                    // Its new edition's tab, so the action stays in view
+                    if (changed.edition !== tab) setTab(changed.edition);
+                  }}
+                  onDuplicate={() =>
+                    update((s) => {
+                      const index = s.actions.findIndex(
+                        (a) => a.id === action.id,
+                      );
+                      const copy = structuredClone(action);
+                      s.actions.splice(index + 1, 0, {
+                        ...copy,
+                        id: crypto.randomUUID(),
+                      });
+                    })
+                  }
+                  onRemove={() =>
+                    setDeleting({
+                      id: action.id,
+                      name: actionName(action, gifts, language),
+                      at,
+                    })
+                  }
+                />
+              ))}
+            </ul>
+          )}
+          <Btn
+            ref={addRef}
+            className={styles.add}
+            onClick={() =>
+              update((s) => {
+                s.actions.push(createAction(tab, newRowTrigger(platforms)));
+              })
+            }
+          >
+            <FiPlus size={20} />
+            {t("games.actions.add")}
+          </Btn>
+        </div>
       </div>
       {deleting && (
         <DeleteActionModal

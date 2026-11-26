@@ -34,6 +34,7 @@ import {
   PlayButton,
   useVideoURL,
   Slider,
+  tabPanel,
   Tabs,
   TestState,
   testProps,
@@ -55,6 +56,7 @@ import {
   RefObject,
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -126,6 +128,7 @@ export function AlertEditor({
   const platforms = usePlatforms();
   const test = alertTest(alert, platforms);
   const tabs = useOptions(TABS);
+  const panelId = useId();
 
   return (
     <Modal
@@ -151,9 +154,12 @@ export function AlertEditor({
         />
       </label>
 
-      <Tabs tabs={tabs} value={tab} onChange={setTab} />
+      <Tabs tabs={tabs} value={tab} onChange={setTab} panelId={panelId} />
 
-      <div className={cx(styles.panel, tab === "trigger" && styles.scrolls)}>
+      <div
+        {...tabPanel(panelId, tab)}
+        className={cx(styles.panel, tab === "trigger" && styles.scrolls)}
+      >
         {tab === "trigger" && (
           <TriggerTab
             alert={alert}
