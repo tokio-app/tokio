@@ -62,6 +62,14 @@ type Providers = {
 const isEncrypted = (key: string) =>
   /^v\d\d$/.test(Buffer.from(key, "base64").subarray(0, 3).toString("latin1"));
 
+// A profile's name in lowercase ASCII letters, digits, "-" and "_", for its
+// file and its export's
+export const profileSlug = (name: string) =>
+  cleanText(name, { asciiOnly: true })
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .slice(0, 64)
+    .replace(/^-+|-+$/g, "") || "profile";
+
 // How long live events go without reading again an active profile that failed
 export const LOAD_RETRY_MS = 30_000;
 
@@ -149,6 +157,10 @@ export class StoreManagerService extends Service {
           file,
           name: profile.name,
         }));
+        // Default's entry, under the name it was saved with
+        const activeFile = data.settings.activeProfile.file;
+        const active = data.profiles.find((p) => p.file === activeFile);
+        if (active) data.settings.activeProfile = { ...active };
         const { soundsFolder, mediaFolder, minecraftFolder } =
           this._pathManagerService.folders;
         const alerts = profiles.flatMap(({ profile }) => profile.alerts.items);
@@ -1178,11 +1190,7 @@ export class StoreManagerService extends Service {
    */
   public async profileFileFor(name: string): Promise<string> {
     this._ensureInitialized();
-    const slug = cleanText(name, { asciiOnly: true })
-      .replace(/[^a-z0-9_-]+/g, "-")
-      .slice(0, 64)
-      .replace(/^-+|-+$/g, "");
-    return this._freeProfileFile(slug || "profile");
+    return this._freeProfileFile(profileSlug(name));
   }
 
   // `base`.json, or `base`-2.json and on when it's taken
@@ -1219,6 +1227,42 @@ export class StoreManagerService extends Service {
     let free = name;
     for (let n = 2; taken.has(free.toLowerCase()); n++) free = `${name} ${n}`;
     return free;
+  }
+
+  /**
+   * Gives the profile in that file a new name; the file keeps its own. null
+   * when it isn't listed or its file can't be written, "unsaved" when the
+   * store couldn't be saved, with the old name put back.
+   */
+  public async renameProfile(
+    file: string,
+    name: string,
+  ): Promise<"renamed" | "unsaved" | null> {
+    this._ensureInitialized();
+    const entry = this._storeData!.profiles.find((p) => p.file === file);
+    if (!entry) {
+      Logger.error(
+        `<System> Refused to rename the profile ${file}, it isn't listed.`,
+        this._logFile,
+      );
+      return null;
+    }
+    const previous = entry.name;
+    if (!(await this.updateProfileData({ name }, file))) return null;
+
+    // The active profile's entry is another object after startup
+    const setName = (value: string) => {
+      entry.name = value;
+      const active = this._storeData!.settings.activeProfile;
+      if (active.file === file) active.name = value;
+    };
+    setName(name);
+    if (await this._queueSave()) return "renamed";
+    setName(previous);
+    await this.updateProfileData({ name: previous }, file);
+    // An earlier save still queued may have written the new name.
+    void this._queueSave();
+    return "unsaved";
   }
 
   public async addProfile(

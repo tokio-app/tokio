@@ -193,9 +193,13 @@ describe("StoreManagerService", () => {
       await writeFile(defaultProfileFile, JSON.stringify(custom));
       await writeFile(storeFile, "{ oops");
 
-      await init();
+      const store = await init();
 
       expect(await readJSON(defaultProfileFile)).toEqual(custom);
+      const entry = { file: "default.json", name: "My setup" };
+      expect(store.getProfiles()).toEqual([entry]);
+      expect(store.getSettings().activeProfile).toEqual(entry);
+      expect((await readJSON(storeFile)).settings.activeProfile).toEqual(entry);
     });
 
     it("keeps a Default profile it can't read when the store is rebuilt", async () => {
@@ -1199,6 +1203,75 @@ describe("StoreManagerService", () => {
         join(paths.folders.profilesFolder, "copy.json"),
       );
       expect(copy.connector.username).toBe("streamer");
+    });
+
+    it("renames a profile, keeping its file", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      const files = await readdir(paths.folders.profilesFolder);
+
+      expect(await store.renameProfile("stream.json", "Night stream")).toBe(
+        "renamed",
+      );
+
+      const entry = { file: "stream.json", name: "Night stream" };
+      expect(store.getProfiles()).toContainEqual(entry);
+      expect((await readJSON(storeFile)).profiles).toContainEqual(entry);
+      expect(
+        (await readJSON(join(paths.folders.profilesFolder, "stream.json")))
+          .name,
+      ).toBe("Night stream");
+      expect(await readdir(paths.folders.profilesFolder)).toEqual(files);
+      expect(store.getSettings().activeProfile.name).toBe("Default");
+    });
+
+    it("renames the active profile in the list, the settings and memory", async () => {
+      // Loaded from a store file, so the list and the settings hold copies
+      await init();
+      const store = await init();
+      await store.getProfileData();
+
+      expect(await store.renameProfile("default.json", "Main")).toBe("renamed");
+
+      const entry = { file: "default.json", name: "Main" };
+      expect(store.getProfiles()).toEqual([entry]);
+      expect(store.getSettings().activeProfile).toEqual(entry);
+      expect((await readJSON(storeFile)).settings.activeProfile).toEqual(entry);
+      expect((await store.getProfileData())?.name).toBe("Main");
+    });
+
+    it("puts the old name back when the store can't be saved", async () => {
+      const store = await init();
+      await store.getProfileData();
+      vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
+
+      expect(await store.renameProfile("default.json", "Main")).toBe("unsaved");
+
+      expect(store.getProfiles()).toEqual(defaultStoreData.profiles);
+      expect(store.getSettings().activeProfile).toEqual(
+        defaultStoreData.profiles[0],
+      );
+      expect((await readJSON(defaultProfileFile)).name).toBe("Default");
+      expect((await store.getProfileData())?.name).toBe("Default");
+      await settle(1000);
+      expect((await readJSON(storeFile)).profiles).toEqual(
+        defaultStoreData.profiles,
+      );
+    });
+
+    it("renames nothing it doesn't list, or can't write", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      await rm(join(paths.folders.profilesFolder, "stream.json"));
+      vi.spyOn(Logger, "error");
+
+      expect(await store.renameProfile("missing.json", "Main")).toBeNull();
+      expect(await store.renameProfile("stream.json", "Main")).toBeNull();
+
+      expect(store.getProfiles().map((p) => p.name)).toEqual([
+        "Default",
+        "Stream",
+      ]);
     });
 
     it("refuses to switch to a profile that isn't listed", async () => {
