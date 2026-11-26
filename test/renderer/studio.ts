@@ -101,7 +101,7 @@ export const addMenu = () =>
   page().getByRole("button", { name: "Add a group or an element" });
 // The + menu's buttons, while it's open
 export const addItems = () =>
-  within(addMenu().nextElementSibling as HTMLElement);
+  within(addMenu().parentElement!.querySelector<HTMLElement>(":scope > div")!);
 export const deleteButton = (name: string) =>
   page().getByRole("button", { name });
 export const undo = () => page().getByRole("button", { name: "Undo (Ctrl+Z)" });
