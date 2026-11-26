@@ -25,7 +25,7 @@ type RequestFailure = ConnectorFailure & { status?: number };
 
 const VIDEO_ID = /^[\w-]{11}$/;
 const YOUTUBE_URL =
-  /^(https?:\/\/)?((www|m)\.)?(youtube\.com|youtu\.be)(\/|$)/i;
+  /^(https?:\/\/)?((www|m|studio)\.)?(youtube\.com|youtu\.be)(\/|$)/i;
 
 /**
  * What the streamer typed on Home: a handle (bare text always is one, even
@@ -42,10 +42,16 @@ export function parseInput(input: string): Target | null {
   const [first = "", second = ""] = url.pathname.split("/").filter(Boolean);
   let id: string | null = null;
   if (/youtu\.be$/i.test(url.hostname)) id = first;
-  else if (first === "watch") id = url.searchParams.get("v");
-  else if (first === "live") id = second;
+  // live_chat is the popout chat streamers dock in OBS
+  else if (first === "watch" || first === "live_chat") {
+    id = url.searchParams.get("v");
+  }
+  // video/<id> is YouTube Studio's LIVE
+  else if (first === "live" || first === "video") id = second;
   else if (first.startsWith("@")) return { path: `/${first}` };
-  else if (first === "channel" && second) return { path: `/channel/${second}` };
+  else if (["channel", "c", "user"].includes(first) && second) {
+    return { path: `/${first}/${second}` };
+  }
   return id && VIDEO_ID.test(id) ? { videoId: id } : null;
 }
 
