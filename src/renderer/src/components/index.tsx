@@ -26,6 +26,7 @@ export * from "./ShortcutField";
 export * from "./SoundPicker";
 export * from "./Toasts";
 export * from "./Tour";
+export * from "./TwitchSignIn";
 export * from "./UpdateButton";
 export * from "./VariableList";
 export * from "./VoiceSelect";
