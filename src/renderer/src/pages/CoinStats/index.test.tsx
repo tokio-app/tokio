@@ -138,10 +138,10 @@ describe("LIVE history", () => {
     expect(options()).toEqual([
       "All time, 13,000 coins",
       expect.stringMatching(
-        /^Saturday, October 31, 2026 at 7:00\sPM, 600 coins$/,
+        /^Saturday, October 31, 2026 at 7:00\sPM, 00:30:00, 600 coins$/,
       ),
       expect.stringMatching(
-        /^Friday, October 30, 2026 at 8:14\sPM, 12,400 coins$/,
+        /^Friday, October 30, 2026 at 8:14\sPM, 02:14:05, 12,400 coins$/,
       ),
     ]);
     expect(option(/^Friday/)).toHaveTextContent(
@@ -198,6 +198,15 @@ describe("LIVE history", () => {
 
     expect(heading()).toHaveTextContent("Saturday, October 31, 2026");
     expect(screen.queryByText("@")).not.toBeInTheDocument();
+  });
+
+  it("shows a channel typed as a link as typed, without the @", async () => {
+    renderWithProviders(<CoinStats />);
+    const link = "https://kick.com/kai_live";
+    await lives([liveSummary(SATURDAY, { username: link })]);
+
+    expect(screen.getByText(link)).toBeInTheDocument();
+    expect(screen.queryByText(`@${link}`)).not.toBeInTheDocument();
   });
 
   it("filters the LIVEs by date, with their totals and top gifters", async () => {
@@ -518,7 +527,7 @@ describe("LIVE history", () => {
     expect(sent(APP_EVENTS.CLEAR_LIVES)).toEqual([undefined]);
 
     await lives([]);
-    expect(options()).toEqual(["All time, 0 coins"]);
+    expect(screen.queryByRole("listbox")).toBeNull();
     expect(
       screen.getByRole("button", { name: "Clear history" }),
     ).toBeDisabled();
@@ -743,12 +752,22 @@ describe("LIVE history", () => {
 
     await lives([]);
 
-    expect(selected()).toMatch(/^All time/);
+    // All time once, in the heading: no dates to pick, no totals row and
+    // no one to search
+    expect(heading()).toHaveTextContent("All time");
+    expect(screen.getAllByText("All time")).toHaveLength(1);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Dates" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /search/i })).toBeNull();
+    const empty = screen.getByText(
+      (_, el) =>
+        el?.tagName === "P" &&
+        el.textContent ===
+          "No LIVEs yet. Connect on Home, and each LIVE shows up here when it ends.",
+    );
     expect(
-      screen.getByText(
-        "No LIVEs yet. Connect on Home, and each LIVE shows up here when it ends.",
-      ),
-    ).toBeInTheDocument();
+      within(empty).getByRole("link", { name: "Connect on Home" }),
+    ).toHaveAttribute("href", "/");
     expect(
       screen.getByText(
         "No gifts yet. Viewers who send gifts show up here, the biggest gifters first.",

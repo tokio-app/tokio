@@ -51,4 +51,5 @@ paths:
 - Rows out of view skip layout (`content-visibility`), so `MAX_FANS` rows stay cheap.
 - The search filters the tab shown, through `viewerMatcher` (see `.claude/rules/history.md`). Each tab has its own empty text.
 - **Super Fans only** (the user's request) lists just them, together with the search. It sits at the end of the tab row and shows on TikTok's tab alone; with one platform it's in the header, after the search.
+- Neither the search nor **Super Fans only** shows while the tab has no fans.
 - Fans can't be removed from the page.

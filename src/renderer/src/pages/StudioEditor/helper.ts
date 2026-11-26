@@ -813,11 +813,11 @@ export function pickElement(
   locked: ReadonlySet<string>,
   point: Point,
 ): string | null {
-  for (const layer of [...view.layers].reverse()) {
+  for (const layer of view.layers.toReversed()) {
     if (locked.has(layer.id)) continue;
-    const element = [...layer.elements]
-      .reverse()
-      .find((e) => !locked.has(e.id) && holdsTurned(e, point));
+    const element = layer.elements.findLast(
+      (e) => !locked.has(e.id) && holdsTurned(e, point),
+    );
     if (element) return element.id;
   }
   return null;
@@ -913,7 +913,7 @@ export function zoomStep(scale: number, by: 1 | -1): number | null {
   const next =
     by > 0
       ? ZOOMS.find((zoom) => zoom > scale * 1.001)
-      : [...ZOOMS].reverse().find((zoom) => zoom < scale / 1.001);
+      : ZOOMS.findLast((zoom) => zoom < scale / 1.001);
   return next ?? null;
 }
 

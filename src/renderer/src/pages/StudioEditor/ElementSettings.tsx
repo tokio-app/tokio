@@ -528,6 +528,17 @@ export function ElementSettings({
           onChange={(e) => onChange({ ...element, label: e.target.value })}
         />
       </Field>
+      {/* Right under the name: it decides what the text's variables are */}
+      <ReactionFields
+        value={element}
+        whens={whens}
+        triggers={triggers}
+        untilEnd={untilEnd}
+        gifts={gifts}
+        emotes={emotes}
+        counters={counters}
+        onChange={onChange}
+      />
       {own}
       {"crop" in element && (
         <PictureFields
@@ -557,17 +568,6 @@ export function ElementSettings({
           onChange({ ...element, ...alignTo(element, canvas, to) })
         }
         onOpacity={(opacity) => onChange({ ...element, opacity })}
-      />
-
-      <ReactionFields
-        value={element}
-        whens={whens}
-        triggers={triggers}
-        untilEnd={untilEnd}
-        gifts={gifts}
-        emotes={emotes}
-        counters={counters}
-        onChange={onChange}
       />
     </div>
   );

@@ -136,7 +136,7 @@ describe("Tools", () => {
       data: [studioOverlay("Main scene"), studioOverlay("Just chatting")],
     });
     expect(row("Overlay Studio")).toHaveAccessibleDescription(
-      "Make your own overlays from text, images and other overlays, and have them react to your LIVE. 2 overlays",
+      "Build your own overlays that react to your LIVE. 2 overlays",
     );
 
     await send(APP_EVENTS_RESPONSE.STUDIO, failure());
@@ -177,7 +177,7 @@ describe("Tools", () => {
     });
     await wait(5000);
     expect(clock().getByText("00:00:09")).toBeVisible();
-    expect(clock().getByText("Paused")).toBeVisible();
+    expect(clock().getByText("Paused, still adding time")).toBeVisible();
   });
 
   it("warms the timer's row only while it runs", async () => {

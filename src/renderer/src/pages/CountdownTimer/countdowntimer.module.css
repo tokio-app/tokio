@@ -199,6 +199,12 @@
   width: 88px;
 }
 
+/* The rest of its sentence's row, so the words before it don't wrap */
+.keyword {
+  flex: 1;
+  min-width: 0;
+}
+
 .name {
   width: 240px;
 }

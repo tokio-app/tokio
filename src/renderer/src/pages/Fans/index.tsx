@@ -71,18 +71,20 @@ export function Fans() {
   const onTab =
     tab === "all"
       ? // Nothing ranked across platforms: the most recently seen first
-        fans && [...fans].sort((a, b) => b.seenAt - a.seenAt)
+        fans?.toSorted((a, b) => b.seenAt - a.seenAt)
       : fans?.filter((fan) => platformOf(fan) === tab);
+  // No search or Super Fans switch while the tab has no one to filter
+  const filters = !!onTab?.length;
   const shown = onTab?.filter(
     (fan) => (!tiktok || !superfansOnly || fan.superfan) && named(fan),
   );
 
   const empty = () => {
-    if (query) return t("fans.noMatch", { query });
+    if (filters && query) return t("fans.noMatch", { query });
     if (tab === "all") return t("fans.emptyAll");
     if (tab === "youtube") return t("fans.emptyMembers");
     if (tab !== "tiktok") return t("fans.emptySubscribers");
-    return superfansOnly ? t("fans.noSuperfans") : t("fans.empty");
+    return filters && superfansOnly ? t("fans.noSuperfans") : t("fans.empty");
   };
 
   // A TikTok fan's level, with its badge on their own tab
@@ -211,14 +213,16 @@ export function Fans() {
           title={t("fans.title")}
           description={t("fans.description")}
           actions={
-            <>
-              <SearchToggle
-                placeholder={t("fans.search")}
-                value={search}
-                onChange={setSearch}
-              />
-              {!several && tiktok && only}
-            </>
+            filters && (
+              <>
+                <SearchToggle
+                  placeholder={t("fans.search")}
+                  value={search}
+                  onChange={setSearch}
+                />
+                {!several && tiktok && only}
+              </>
+            )
           }
         >
           {several && (
@@ -239,7 +243,7 @@ export function Fans() {
                 value={tab}
                 onChange={setPicked}
               />
-              {tiktok && only}
+              {filters && tiktok && only}
             </div>
           )}
           {content}

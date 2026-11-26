@@ -31,6 +31,9 @@ const LIST_ICONS: Record<StudioListSource, IconType> = {
 
 // The px a shape's miniature takes on its longer side
 const SHAPE_PX = 18;
+// A speech bubble's shorter side at least: flatter, its border and tail
+// drew a flat bar
+const BUBBLE_PX = 10;
 
 /**
  * What a layer's row shows of it, on the canvas's own color: its picture,
@@ -84,8 +87,9 @@ export function LayerThumb({
     case "shape": {
       const { shape } = element;
       const scale = SHAPE_PX / Math.max(element.width, element.height);
-      const width = Math.max(2, element.width * scale);
-      const height = Math.max(2, element.height * scale);
+      const least = shape === "bubble" ? BUBBLE_PX : 2;
+      const width = Math.max(least, element.width * scale);
+      const height = Math.max(least, element.height * scale);
       const border = Math.max(1, element.border_width * scale);
       const gradient =
         element.fill && element.gradient

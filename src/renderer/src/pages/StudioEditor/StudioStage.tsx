@@ -32,13 +32,13 @@ import {
 } from "react";
 import { createPortal, flushSync } from "react-dom";
 import {
-  LuMaximize,
   LuRuler,
   LuVolume2,
   LuVolumeX,
   LuZoomIn,
   LuZoomOut,
 } from "react-icons/lu";
+import { MdOutlineFitScreen } from "react-icons/md";
 import {
   Axis,
   Box,
@@ -788,7 +788,7 @@ export function StudioStage({
   // The selected item a press there would move, the front-most: a group by
   // its frame, else the element picked, when selected. Not a locked one.
   const selectedAt = (point: Point, picked: string | null) =>
-    [...view.layers].reverse().find((layer) => {
+    view.layers.findLast((layer) => {
       const f = selected.includes(layer.id) && frames.get(layer.id);
       return f && !locked.has(layer.id) && holdsTurned(f, point);
     })?.id ?? (picked !== null && selected.includes(picked) ? picked : null);
@@ -1423,8 +1423,12 @@ export function StudioStage({
           ref={stageEl}
           className={cx(styles.stage, space && styles.spaced)}
           tabIndex={0}
-          aria-label={t(
-            draft ? "studio.editor.cropping" : "studio.editor.canvas",
+          // It takes the arrows, Space and Delete, so screen readers pass
+          // them through
+          role="application"
+          aria-label={t("studio.editor.canvas")}
+          aria-description={t(
+            draft ? "studio.editor.cropping" : "studio.editor.canvasHelp",
           )}
           aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Escape Delete Backspace Space Control+C Control+X Control+V"
           style={{
@@ -1637,7 +1641,7 @@ export function StudioStage({
             aria-keyshortcuts="Control+0"
             onClick={() => zoomTo(null)}
           >
-            <LuMaximize size={16} />
+            <MdOutlineFitScreen size={16} />
           </Btn>
         </div>
       </div>

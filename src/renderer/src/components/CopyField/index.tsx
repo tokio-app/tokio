@@ -33,11 +33,19 @@ function useCopied(value: string) {
   return { copied: copies > 0, copy };
 }
 
-const CopyIcon = ({ copied, size }: { copied: boolean; size: number }) =>
+const CopyIcon = ({
+  copied,
+  size,
+  icon,
+}: {
+  copied: boolean;
+  size: number;
+  icon?: ReactNode;
+}) =>
   copied ? (
     <FiCheck size={size} className={styles.copied} />
   ) : (
-    <FaRegCopy size={size} />
+    (icon ?? <FaRegCopy size={size} />)
   );
 
 // A field showing a value, like a URL or an address, which copies it when
@@ -62,17 +70,20 @@ export function CopyButton({
   value,
   title,
   disabled,
+  icon,
 }: {
   value: string;
   // Says what it copies
   title: string;
   disabled?: boolean;
+  // Instead of the copy icon, as a link for a URL next to a Duplicate
+  icon?: ReactNode;
 }) {
   const { copied, copy } = useCopied(value);
 
   return (
     <Btn variant="icon" title={title} disabled={disabled} onClick={copy}>
-      <CopyIcon copied={copied} size={18} />
+      <CopyIcon copied={copied} size={18} icon={icon} />
     </Btn>
   );
 }

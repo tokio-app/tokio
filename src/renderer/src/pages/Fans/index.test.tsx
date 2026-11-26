@@ -314,6 +314,11 @@ describe("Fans", () => {
       await fans([]);
 
       expect(screen.getByText(/^No fans yet\. Viewers/)).toBeInTheDocument();
+      // Nothing to search or filter
+      expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
+      expect(
+        screen.queryByRole("checkbox", { name: "Super Fans only" }),
+      ).toBeNull();
       await user.click(pick("Twitch"));
       expect(screen.getByText(/^No subscribers yet\./)).toBeInTheDocument();
       await user.click(pick("Kick"));
