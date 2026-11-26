@@ -825,18 +825,19 @@ describe("Games", () => {
   });
 
   it("shows why a test failed", async () => {
+    // main.games.notConnected, as main words it
+    const notConnected =
+      "Turn on Listen for Minecraft on Games, then paste the command it shows in Minecraft's chat.";
     const { user } = await load([action("a1")]);
 
     await user.click(screen.getByRole("button", { name: "Test" }));
     await send(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, {
-      ...failure("Turn on Minecraft and connect the game first."),
+      ...failure(notConnected),
       id: "a1",
       results: [],
     });
 
-    expect(
-      screen.getByText("Turn on Minecraft and connect the game first."),
-    ).toBeInTheDocument();
+    expect(screen.getByText(notConnected)).toBeInTheDocument();
   });
 
   it("can't test an action without steps", async () => {
