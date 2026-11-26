@@ -248,12 +248,13 @@ describe("Overlays", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("closes the settings on Cancel without saving", async () => {
+  it("closes the settings on Cancel without saving, once the changes are discarded", async () => {
     const { user } = await customize();
     await loadConfig();
     await user.type(dialog().getByPlaceholderText("Type a title"), "!");
 
     await user.click(dialog().getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Discard" }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(sent(APP_EVENTS.SAVE_OVERLAY_CONFIG)).toEqual([]);

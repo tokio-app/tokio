@@ -42,6 +42,8 @@ export function OverlayModal({
   const [prevConfig, setPrevConfig] = useState(config);
   const preview = useRef<HTMLIFrameElement>(null);
   const [previewReady, setPreviewReady] = useState(false);
+  // Asking whether to throw the unsaved changes away
+  const [discarding, setDiscarding] = useState(false);
 
   // Load the config once it arrives.
   if (config !== prevConfig) {
@@ -74,6 +76,11 @@ export function OverlayModal({
     isEqual(field.attributes.value, field.attributes.default),
   );
 
+  // Escape, × and Cancel ask first while there are changes to lose. Ones
+  // being saved aren't.
+  const close = () =>
+    dirty && !saving ? setDiscarding(true) : onRequestClose();
+
   // Hidden fields keep their values, which are saved as they are.
   const shown = settings == null ? new Set() : shownFields(settings);
 
@@ -94,96 +101,119 @@ export function OverlayModal({
   };
 
   return (
-    <Modal
-      title={overlay.name}
-      maxWidth="1040px"
-      closeButton
-      onClose={onRequestClose}
-      footer={
-        <div className={styles.footer}>
-          <Btn
-            disabled={settings == null || atDefaults}
-            onClick={() =>
-              setSettings((prev) =>
-                prev == null ? prev : resetOverlayConfig(prev),
-              )
-            }
-          >
-            {t("components.overlayModal.resetAll")}
-          </Btn>
-          <div className={styles.footer_actions}>
-            <Btn onClick={onRequestClose}>{t("common.cancel")}</Btn>
+    <>
+      <Modal
+        title={overlay.name}
+        maxWidth="1040px"
+        closeButton
+        onClose={close}
+        footer={
+          <div className={styles.footer}>
             <Btn
-              variant="accent"
-              disabled={!dirty}
-              loading={saving}
-              onClick={() => {
-                if (settings != null) onSave(settings);
-              }}
+              disabled={settings == null || atDefaults}
+              onClick={() =>
+                setSettings((prev) =>
+                  prev == null ? prev : resetOverlayConfig(prev),
+                )
+              }
             >
-              {t("common.save")}
+              {t("components.overlayModal.resetAll")}
             </Btn>
+            <div className={styles.footer_actions}>
+              <Btn onClick={close}>{t("common.cancel")}</Btn>
+              <Btn
+                variant="accent"
+                disabled={!dirty}
+                loading={saving}
+                onClick={() => {
+                  if (settings != null) onSave(settings);
+                }}
+              >
+                {t("common.save")}
+              </Btn>
+            </div>
           </div>
-        </div>
-      }
-    >
-      <div
-        className={cx(
-          styles.editor,
-          // Room for a table's columns
-          fields.some((f) => f.type === "table") && styles.editor_wide,
-        )}
+        }
       >
-        <div className={styles.preview}>
-          <OverlayPreview
-            ref={preview}
-            overlay={overlay}
-            onLoad={() => setPreviewReady(true)}
-          />
-          <div className={styles.preview_actions}>
-            <Btn onClick={onTest}>
-              <PiShootingStarThin size={18} />
-              {t("common.test")}
-            </Btn>
-            <p className={styles.note}>{t("components.overlayModal.note")}</p>
+        <div
+          className={cx(
+            styles.editor,
+            // Room for a table's columns
+            fields.some((f) => f.type === "table") && styles.editor_wide,
+          )}
+        >
+          <div className={styles.preview}>
+            <OverlayPreview
+              ref={preview}
+              overlay={overlay}
+              onLoad={() => setPreviewReady(true)}
+            />
+            <div className={styles.preview_actions}>
+              <Btn onClick={onTest}>
+                <PiShootingStarThin size={18} />
+                {t("common.test")}
+              </Btn>
+              <p className={styles.note}>{t("components.overlayModal.note")}</p>
+            </div>
           </div>
+
+          {settings == null ? (
+            <div className={styles.loading}>
+              <Spinner size={32} />
+            </div>
+          ) : (
+            <div className={styles.settings}>
+              {settings.sections.map((section) => {
+                const sectionFields = fields.filter(
+                  (field) =>
+                    field.section === section.id && shown.has(field.id),
+                );
+                if (sectionFields.length === 0) return null;
+
+                return (
+                  <fieldset key={section.id} className={styles.group}>
+                    <legend className={styles.group_name}>
+                      {section.name}
+                    </legend>
+                    {sectionFields.map((field) => (
+                      <SettingField
+                        key={field.id}
+                        field={field}
+                        gifts={gifts}
+                        onChange={(value) => handleValueChange(field.id, value)}
+                        onReset={() =>
+                          handleValueChange(
+                            field.id,
+                            structuredClone(field.attributes.default),
+                          )
+                        }
+                      />
+                    ))}
+                  </fieldset>
+                );
+              })}
+            </div>
+          )}
         </div>
+      </Modal>
 
-        {settings == null ? (
-          <div className={styles.loading}>
-            <Spinner size={32} />
-          </div>
-        ) : (
-          <div className={styles.settings}>
-            {settings.sections.map((section) => {
-              const sectionFields = fields.filter(
-                (field) => field.section === section.id && shown.has(field.id),
-              );
-              if (sectionFields.length === 0) return null;
-
-              return (
-                <fieldset key={section.id} className={styles.group}>
-                  <legend className={styles.group_name}>{section.name}</legend>
-                  {sectionFields.map((field) => (
-                    <SettingField
-                      key={field.id}
-                      field={field}
-                      gifts={gifts}
-                      onChange={(value) => handleValueChange(field.id, value)}
-                      onReset={() =>
-                        handleValueChange(
-                          field.id,
-                          structuredClone(field.attributes.default),
-                        )
-                      }
-                    />
-                  ))}
-                </fieldset>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </Modal>
+      {discarding && (
+        <Modal
+          title={t("components.overlayModal.discardTitle")}
+          description={t("components.overlayModal.discardDescription")}
+          onClose={() => setDiscarding(false)}
+          footer={
+            <>
+              <Btn onClick={() => setDiscarding(false)}>
+                {t("components.overlayModal.keepEditing")}
+              </Btn>
+              <Btn variant="accent" onClick={onRequestClose}>
+                {t("components.overlayModal.discard")}
+              </Btn>
+            </>
+          }
+        />
+      )}
+    </>
   );
 }
