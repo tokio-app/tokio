@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PLATFORMS, type Platform } from "../types/connector";
+import { PLATFORMS } from "../types/connector";
 import {
   ALERTS_PATH,
   GAMES_PATH,
@@ -8,6 +8,7 @@ import {
   STUDIO_PATH,
   TIMER_PATH,
 } from "../util/constants/server";
+import { knownPlatforms } from "./profile";
 
 // Paths Tokio serves itself: the phone remote and its API at /remote/, and
 // the MCP server at /mcp
@@ -48,12 +49,7 @@ export const CatalogOverlaySchema = z.object({
   // published before it. A platform this Tokio doesn't know is left out, so
   // the entry still parses.
   platforms: z
-    .array(z.string())
-    .transform((list) =>
-      list.filter((p): p is Platform =>
-        (PLATFORMS as readonly string[]).includes(p),
-      ),
-    )
+    .preprocess(knownPlatforms(), z.array(z.enum(PLATFORMS)))
     .optional(),
 });
 

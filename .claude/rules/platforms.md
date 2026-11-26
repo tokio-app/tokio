@@ -52,7 +52,7 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 
 - `UserData.platform` is missing for TikTok (`platformOf`), everything sent or saved before other platforms. `ActivityUser`, `TopGifter` and history's gifters carry it the same way.
 - A trigger's `platform` is missing for any platform, and one a newer Tokio saved that this one doesn't know reads as any (`.catch`). `matchesTrigger` skips a row whose platform isn't the event's, and Music change matches only a row for any.
-- The profile's top-level `platforms` (default `["tiktok"]`) and `channels` (the name typed for each platform that takes one): unknown platforms are dropped when read, so an older Tokio still loads a newer profile. `connector.username` stays TikTok's.
+- The profile's top-level `platforms` (default `["tiktok"]`) and `channels` (the name typed for each platform that takes one): unknown platforms are dropped when read, so an older Tokio still loads a newer profile. So are the keys of the permissions' `platforms` records outside their enum (`knownPlatforms`, `src/common/schemas/profile.ts`, which the catalog's `platforms` and LIVE history's parts use too). `connector.username` stays TikTok's.
 - `PLATFORM_TRIGGERS` (`src/common/util/platforms.ts`) is one row per platform, so a new platform touches only its own. Every trigger must be on a platform or be Music change (its test). The pickers, the feed kinds, the stat tiles and the timer rows all derive from it through `triggersFor`; don't list triggers by hand.
 - `TIMER_TRIGGERS` (`src/common/util/timer.ts`) names the event each timer trigger counts, so a profile's platforms say which timer rows and carousel items apply.
 - The feed, LIVE history and the overlays' payloads only add fields.

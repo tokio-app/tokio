@@ -408,6 +408,43 @@ describe("HistoryService", () => {
     expect(await history.getLive(0)).toMatchObject({ platforms: {} });
   });
 
+  it("leaves out a LIVE's part on a platform it doesn't know", async () => {
+    await mkdir(join(dir, "a"), { recursive: true });
+    const part = { amount: 5, gifts: 1, giftSubs: 0 };
+    const live = (startedAt: number, platforms: object) => ({
+      username: "kai",
+      startedAt,
+      endedAt: startedAt + 10,
+      coins: 0,
+      gifts: 1,
+      platforms,
+    });
+    await writeFile(
+      join(dir, "a", "index.json"),
+      JSON.stringify({
+        lives: [
+          live(0, { kick: part, rumble: part }),
+          live(20, { rumble: part }),
+        ],
+        gifters: [],
+        newest: 20,
+      }),
+    );
+    await writeFile(
+      join(dir, "a", "0.json"),
+      JSON.stringify({ ...live(0, { rumble: part }), gifters: [] }),
+    );
+
+    const history = await loaded();
+
+    // Newest first
+    expect(history.getHistory().lives).toEqual([
+      live(20, {}),
+      live(0, { kick: part }),
+    ]);
+    expect(await history.getLive(0)).toMatchObject({ platforms: {} });
+  });
+
   it("reads a platform it doesn't know as TikTok's", async () => {
     await mkdir(join(dir, "a"), { recursive: true });
     const gifter = {
