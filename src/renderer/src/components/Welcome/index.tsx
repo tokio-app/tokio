@@ -14,12 +14,8 @@ import { flushSync } from "react-dom";
 import { Btn, Input, Tabs } from "../Elements";
 import { Modal } from "../Modal";
 import { Field } from "../Page";
-import type { TourDone } from "../Tour";
 import { TwitchSignIn } from "../TwitchSignIn";
 import styles from "./welcome.module.css";
-
-// What the tour that follows needs to know
-export type WelcomeResult = { platforms: Platform[]; done: TourDone };
 
 // What main needs from the first GET_SETTINGS reply
 type Loaded = { profile: EntityMetadata; provider: string };
@@ -48,11 +44,7 @@ const FIELDS = {
  * too, or Twitch's sign-in) and the profile's name. Save sends only what was
  * changed; Skip, Escape and the close button send nothing.
  */
-export function Welcome({
-  onClose,
-}: {
-  onClose: (result: WelcomeResult) => void;
-}) {
+export function Welcome({ onClose }: { onClose: () => void }) {
   const t = useT();
   const [platform, setPlatform] = useState<Platform>("tiktok");
   // The channel typed for each platform, kept while another is picked
@@ -87,8 +79,6 @@ export function Welcome({
     if (res.login) saveRef.current?.focus();
   });
 
-  const skip = () => onClose({ platforms: ["tiktok"], done: {} });
-
   const trimmed = name.trim();
   const ready = !!loaded && trimmed.length >= MIN_NAME;
 
@@ -119,24 +109,84 @@ export function Welcome({
         name: trimmed,
       });
     }
-    onClose({
-      platforms: [platform],
-      done: { key: !!typedKey, twitch: platform === "twitch" && !!login },
-    });
+    onClose();
   };
 
-  const field = platform === "twitch" ? null : FIELDS[platform];
+  // A platform's own fields: its channel, or Twitch's account, and TikTok's
+  // Euler key
+  const fieldsOf = (p: Platform) => {
+    if (p === "twitch") {
+      return (
+        <Field label={t("components.welcome.twitch")}>
+          {login ? (
+            <span className={styles.account}>
+              {t("settings.twitch.signedIn", { login })}
+            </span>
+          ) : (
+            <TwitchSignIn />
+          )}
+        </Field>
+      );
+    }
+    const field = FIELDS[p];
+    return (
+      <>
+        <Field label={t(field.label)}>
+          <Input
+            aria-label={t(field.label)}
+            placeholder={t(field.placeholder)}
+            value={channels[p] ?? ""}
+            onChange={(e) => {
+              const text = e.target.value;
+              setChannels((now) => ({ ...now, [p]: text }));
+            }}
+          />
+        </Field>
+        {p === "tiktok" && (
+          <Field
+            label={t("components.welcome.key")}
+            hint={t("components.welcome.optional")}
+          >
+            <Input
+              type="password"
+              aria-label={t("components.welcome.key")}
+              placeholder={t("settings.providers.keyPlaceholder")}
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+            />
+            <p className={styles.note}>
+              {rich(t("components.welcome.keyNote"), {
+                link: (text) => (
+                  <a
+                    className={styles.link}
+                    href={EULER_SIGNUP_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {text}
+                  </a>
+                ),
+              })}
+            </p>
+          </Field>
+        )}
+      </>
+    );
+  };
 
   return (
     <Modal
       title={t("components.welcome.title")}
       description={t("components.welcome.description")}
-      onClose={skip}
+      onClose={onClose}
       closeButton
-      maxWidth="460px"
+      maxWidth="500px"
+      // Its height changes with the platform: from the top, only its foot
+      // moves, never the tabs under the pointer
+      top
       footer={
         <>
-          <Btn onClick={skip}>{t("components.welcome.skip")}</Btn>
+          <Btn onClick={onClose}>{t("components.welcome.skip")}</Btn>
           <Btn ref={saveRef} variant="accent" disabled={!ready} onClick={save}>
             {t("common.save")}
           </Btn>
@@ -146,6 +196,7 @@ export function Welcome({
       <Field label={t("components.welcome.platform")}>
         <Tabs
           variant="pill"
+          className={styles.platforms}
           label={t("components.welcome.platform")}
           value={platform}
           onChange={setPlatform}
@@ -160,58 +211,7 @@ export function Welcome({
         />
       </Field>
 
-      {field ? (
-        <Field label={t(field.label)}>
-          <Input
-            aria-label={t(field.label)}
-            placeholder={t(field.placeholder)}
-            value={channels[platform] ?? ""}
-            onChange={(e) => {
-              const text = e.target.value;
-              setChannels((now) => ({ ...now, [platform]: text }));
-            }}
-          />
-        </Field>
-      ) : (
-        <Field label={t("components.welcome.twitch")}>
-          {login ? (
-            <span className={styles.account}>
-              {t("settings.twitch.signedIn", { login })}
-            </span>
-          ) : (
-            <TwitchSignIn />
-          )}
-        </Field>
-      )}
-
-      {platform === "tiktok" && (
-        <Field
-          label={t("components.welcome.key")}
-          hint={t("components.welcome.optional")}
-        >
-          <Input
-            type="password"
-            aria-label={t("components.welcome.key")}
-            placeholder={t("settings.providers.keyPlaceholder")}
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-          />
-          <p className={styles.note}>
-            {rich(t("components.welcome.keyNote"), {
-              link: (text) => (
-                <a
-                  className={styles.link}
-                  href={EULER_SIGNUP_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {text}
-                </a>
-              ),
-            })}
-          </p>
-        </Field>
-      )}
+      {fieldsOf(platform)}
 
       <Field label={t("components.welcome.profileName")}>
         <Input

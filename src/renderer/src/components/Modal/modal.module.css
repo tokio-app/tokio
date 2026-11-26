@@ -74,6 +74,11 @@
   background-color: transparent;
 }
 
+.backdrop[data-top] {
+  align-items: flex-start;
+  padding-top: 12vh;
+}
+
 .backdrop[data-placed] .card {
   position: fixed;
 }

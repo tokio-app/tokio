@@ -46,7 +46,7 @@ describe("Welcome", () => {
       dialog().getByRole("link", { name: "Get a free key" }),
     ).toHaveAttribute("href", EULER_SIGNUP_URL);
     expect(dialog().getByText("(optional)")).toBeVisible();
-    expect(dialog().getByText(/Settings, under TikTok LIVE\.$/)).toBeVisible();
+    expect(dialog().getByText(/or add it later in Settings\.$/)).toBeVisible();
     // Never the tour's title, which App.test.tsx and e2e look for
     expect(
       screen.queryByRole("dialog", { name: "Welcome to Tokio" }),
@@ -117,10 +117,7 @@ describe("Welcome", () => {
     expect(sent(APP_EVENTS.RENAME_PROFILE)).toEqual([
       { file: "default.json", name: "My stream" },
     ]);
-    expect(onClose).toHaveBeenCalledWith({
-      platforms: ["tiktok"],
-      done: { key: true, twitch: false },
-    });
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it("sends nothing that didn't change", async () => {
@@ -131,10 +128,7 @@ describe("Welcome", () => {
     await user.click(saveButton());
 
     expect(requests()).toEqual([]);
-    expect(onClose).toHaveBeenCalledWith({
-      platforms: ["tiktok"],
-      done: { key: false, twitch: false },
-    });
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it("saves another platform with its channel, and no key typed for TikTok", async () => {
@@ -162,10 +156,7 @@ describe("Welcome", () => {
     expect(sent(APP_EVENTS.SET_CHANNELS)).toEqual([
       { channels: { youtube: "@mychannel" } },
     ]);
-    expect(onClose).toHaveBeenCalledWith({
-      platforms: ["youtube"],
-      done: { key: false, twitch: false },
-    });
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it("signs in to Twitch inside it, then gives Save the focus", async () => {
@@ -191,10 +182,7 @@ describe("Welcome", () => {
     await user.click(saveButton());
     expect(requests()).toEqual([APP_EVENTS.SET_PLATFORMS]);
     expect(sent(APP_EVENTS.SET_PLATFORMS)).toEqual([{ platforms: ["twitch"] }]);
-    expect(onClose).toHaveBeenCalledWith({
-      platforms: ["twitch"],
-      done: { key: false, twitch: true },
-    });
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it("shows the account already signed in to", async () => {
@@ -250,6 +238,6 @@ describe("Welcome", () => {
     await leave(user);
 
     expect(requests()).toEqual([]);
-    expect(onClose).toHaveBeenCalledWith({ platforms: ["tiktok"], done: {} });
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });

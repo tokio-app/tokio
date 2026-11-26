@@ -92,7 +92,7 @@ describe("AppProvider", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("asks a new user's platform first, then tours what they picked", async () => {
+  it("asks a new user's platform first, then opens the tour", async () => {
     const user = userEvent.setup();
     setup();
 
@@ -113,19 +113,12 @@ describe("AppProvider", () => {
     await user.click(within(welcome).getByRole("button", { name: "Save" }));
 
     expect(welcome).not.toBeInTheDocument();
-    const tour = within(
-      screen.getByRole("dialog", { name: "Welcome to Tokio" }),
-    );
-    while (!screen.queryByRole("dialog", { name: "Settings" })) {
-      await user.click(tour.getByRole("button", { name: "Next" }));
-    }
-    // Twitch's, signed in already
     expect(
-      screen.getByText(/^Change Tokio's language, turn on the overlay server/),
+      screen.getByRole("dialog", { name: "Welcome to Tokio" }),
     ).toBeVisible();
   });
 
-  it("tours TikTok after the first-start dialog is skipped", async () => {
+  it("opens the tour after the first-start dialog is skipped", async () => {
     const user = userEvent.setup();
     setup();
     await send(APP_EVENTS_RESPONSE.LOAD_APP, {
@@ -136,13 +129,10 @@ describe("AppProvider", () => {
 
     await user.click(screen.getByRole("button", { name: "Skip" }));
 
-    const tour = within(
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(
       screen.getByRole("dialog", { name: "Welcome to Tokio" }),
-    );
-    while (!screen.queryByRole("dialog", { name: "Settings" })) {
-      await user.click(tour.getByRole("button", { name: "Next" }));
-    }
-    expect(screen.getByRole("link", { name: "Get a free key" })).toBeVisible();
+    ).toBeVisible();
   });
 
   it("opens no tour for a store that was already there", async () => {

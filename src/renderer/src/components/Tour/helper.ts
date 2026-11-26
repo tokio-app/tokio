@@ -1,5 +1,4 @@
 import type { MessageKey } from "@/common/i18n";
-import { Platform, PLATFORMS } from "@/common/types";
 
 type TourStep = {
   // The piece of the window the step is about: its data-tour attribute
@@ -38,57 +37,6 @@ export const TOUR_STEPS: readonly TourStep[] = [
     text: "components.tour.connect",
   },
 ];
-
-// What each platform's tab needs, in the Connect step
-const CONNECT: Record<Platform, MessageKey> = {
-  tiktok: "components.tour.connectTiktok",
-  twitch: "components.tour.connectTwitch",
-  youtube: "components.tour.connectYoutube",
-  kick: "components.tour.connectKick",
-};
-
-// What the first-start dialog already did: the Euler key, Twitch's sign-in
-export type TourDone = { key?: boolean; twitch?: boolean };
-
-/**
- * The sentences a step says for the profile's platforms: TikTok LIVE Studio,
- * the Euler key and Twitch's sign-in only where they apply and aren't `done`,
- * and in Connect what each of the profile's tabs needs, in Home's order.
- */
-export function tourTexts(
-  step: TourStep,
-  platforms: readonly Platform[],
-  done: TourDone = {},
-): MessageKey[] {
-  const tiktok = platforms.includes("tiktok");
-  const key = tiktok && !done.key;
-  const signIn = platforms.includes("twitch") && !done.twitch;
-  switch (step.text) {
-    case "components.tour.overlays":
-      return [tiktok ? step.text : "components.tour.overlaysObs"];
-    case "components.tour.settings":
-      if (key) {
-        return signIn
-          ? [step.text, "components.tour.settingsTwitchToo"]
-          : [step.text];
-      }
-      return [
-        signIn
-          ? "components.tour.settingsTwitch"
-          : "components.tour.settingsOther",
-      ];
-    case "components.tour.connect":
-      return [
-        step.text,
-        ...PLATFORMS.filter(
-          (p) => platforms.includes(p) && (p !== "twitch" || signIn),
-        ).map((p) => CONNECT[p]),
-        "components.tour.connectEnd",
-      ];
-    default:
-      return [step.text];
-  }
-}
 
 // Around the piece, and between the cut-out and the card
 const PAD = 10;

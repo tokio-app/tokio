@@ -1,6 +1,6 @@
 import Logo from "@/assets/logo.png";
-import { APP_EVENTS, APP_EVENTS_RESPONSE, Platform } from "@/common/types";
-import { Tour, type TourDone } from "@/components/Tour";
+import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import { Tour } from "@/components/Tour";
 import { Welcome } from "@/components/Welcome";
 import { WhatsNew } from "@/components/WhatsNew";
 import { queueAlert } from "@/helper/alerts";
@@ -39,12 +39,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [started, setStarted] = useState<boolean | null>(null);
   // The version the update replaced, while What's new is open
   const [updatedFrom, setUpdatedFrom] = useState<string>();
-  // The tour while it's open, with what the first-start dialog told it
-  const [tour, setTour] = useState<{
-    platforms?: Platform[];
-    done?: TourDone;
-  } | null>(null);
-  const startTour = useCallback(() => setTour({}), []);
+  const [touring, setTouring] = useState(false);
+  const startTour = useCallback(() => setTouring(true), []);
   // The first-start dialog, which opens the tour as it closes
   const [welcome, setWelcome] = useState(false);
   const t = useT();
@@ -58,7 +54,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Only the first load's reply has them, so a later one leaves them open
     if (res?.updatedFrom !== undefined) setUpdatedFrom(res.updatedFrom);
     if (res?.welcome) setWelcome(true);
-    else if (res?.newStore) setTour({});
+    else if (res?.newStore) setTouring(true);
   });
 
   useEffect(() => {
@@ -142,13 +138,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )}
       {welcome && (
         <Welcome
-          onClose={(result) => {
+          onClose={() => {
             setWelcome(false);
-            setTour(result);
+            setTouring(true);
           }}
         />
       )}
-      {tour && <Tour {...tour} onClose={() => setTour(null)} />}
+      {touring && <Tour onClose={() => setTouring(false)} />}
     </TourContext.Provider>
   );
 }

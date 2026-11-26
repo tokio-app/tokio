@@ -54,6 +54,9 @@ type Props = {
   // Puts the card there instead of the window's center, over a backdrop that
   // doesn't dim: the caller dims around what the card is about (the tour)
   at?: Pick<CSSProperties, "top" | "left" | "translate">;
+  // Near the window's top instead of its center, for a card whose height
+  // changes as it's used: only its foot moves
+  top?: boolean;
   children?: ReactNode;
 };
 
@@ -68,6 +71,7 @@ export function Modal({
   closeButton,
   maxWidth = "400px",
   at,
+  top,
   children,
 }: Props) {
   const t = useT();
@@ -98,7 +102,11 @@ export function Modal({
     ));
 
   return (
-    <div className={styles.backdrop} data-placed={at ? "" : undefined}>
+    <div
+      className={styles.backdrop}
+      data-placed={at ? "" : undefined}
+      data-top={top ? "" : undefined}
+    >
       <div
         ref={dialogRef}
         role="dialog"
