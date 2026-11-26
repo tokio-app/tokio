@@ -110,7 +110,7 @@ paths:
 - Videos are cut the same way: `AlertMediaSchema` spreads `CUT`; images ignore it. `setMedia` keeps the cut for the same file and drops it for another. `showMedia` refuses non-finite ones and clamps them.
 - The overlay page loads the video at `#t=<start>` and, from its first `playing`, hides it at `min(end, start + duration)` of `currentTime`, waiting again while the clock lags: a fragment's end is checked only every 250 ms. Its `duration` timer hides only media that isn't playing, since a video starts after its turn begins, which ended cuts early.
 - The waveform (`SoundCut`) gets the bytes with `GET_SOUND_DATA { file }`; `SOUND_DATA` echoes the file, failures included, with `notify: false`, as the tab shows the failure. It decodes them under the file's name, `ALERT_AUDIO`'s key, so the editor and the alert share one decode. A decode that ends after the tab's sound changed is dropped, its failure too.
-- `CutTrack` (`SoundCut.tsx`) and `ResetCut` are shared with the Media tab and Overlay Studio's video fields.
+- `CutTrack` (`SoundCut.tsx`) and `ResetCut` are shared with the **Image or video** tab and Overlay Studio's video fields.
 
 ## Text-to-speech
 
@@ -138,7 +138,7 @@ paths:
 - Migration: `withSavedMedia` gives media saved without a volume the alert's, and cuts a video saved before cuts at its old `duration` unless its old `match_video` was on.
 - Media rides on the alert's audio: a missing sound, or a message that banned words block or that fails, skips it too. A file missing on disk (a profile from another computer) shows nothing, with no notice.
 - Stopping a test leaves its media on the overlay until it ends.
-- The Media tab sets a video's duration to `cutPart` of the length its preview read, so a file browsed while the tab isn't shown keeps the old duration until it is. A video of unknown length (some recordings don't say it) can't be cut and keeps a typed Duration.
+- The **Image or video** tab sets a video's duration to `cutPart` of the length its preview read, so a file browsed while the tab isn't shown keeps the old duration until it is. A video of unknown length (some recordings don't say it) can't be cut and keeps a typed Duration.
 
 ## LibraryPicker
 

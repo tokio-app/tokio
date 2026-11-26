@@ -54,6 +54,7 @@ paths:
   - A platform without an entry allows everyone (`defaultPlatformPermissions`, the user's call).
   - The lists are one set for every platform (the user's call), so a handle matches on any of them.
   - `PermissionsSection` (TTS and Music) has a tab per profile platform, each offering only what its chat says, with the lists below the tabs. With one platform it has no tab row.
+  - Its rule lines (`components.permissions.rule`, `ruleLevel`, `allowListRule`) say in words how `hasPermission` combines them: any one role or the fan level passes, none checked passes everyone, and a named allow list decides alone. Change them with it. Allow everyone disables the roles, since it overrides them.
 - **Special users** (`tts.user_voices`): a message from a listed handle (`sameHandle`, first match wins) is read in that user's voice. Only the voice changes: the trigger, permissions, protection and the page's speed, pitch and volume still apply.
 - Main sends each message with `TTS_AUDIO` to the window's `tts_data` queue, with speed and pitch per message, so a change spares the queued ones.
 - The window answers `TTS_PLAYED { id }` when a message ends or is dropped. Main makes the next message only while fewer than min(2, queue length) are held, so nothing is made just to be dropped. A hold ends after `HOLD_TIMEOUT_MS`, and a repeat `LOAD_APP` (a reloaded window) calls `releaseHeld()`.
