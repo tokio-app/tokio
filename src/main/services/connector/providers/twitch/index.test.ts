@@ -47,6 +47,8 @@ const twitch = {
   // The keepalive each new socket's welcome says, in seconds
   keepalive: [] as number[],
   live: null as number | null,
+  // false: a new socket is taken but never welcomed
+  welcome: true,
   // Answers a request instead, until it gives undefined
   override: undefined as
     ((url: string) => Response | Promise<Response> | undefined) | undefined,
@@ -108,6 +110,7 @@ describe("TwitchConnector", () => {
       subStatus: {},
       keepalive: [],
       live: null,
+      welcome: true,
       override: undefined,
       calls: [],
     });
@@ -118,6 +121,7 @@ describe("TwitchConnector", () => {
     server.on("connection", (ws, req) => {
       const url = req.url ?? "";
       twitch.sockets.push({ socket: ws, url });
+      if (!twitch.welcome) return;
       // A reconnect's socket keeps the session
       const id = url.includes("reconnect")
         ? "session-1"
@@ -285,6 +289,25 @@ describe("TwitchConnector", () => {
       const res = await connector.connect("");
 
       expect(res.error?.kind).toBe("rateLimited");
+      expect(connector.isConnected()).toBe(false);
+    });
+
+    it("fails a try on a socket Twitch never welcomes", async () => {
+      twitch.welcome = false;
+      connector = new TwitchConnector({
+        CLIENT_ID: "client",
+        EVENTSUB_URL: `ws://127.0.0.1:${port}/ws`,
+        REQUEST_TIMEOUT_MS: 50,
+        CONNECT_RETRY_MS: 10,
+      });
+      connector.setAccount(ACCOUNT);
+      connector.onAccount(saved);
+
+      const res = await connector.connect("");
+
+      expect(res.error?.kind).toBe("network");
+      expect(res.error?.message).toContain("welcome");
+      expect(twitch.sockets).toHaveLength(config.CONNECT_TRIES);
       expect(connector.isConnected()).toBe(false);
     });
 

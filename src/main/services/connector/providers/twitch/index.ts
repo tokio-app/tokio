@@ -216,6 +216,7 @@ export class TwitchConnector
       eventsub: new EventSub(
         this._config.EVENTSUB_URL,
         this._config.KEEPALIVE_GRACE_MS,
+        this._config.REQUEST_TIMEOUT_MS,
         {
           notification: (type, event) => this._notify(conn, type, event),
           revocation: (sub) => {

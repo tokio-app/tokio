@@ -14,7 +14,8 @@ const config = {
 
   // A keepalive can come this late before the socket counts as dropped
   KEEPALIVE_GRACE_MS: 5000,
-  // Each request, so a dead network fails a connect instead of holding it
+  // Each request and the EventSub socket's welcome, so a dead network fails
+  // a connect instead of holding it
   REQUEST_TIMEOUT_MS: 10_000,
   // How often the viewers are asked for while the stream is live
   STREAMS_POLL_MS: 30_000,
