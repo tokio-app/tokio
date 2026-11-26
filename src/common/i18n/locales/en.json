@@ -300,7 +300,7 @@
   "components.tour.settings": "Add your platforms' keys and sign-ins here, and change the language, shortcuts and more.",
   "components.tour.features": "Turn on what you need for your LIVE. It stays as you leave it.",
   "components.tour.connectTitle": "Connect to your LIVE",
-  "components.tour.connect": "Each platform you stream to gets a tab here, and the + adds another. Once you're live, click Connect. You can take this tour again from About.",
+  "components.tour.connect": "Each platform gets a tab here, and + adds one. Once you're live, click Connect. Take this tour again from About.",
   "components.tour.step": "{step} of {total}",
   "components.tour.back": "Back",
   "components.tour.next": "Next",

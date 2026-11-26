@@ -300,7 +300,7 @@
   "components.tour.settings": "Agrega aquí las claves e inicios de sesión de tus plataformas, y cambia el idioma, los atajos y más.",
   "components.tour.features": "Activa lo que necesitas para tu LIVE. Queda como lo dejes.",
   "components.tour.connectTitle": "Conéctate a tu LIVE",
-  "components.tour.connect": "Cada plataforma donde transmites tiene aquí una pestaña, y el + agrega otra. Cuando estés en vivo, haz clic en Conectar. Puedes volver a hacer este recorrido desde Acerca de.",
+  "components.tour.connect": "Cada plataforma tiene aquí su pestaña, y el + agrega otra. Cuando estés en vivo, haz clic en Conectar. Repite este recorrido desde Acerca de.",
   "components.tour.step": "{step} de {total}",
   "components.tour.back": "Atrás",
   "components.tour.next": "Siguiente",

@@ -37,6 +37,23 @@ describe("Tour", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("scrolls the piece it lights into view before placing its card", async () => {
+    const user = userEvent.setup();
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
+    render(
+      <>
+        <a href="#overlays" data-tour="/overlays" />
+        <Tour onClose={vi.fn()} />
+      </>,
+    );
+    expect(scroll).not.toHaveBeenCalled();
+
+    await user.click(card().getByRole("button", { name: "Next" }));
+
+    expect(scroll).toHaveBeenCalledExactlyOnceWith({ block: "nearest" });
+    expect(scroll.mock.contexts[0]).toHaveAttribute("data-tour", "/overlays");
+  });
+
   it("starts on Next, and gives Next the focus when Back leaves", async () => {
     const user = userEvent.setup();
     render(<Tour onClose={vi.fn()} />);
@@ -88,7 +105,7 @@ describe("Tour", () => {
     }
     expect(
       card().getByText(
-        "Each platform you stream to gets a tab here, and the + adds another. Once you're live, click Connect. You can take this tour again from About.",
+        "Each platform gets a tab here, and + adds one. Once you're live, click Connect. Take this tour again from About.",
       ),
     ).toBeVisible();
   });

@@ -25,13 +25,13 @@ export function Tour({ onClose }: Props) {
   const step = TOUR_STEPS[index];
   const last = index === TOUR_STEPS.length - 1;
 
-  // Before it's painted, and again when the window's size changes.
-  // shortcut: doesn't scroll a piece into view, since Home's fit the 1200×800
-  // minimum window; scroll it in if a step ever shows something lower.
+  // Before it's painted, and again when the window's size changes. In view
+  // first: during a LIVE, Home's Active features sit below an 800px window.
   useLayoutEffect(() => {
     const measure = () => {
       const piece =
         step.target && document.querySelector(`[data-tour="${step.target}"]`);
+      if (piece) piece.scrollIntoView({ block: "nearest" });
       setPlace({
         ...placeTour(
           piece ? piece.getBoundingClientRect() : undefined,
