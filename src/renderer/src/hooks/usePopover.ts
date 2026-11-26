@@ -70,10 +70,18 @@ export function usePopover(gap = 4) {
   useEffect(() => {
     if (!open) return undefined;
 
-    // The popover doesn't follow its anchor, so close it instead.
+    // The popover doesn't follow its anchor, so close it once a scroll moves
+    // the anchor. A scroll that leaves it in place keeps it open: a late
+    // event from the scroll that brought the anchor into view, or the
+    // browser's scroll anchoring as content above it loads.
+    const start = anchorRef.current?.getBoundingClientRect();
     const onScroll = (event: Event) => {
       const target = event.target;
       if (target instanceof Node && popoverRef.current?.contains(target)) {
+        return;
+      }
+      const now = anchorRef.current?.getBoundingClientRect();
+      if (start && now && now.top === start.top && now.left === start.left) {
         return;
       }
       setOpen(false);
