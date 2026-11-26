@@ -172,6 +172,27 @@ test("creates a profile and saves it", async () => {
   expect(names).toContain("E2E Stream");
 });
 
+test("renames the open profile, keeping its file", async () => {
+  await page.getByRole("button", { name: "Rename" }).click();
+  const dialog = page.getByRole("dialog", { name: "Rename the profile" });
+  await dialog.getByRole("textbox").fill("Main stream");
+  await dialog.getByRole("button", { name: "Rename" }).click();
+
+  await expect(
+    page.getByText('Profile renamed to "Main stream".'),
+  ).toBeVisible();
+  const store = JSON.parse(
+    await readFile(data("settings", "tokio.json"), "utf8"),
+  );
+  expect(store.settings.activeProfile).toEqual({
+    file: "default.json",
+    name: "Main stream",
+  });
+  expect(
+    JSON.parse(await readFile(data("profiles", "default.json"), "utf8")).name,
+  ).toBe("Main stream");
+});
+
 test("imports an overlay and runs its preview from disk", async () => {
   // The folder picker is native, answer it from main
   await app.evaluate(({ dialog }, folder) => {
