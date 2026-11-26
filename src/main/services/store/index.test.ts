@@ -1274,6 +1274,105 @@ describe("StoreManagerService", () => {
       ]);
     });
 
+    describe("deleteProfile", () => {
+      let fansFolder: string;
+      let historyFolder: string;
+      beforeEach(() => {
+        ({ fansFolder, historyFolder } = paths.folders);
+      });
+      const exists = (path: string) =>
+        readFile(path).then(
+          () => true,
+          (error: NodeJS.ErrnoException) => error.code === "EISDIR",
+        );
+
+      // A second profile with fans, LIVEs and a cleared history's leftover,
+      // and the active profile's own
+      const withData = async () => {
+        const store = await init();
+        await store.createNewProfile("stream.json", "Stream");
+        for (const name of ["stream", "default"]) {
+          await mkdir(fansFolder, { recursive: true });
+          await writeFile(join(fansFolder, `${name}.json`), "{}");
+          await mkdir(join(historyFolder, name), { recursive: true });
+          await writeFile(join(historyFolder, name, "index.json"), "{}");
+        }
+        await mkdir(join(historyFolder, "stream.cleared-123"));
+        // Another profile whose name starts the same
+        await mkdir(join(historyFolder, "stream.cleared-123x"));
+        return store;
+      };
+
+      it("deletes a profile, its fans and its LIVE history", async () => {
+        const store = await withData();
+
+        expect(await store.deleteProfile("stream.json")).toBe("deleted");
+
+        expect(store.getProfiles()).toEqual(defaultStoreData.profiles);
+        expect((await readJSON(storeFile)).profiles).toEqual(
+          defaultStoreData.profiles,
+        );
+        expect(await readdir(paths.folders.profilesFolder)).toEqual([
+          "default.json",
+        ]);
+        expect(await readdir(fansFolder)).toEqual(["default.json"]);
+        expect((await readdir(historyFolder)).sort()).toEqual([
+          "default",
+          "stream.cleared-123x",
+        ]);
+      });
+
+      it("refuses the active profile, the only one and one it doesn't list", async () => {
+        const store = await withData();
+        vi.spyOn(Logger, "error");
+
+        expect(await store.deleteProfile("default.json")).toBeNull();
+        expect(await store.deleteProfile("missing.json")).toBeNull();
+        await store.deleteProfile("stream.json");
+        expect(await store.deleteProfile("default.json")).toBeNull();
+
+        expect(store.getProfiles()).toEqual(defaultStoreData.profiles);
+        expect(await exists(defaultProfileFile)).toBe(true);
+        expect(await exists(join(fansFolder, "default.json"))).toBe(true);
+        expect(await exists(join(historyFolder, "default"))).toBe(true);
+      });
+
+      it("deletes nothing and keeps it listed when the store can't be saved", async () => {
+        const store = await withData();
+        const listed = store.getProfiles();
+        vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
+
+        expect(await store.deleteProfile("stream.json")).toBe("unsaved");
+
+        expect(store.getProfiles()).toEqual(listed);
+        const stream = join(paths.folders.profilesFolder, "stream.json");
+        expect(await exists(stream)).toBe(true);
+        expect(await exists(join(fansFolder, "stream.json"))).toBe(true);
+        expect(await exists(join(historyFolder, "stream"))).toBe(true);
+        await settle(1000);
+        expect((await readJSON(storeFile)).profiles).toEqual(listed);
+      });
+
+      it("keeps the profile's file while its fans can't be deleted, so no new profile gets them", async () => {
+        const store = await withData();
+        vi.spyOn(Logger, "warn");
+        const fans = join(fansFolder, "stream.json");
+        const fs = await import("fs/promises");
+        vi.spyOn(fs, "rm").mockImplementationOnce(() =>
+          Promise.reject(Object.assign(new Error("EBUSY"), { code: "EBUSY" })),
+        );
+
+        expect(await store.deleteProfile("stream.json")).toBe("deleted");
+
+        expect(store.getProfiles()).toEqual(defaultStoreData.profiles);
+        expect(await exists(fans)).toBe(true);
+        expect(
+          await exists(join(paths.folders.profilesFolder, "stream.json")),
+        ).toBe(true);
+        expect(await store.profileFileFor("Stream")).toBe("stream-2.json");
+      });
+    });
+
     it("refuses to switch to a profile that isn't listed", async () => {
       const store = await init();
       await store.createNewProfile("stream.json", "Stream");

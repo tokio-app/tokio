@@ -46,9 +46,9 @@ import { PathManagerService } from "@/services/path";
 import { TranslationService } from "@/services/translation";
 import { TTSService } from "@/services/tts";
 import { safeStorage } from "electron";
-import { access, readdir, readFile, unlink } from "fs/promises";
+import { access, readdir, readFile, rm, unlink } from "fs/promises";
 import { randomUUID } from "node:crypto";
-import { basename, dirname, extname, join, resolve } from "path";
+import { basename, dirname, extname, join, parse, resolve } from "path";
 import { z } from "zod";
 import { Service } from "../shared";
 
@@ -771,6 +771,10 @@ export class StoreManagerService extends Service {
       }
       const updates = profile && change(profile);
       if (!updates) continue;
+      // Deleted while it was read: its file is gone, nothing to clean
+      if (!this._storeData!.profiles.some((p) => p.file === profileFile)) {
+        continue;
+      }
 
       // Through updateProfileData, which keeps the active one in memory
       saved = (await this.updateProfileData(updates, profileFile)) && saved;
@@ -1333,6 +1337,79 @@ export class StoreManagerService extends Service {
     // An earlier save still queued may have written the new name.
     void this._queueSave();
     return "unsaved";
+  }
+
+  /**
+   * Deletes a profile with what it collects outside its file: its fans
+   * (fans/<file>) and its LIVE history (history/<file without .json>/). null
+   * when it isn't listed or it's the active one, which the only profile always
+   * is. "unsaved" when the store couldn't be saved: it stays listed and
+   * nothing is deleted.
+   */
+  public async deleteProfile(
+    file: string,
+  ): Promise<"deleted" | "unsaved" | null> {
+    this._ensureInitialized();
+    const profiles = this._storeData!.profiles;
+    const index = profiles.findIndex((p) => p.file === file);
+    if (index < 0 || file === this._activeProfileFile()) {
+      Logger.error(
+        `<System> Refused to delete the profile ${file}, it isn't listed or it's the active one.`,
+        this._logFile,
+      );
+      return null;
+    }
+    // Unlisted first, so sweeps and switches no longer reach it
+    const [entry] = profiles.splice(index, 1);
+    if (!(await this._queueSave())) {
+      profiles.splice(Math.min(index, profiles.length), 0, entry);
+      // An earlier save still queued may have written it unlisted.
+      void this._queueSave();
+      return "unsaved";
+    }
+
+    const { fansFolder, historyFolder, profilesFolder } =
+      this._pathManagerService.folders;
+    const { name } = parse(file);
+    // clear()'s leftovers too: <name>.cleared-<digits>
+    const prefix = `${name}.cleared-`;
+    const cleared = (await readdir(historyFolder).catch(() => []))
+      .filter(
+        (entry) =>
+          entry.startsWith(prefix) && /^\d+$/.test(entry.slice(prefix.length)),
+      )
+      .map((entry) => join(historyFolder, entry));
+    const gone = await Promise.all(
+      [join(fansFolder, file), join(historyFolder, name), ...cleared].map(
+        (path) => this._remove(path),
+      ),
+    );
+    // While the profile's file is there, its name's file stays taken, so a
+    // new profile can't get the fans and LIVEs left behind.
+    if (gone.every(Boolean)) {
+      const path = join(profilesFolder, file);
+      // shortcut: an update queued on the file after this wait could write it
+      // again; only a sweep that read it before the unlisting can, and the
+      // file then sits unlisted until a store rebuild lists it.
+      await this._jsonManagerService.whenWritten(path);
+      await this._remove(path);
+    }
+    return "deleted";
+  }
+
+  // A file or folder, with a few tries for one Windows holds a moment. False
+  // when it's still there.
+  private _remove(path: string): Promise<boolean> {
+    return rm(path, { recursive: true, force: true, maxRetries: 3 }).then(
+      () => true,
+      (error: unknown) => {
+        Logger.warn(
+          `<System> Unable to delete ${path} -- ${formatError(error)}`,
+          this._logFile,
+        );
+        return false;
+      },
+    );
   }
 
   public async addProfile(

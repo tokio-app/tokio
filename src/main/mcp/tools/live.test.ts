@@ -794,6 +794,13 @@ describe("live MCP tools", () => {
           profiles[index] = { file, name };
           return "renamed" as const;
         }),
+        deleteProfile: vi.fn(async (file: string) => {
+          profiles.splice(
+            profiles.findIndex((p) => p.file === file),
+            1,
+          );
+          return "deleted" as const;
+        }),
       };
       const h = createHandler(
         {
@@ -858,6 +865,36 @@ describe("live MCP tools", () => {
       expect(
         (await call("profile", { action: "switch", name: "Nope" })).isError,
       ).toBe(true);
+    });
+
+    it("deletes one by name with remove, through DELETE_PROFILE", async () => {
+      const { h, store } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("remove", { kind: "profiles", id: "Game night" });
+
+      expect(res).toMatchObject({ isError: false, text: "Removed." });
+      expect(store.deleteProfile).toHaveBeenCalledExactlyOnceWith(
+        "game-night.json",
+      );
+      expect(h.pushed(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
+    });
+
+    it("gives the handler's refusal for the active profile, and one it doesn't list", async () => {
+      const { h, store } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      expect(
+        await call("remove", { kind: "profiles", id: "main.json" }),
+      ).toMatchObject({
+        isError: true,
+        text: t("main.settings.deleteActive"),
+      });
+      expect(
+        (await call("remove", { kind: "profiles", id: "../outside.json" }))
+          .isError,
+      ).toBe(true);
+      expect(store.deleteProfile).not.toHaveBeenCalled();
     });
 
     it("creates one through CREATE_PROFILE", async () => {

@@ -131,7 +131,7 @@ export const sections: Sections = {
 export const kinds: Kinds = {
   profiles: defineKind({
     notes:
-      "The id is the profile's file. Each profile keeps its own TTS, music, alerts and games settings; the profile tool switches them.",
+      "The id is the profile's file. Each profile keeps its own TTS, music, alerts and games settings; the profile tool switches them. remove deletes a profile with its LIVE history and fans, never the active one (switch first) or the only one.",
     list: ({ storeManagerService }, { query, limit }) => {
       const active = storeManagerService.getSettings().activeProfile.file;
       const wanted = query?.toLowerCase();
@@ -146,6 +146,17 @@ export const kinds: Kinds = {
           active: p.file === active,
         })),
       });
+    },
+    remove: async (handler, id) => {
+      const target = findProfile(handler, id);
+      if (!target) return fail(`There's no profile ${id}.`);
+      const { error } = await invokeOk(
+        handler,
+        APP_EVENTS.DELETE_PROFILE,
+        { file: target.file },
+        APP_EVENTS_RESPONSE.DELETE_PROFILE,
+      );
+      return error ?? ok("Removed.");
     },
   }),
 };
@@ -520,7 +531,7 @@ export const tools: ToolDef<any>[] = [
     name: "profile",
     title: "Profiles",
     description:
-      "switch makes `name` (a profile's name or id, see list kind profiles) the active profile: refused during a LIVE. create makes an empty profile called `name`; clone copies the profile `from` (name or id) as `name`. Neither switches to it. rename gives the profile `from` (name or id; the active one without it) the name `name`, also during a LIVE; its id stays. There's no delete.",
+      "switch makes `name` (a profile's name or id, see list kind profiles) the active profile: refused during a LIVE. create makes an empty profile called `name`; clone copies the profile `from` (name or id) as `name`. Neither switches to it. rename gives the profile `from` (name or id; the active one without it) the name `name`, also during a LIVE; its id stays. To delete one, use remove with kind profiles.",
     input: ProfileInput,
     annotations: WRITE,
     run: async (handler, { action, name, from }) => {

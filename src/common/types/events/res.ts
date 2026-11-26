@@ -81,6 +81,7 @@ export enum APP_EVENTS_RESPONSE {
   CREATE_PROFILE = "app:settings:res:create:profile",
   CLONE_PROFILE = "app:settings:res:clone:profile",
   RENAME_PROFILE = "app:settings:res:rename:profile",
+  DELETE_PROFILE = "app:settings:res:delete:profile",
   IMPORT_ENTITY = "app:settings:res:import:entity",
   EXPORT_ENTITY = "app:settings:res:export:entity",
   SET_PROVIDER = "app:settings:res:set:provider",
@@ -272,6 +273,9 @@ export interface AppEventsResponseMap {
 
   // The profile's file, failures included, so a modal ignores another's
   [APP_EVENTS_RESPONSE.RENAME_PROFILE]: Reply<{ file: string }>;
+
+  // The profile's file, failures included
+  [APP_EVENTS_RESPONSE.DELETE_PROFILE]: Reply<{ file: string }>;
 
   [APP_EVENTS_RESPONSE.IMPORT_ENTITY]: Reply<{
     type: "profile";

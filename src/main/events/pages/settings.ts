@@ -329,6 +329,60 @@ events.push(
   },
 );
 
+const deleteProfile = async (
+  { storeManagerService: store, notifier }: AppHandlerVariables,
+  e: ReplyEvent,
+  file: string,
+) => {
+  const listed = store.getProfiles().find((p) => p.file === file);
+  if (!listed) throw new Error(`The profile ${file} isn't listed.`);
+  // The only profile is always the active one
+  if (file === store.getSettings().activeProfile.file) {
+    throw new AppFailure(
+      FEEDBACK_CODES.PROFILE_DELETE_FAILED,
+      t("main.settings.deleteActive"),
+      { level: "warning" },
+    );
+  }
+  const res = await store.deleteProfile(file);
+  if (res === "unsaved") {
+    replySettings(e, store);
+    throw saveFailure();
+  }
+  if (!res) throw new Error(`Deleting the profile ${file} failed.`);
+
+  e.reply(APP_EVENTS_RESPONSE.DELETE_PROFILE, { success: true, file });
+  replySettings(e, store);
+  notifier.success(
+    "system",
+    FEEDBACK_CODES.PROFILE_DELETED,
+    t("main.settings.profileDeleted", { name: listed.name }),
+  );
+};
+
+// On the switches' chain: a switch to it, or away from it with its timer,
+// fans and history still saving there, ends before it's deleted
+events.push(
+  APP_EVENTS.DELETE_PROFILE,
+  async (services, e, { file }) => {
+    const run = switching.then(() => deleteProfile(services, e, file));
+    switching = run.catch(() => {});
+    await run;
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.PROFILE_DELETE_FAILED,
+      message: "main.failure.deleteProfile",
+    },
+    onError: (e, error, { file }) =>
+      e.reply(APP_EVENTS_RESPONSE.DELETE_PROFILE, {
+        success: false,
+        file,
+        error,
+      }),
+  },
+);
+
 events.push(
   APP_EVENTS.EXPORT_ENTITY,
   async ({ storeManagerService, win, notifier }, e, { type, file }) => {
