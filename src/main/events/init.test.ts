@@ -3653,7 +3653,7 @@ describe("init events", () => {
       ]);
     });
 
-    it("records the version of a new store, and tells only its first load it's new for the tour", async () => {
+    it("records the version of a new store, and tells only its first load it's new for the welcome and the tour", async () => {
       const s = setup();
       s.settings.lastVersion = "";
       s.storeManagerService.wasRebuilt.mockReturnValue(true);
@@ -3663,13 +3663,36 @@ describe("init events", () => {
 
       // No updatedFrom: What's new doesn't open over the tour
       expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
-        { success: true, newStore: true },
+        { success: true, newStore: true, welcome: true },
         { success: true },
       ]);
       expect(s.storeManagerService.updateLastVersion.mock.calls).toEqual([
         ["1.0.0"],
       ]);
     });
+
+    it.each<[string, Partial<Profile>]>([
+      ["another platform", { platforms: ["tiktok", "kick"] }],
+      ["a username", { connector: { username: "streamer" } }],
+      ["a channel", { channels: { youtube: "@me" } }],
+    ])(
+      "gives a new store over a profile with %s only the tour",
+      async (_what, saved) => {
+        const s = setup();
+        s.settings.lastVersion = "";
+        s.storeManagerService.wasRebuilt.mockReturnValue(true);
+        s.storeManagerService.getProfileData.mockResolvedValue({
+          ...profile,
+          ...saved,
+        });
+
+        await load(s);
+
+        expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
+          { success: true, newStore: true },
+        ]);
+      },
+    );
 
     it("warns that a store that didn't load was reset, without the tour", async () => {
       const s = setup();
