@@ -72,6 +72,26 @@ describe("NumberInput", () => {
     expect(onChange).toHaveBeenLastCalledWith(25);
   });
 
+  it("says while its text is a value it doesn't take", async () => {
+    const user = userEvent.setup();
+    render(<Field min={1} max={50} integer />);
+    expect(field()).not.toHaveAttribute("aria-invalid");
+    await user.click(field());
+
+    fireEvent.change(field(), { target: { value: "51" } });
+    expect(field()).toBeInvalid();
+
+    fireEvent.change(field(), { target: { value: "" } });
+    expect(field()).not.toHaveAttribute("aria-invalid");
+
+    fireEvent.change(field(), { target: { value: "0" } });
+    expect(field()).toBeInvalid();
+    // Leaving it puts the last value back
+    await user.tab();
+    expect(field()).toHaveValue(10);
+    expect(field()).not.toHaveAttribute("aria-invalid");
+  });
+
   it("takes fractions unless it's for whole numbers", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

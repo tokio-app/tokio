@@ -160,6 +160,12 @@
   cursor: not-allowed;
 }
 
+/* Text that isn't a value it takes, such as a number past its limits. Not
+   :user-invalid: NumberInput's own limits decide, not the native step. */
+.input[aria-invalid="true"]:not(:disabled) {
+  border-color: var(--danger);
+}
+
 .textarea {
   height: auto;
   min-height: 80px;
