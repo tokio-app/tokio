@@ -132,7 +132,9 @@ export function CoinStats() {
   const scope: DateRange = live
     ? { from: live.startedAt, to: live.endedAt }
     : (range ?? {});
-  const searching = search.trim() !== "";
+  // With no LIVEs there's no one to search
+  const searchable = (history?.lives.length ?? 0) > 0;
+  const searching = searchable && search.trim() !== "";
   // Replies for other dates, another LIVE or another search are dropped
   const isDates = (res?: GiftersReply) =>
     !!range && !res?.query && res?.from === range.from && res?.to === range.to;
@@ -324,8 +326,15 @@ export function CoinStats() {
                     end: formatDate(live.endedAt, language, "time"),
                   }),
                   formatDuration(live.endedAt - live.startedAt),
-                  // Empty only for a LIVE no connect started
-                  ...(live.username ? [`@${live.username}`] : []),
+                  // Empty only for a LIVE no connect started. A LIVE link
+                  // shows as typed, as Home's does, not as "@https://…".
+                  ...(live.username
+                    ? [
+                        live.username.includes("/")
+                          ? live.username
+                          : `@${live.username}`,
+                      ]
+                    : []),
                 ]}
                 action={
                   <Btn
@@ -379,7 +388,7 @@ export function CoinStats() {
               by={by}
               onBy={(next) => setRanked({ tab, by: next })}
               search={search}
-              onSearch={setSearch}
+              onSearch={searchable ? setSearch : undefined}
             />
           </div>
 

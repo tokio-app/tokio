@@ -80,7 +80,8 @@ interface Props extends GiftersList {
   by: Ranking;
   onBy: (by: Ranking) => void;
   search: string;
-  onSearch: (search: string) => void;
+  // None while there's nothing to search
+  onSearch?: (search: string) => void;
 }
 
 // What each of the platform's gifters sent in the ranking's unit: their
@@ -172,7 +173,8 @@ export function GiftersSection({
       title={title}
       // A search ranks too, so it waits for a platform
       actions={
-        platform && (
+        platform &&
+        onSearch && (
           <SearchToggle
             placeholder={t("coinStats.gifters.search")}
             value={search}

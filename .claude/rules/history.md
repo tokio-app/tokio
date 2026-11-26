@@ -109,4 +109,6 @@ paths:
   - Rows stay all of their LIVE. The first row becomes the dates' totals with main's top gifters (`GET_GIFTERS`, asked again when the LIVEs change), and a new filter selects it. Its amounts and gifts are the LIVEs all in the dates (`allTime` in `helper.ts`) until main's `totals`, read through `platformParts`, add the cut LIVEs' gifts.
 - The gifter search goes to main (`GET_GIFTERS`), so it finds anyone, not only the gifters listed. The selected LIVE goes as its own span (`startedAt` to `endedAt`), or the filter's range. The search stays while the selection and the dates change.
 - Clear history shows only on All time, since it takes every LIVE.
+- With no LIVEs at all, the list has no date filter, no totals row and no gifter search, so All time shows once, in the heading.
+- A LIVE's channel shows as `@` and its username, but one typed as a link (with a `/`) as typed, as Home's connect notice does (`handleOf` in `home.ts`).
 - A Spanish long date is capitalized for the title (`capitalize`).

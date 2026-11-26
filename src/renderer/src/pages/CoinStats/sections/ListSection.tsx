@@ -4,6 +4,7 @@ import { DateTimePicker, EmptyState, Select } from "@/components";
 import { cx, formatDate, formatDuration } from "@/helper";
 import { amountLabel, giftsLabel } from "@/helper/gifts";
 import { rich, useLanguage, useOptions, useT } from "@/ui/i18n";
+import { Link } from "@tanstack/react-router";
 import { KeyboardEvent } from "react";
 import styles from "../coinstats.module.css";
 import {
@@ -138,75 +139,84 @@ export function ListSection({
 
   const total = statText(amount, currency, language);
   const all = tab === "all";
+  // No LIVEs at all: no dates to pick, and no totals row repeating the title
+  const none = !filtered && lives.length === 0;
   return (
     <div className={styles.side}>
-      <DateFilterBar filter={filter} onChange={onFilter} />
-      <ul
-        className={styles.list}
-        role="listbox"
-        aria-label={t("coinStats.list.title")}
-        onKeyDown={onKeyDown}
-      >
-        <li
-          {...option(null)}
-          aria-label={t("coinStats.list.option", {
-            date: title,
-            coins: label(amount),
-          })}
+      {!none && <DateFilterBar filter={filter} onChange={onFilter} />}
+      {!none && (
+        <ul
+          className={styles.list}
+          role="listbox"
+          aria-label={t("coinStats.list.title")}
+          onKeyDown={onKeyDown}
         >
-          <span className={cx(styles.all_time, all && styles.all_time_gifts)}>
-            {title}
-          </span>
-          {all ? (
-            // All counts gifts, named so they aren't read as money
-            <span className={styles.total_gifts} title={total.full}>
-              {rich(t("coinStats.list.gifts", { count: amount }), {
-                amount: <span className={styles.coins}>{total.short}</span>,
-              })}
+          <li
+            {...option(null)}
+            aria-label={t("coinStats.list.totalOption", {
+              date: title,
+              coins: label(amount),
+            })}
+          >
+            <span className={cx(styles.all_time, all && styles.all_time_gifts)}>
+              {title}
             </span>
-          ) : (
-            <span className={styles.coins} title={total.full}>
-              {total.short}
-            </span>
-          )}
-        </li>
-        {lives.map((live) => {
-          const value = valueOf(live);
-          const { short, full } = statText(value, currency, language);
-          return (
-            <li
-              key={live.startedAt}
-              {...option(live.startedAt)}
-              aria-label={t("coinStats.list.option", {
-                date: formatDate(live.startedAt, language, "dateTime"),
-                coins: label(value),
-              })}
-            >
-              <span className={styles.date}>
-                {formatDate(live.startedAt, language, "short")}
+            {all ? (
+              // All counts gifts, named so they aren't read as money
+              <span className={styles.total_gifts} title={total.full}>
+                {rich(t("coinStats.list.gifts", { count: amount }), {
+                  amount: <span className={styles.coins}>{total.short}</span>,
+                })}
               </span>
-              <span className={styles.time}>
-                {formatDate(live.startedAt, language, "time")}
+            ) : (
+              <span className={styles.coins} title={total.full}>
+                {total.short}
               </span>
-              <span className={styles.time}>
-                {formatDuration(live.endedAt - live.startedAt)}
-              </span>
-              <span className={styles.coins} title={full}>
-                {short}
-              </span>
-              <span
-                className={styles.bar}
-                style={{
-                  width: best ? `${(value / best) * 100}%` : 0,
-                }}
-              />
-            </li>
-          );
-        })}
-      </ul>
+            )}
+          </li>
+          {lives.map((live) => {
+            const value = valueOf(live);
+            const { short, full } = statText(value, currency, language);
+            return (
+              <li
+                key={live.startedAt}
+                {...option(live.startedAt)}
+                aria-label={t("coinStats.list.option", {
+                  date: formatDate(live.startedAt, language, "dateTime"),
+                  length: formatDuration(live.endedAt - live.startedAt),
+                  coins: label(value),
+                })}
+              >
+                <span className={styles.date}>
+                  {formatDate(live.startedAt, language, "short")}
+                </span>
+                <span className={styles.time}>
+                  {formatDate(live.startedAt, language, "time")}
+                </span>
+                <span className={styles.time}>
+                  {formatDuration(live.endedAt - live.startedAt)}
+                </span>
+                <span className={styles.coins} title={full}>
+                  {short}
+                </span>
+                <span
+                  className={styles.bar}
+                  style={{
+                    width: best ? `${(value / best) * 100}%` : 0,
+                  }}
+                />
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {lives.length === 0 && (
         <EmptyState>
-          {t(filtered ? "coinStats.filter.empty" : "coinStats.list.empty")}
+          {filtered
+            ? t("coinStats.filter.empty")
+            : rich(t("coinStats.list.empty"), {
+                link: (text) => <Link to="/">{text}</Link>,
+              })}
         </EmptyState>
       )}
     </div>
