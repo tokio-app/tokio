@@ -236,7 +236,7 @@ describe("home events", () => {
       profile.platforms = ["tiktok", "youtube"];
       connectorService.isConnected.mockReturnValue(true);
       connectorService.status.mockReturnValue({ tiktok: "connected" });
-      liveService.getSession.mockReturnValue({ startedAt: 1000 });
+      vi.spyOn(liveService, "startedAt", "get").mockReturnValue(1000);
 
       await h.invoke(home, APP_EVENTS.CONNECT, {
         username: "",
