@@ -4,7 +4,7 @@ import {
   FEEDBACK_CODES,
 } from "@/common/types";
 import { createStack } from "@/helper/events";
-import { AppFailure } from "@/helper/feedback";
+import { AppFailure, logsPlace } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
 
 const events = createStack("system");
@@ -106,7 +106,7 @@ events.push(
     if (!saved) {
       throw new AppFailure(
         FEEDBACK_CODES.HISTORY_SAVE_FAILED,
-        t("main.lives.saveFailed"),
+        t("main.lives.saveFailed", logsPlace()),
         { logged: true },
       );
     }

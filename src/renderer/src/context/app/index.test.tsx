@@ -152,7 +152,7 @@ describe("AppProvider", () => {
     expect(screen.queryByText("Loaded")).not.toBeInTheDocument();
     expect(
       screen.getByText(
-        "Tokio couldn't start. Check the logs folder for details.",
+        "Tokio couldn't start. Close it and open it again. Its logs are in the .tokio folder in your user folder.",
       ),
     ).toBeInTheDocument();
     for (const name of ["Minimize", "Maximize", "Close"]) {

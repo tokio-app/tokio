@@ -592,7 +592,8 @@ describe("alerts events", () => {
 
       const failure = {
         code: FEEDBACK_CODES.ALERT_TTS_FAILED,
-        message: "The message is empty or has a banned word.",
+        message:
+          "This message isn't read aloud: it's empty or has a banned word.",
       };
       expect(h.replies(APP_EVENTS_RESPONSE.TEST_ALERT)).toEqual([
         {

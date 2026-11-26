@@ -24,6 +24,7 @@ import {
   getAlertOverlayURL,
   samplePlatform,
 } from "@/common/util";
+import { saveFailure } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
 import { importPictures, upload } from "@/helper/library";
 import { z } from "zod";
@@ -527,7 +528,7 @@ async function addPath(
       success: true,
       data: storeManagerService.getMinecraftPictures(),
     });
-    if (!res.saved) return fail(t("main.saveFailed"));
+    if (!res.saved) return fail(saveFailure().message);
     const [picture] = res.pictures;
     notifier.success(
       "games",

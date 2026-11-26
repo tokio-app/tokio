@@ -37,7 +37,8 @@ const overlay = (patch: Partial<StudioOverlay> = {}): StudioOverlay => ({
 // The change is made, but the store file wasn't written.
 const saveError = {
   code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
-  message: "Tokio couldn't save the change. Check the logs folder for details.",
+  message:
+    "Tokio couldn't save the change. To report it, export the logs in Settings → Logs.",
 };
 
 // What sending a view reads, besides the store

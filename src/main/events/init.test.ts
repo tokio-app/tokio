@@ -4461,7 +4461,8 @@ describe("init events", () => {
 
       const failure = {
         code: FEEDBACK_CODES.APP_LOAD_FAILED,
-        message: "Tokio couldn't start. Check the logs folder for details.",
+        message:
+          "Tokio couldn't start. Close it and open it again. Its logs are in the .tokio folder in your user folder.",
       };
       expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
         { success: false, error: failure },

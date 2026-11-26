@@ -304,11 +304,11 @@ describe("home events", () => {
       ],
       [
         connectFailure("rateLimited", "", { retryAfterSeconds: 42 }),
-        "Your Euler Stream API key hit its rate limit. Try again in 42 seconds.",
+        "You've connected too often for your Euler Stream plan. Try again in 42 seconds.",
       ],
       [
         connectFailure("rateLimited", ""),
-        "Your Euler Stream API key hit its rate limit. Try again in a minute.",
+        "You've connected too often for your Euler Stream plan. Try again in a minute.",
       ],
       [
         connectFailure("noKey", ""),
@@ -324,7 +324,7 @@ describe("home events", () => {
       ],
       [
         connectFailure("sign", ""),
-        "Euler Stream couldn't sign the connection. Try again in a moment.",
+        "Euler Stream couldn't set up the connection. Try again in a moment.",
       ],
       [
         connectFailure("network", ""),
@@ -1177,7 +1177,7 @@ describe("home events", () => {
             level: "error",
             code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
             message:
-              "Tokio couldn't save the change. Check the logs folder for details.",
+              "Tokio couldn't save the change. To report it, export the logs in Settings → Logs.",
           }),
         ],
       ]);

@@ -6,6 +6,7 @@ import {
   FEEDBACK_CODES,
 } from "@/common/types";
 import { defaultStoreData } from "@/common/util";
+import { logsPlace } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
 import Logger from "@/logger";
 import type { AlertAudio } from "@/services/alerts";
@@ -259,7 +260,7 @@ describe("SET_SHORTCUTS", () => {
 
     const failure = {
       code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
-      message: t("main.saveFailed"),
+      message: t("main.saveFailed", logsPlace()),
     };
     expect(globalShortcut.isRegistered("F9")).toBe(true);
     expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
@@ -402,7 +403,7 @@ describe("remote", () => {
 
       const failure = {
         code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
-        message: t("main.saveFailed"),
+        message: t("main.saveFailed", logsPlace()),
       };
       expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
       expect(h.replies(response)).toEqual([{ success: false, error: failure }]);
