@@ -42,6 +42,19 @@ type ThumbnailProps = {
 };
 
 /**
+ * The videos' lengths in seconds, read by their thumbnails: `lengths` by
+ * file, and `reading(file)`, the `onLength` for that file's thumbnail.
+ */
+export function useMediaLengths() {
+  const [lengths, setLengths] = useState<Record<string, number>>({});
+  const reading = (file: string) => (seconds: number) =>
+    setLengths((known) =>
+      Object.is(known[file], seconds) ? known : { ...known, [file]: seconds },
+    );
+  return { lengths, reading };
+}
+
+/**
  * What a media library file shows: an image, or a video's first frame. A
  * video also gives its length once it's read. Its player mounts only while
  * it's in view, with a box of the same size in its place.
@@ -111,8 +124,7 @@ export function MediaPicker({
   onSelect,
   onClose,
 }: Props) {
-  // The videos' lengths in seconds, read by their thumbnails
-  const [lengths, setLengths] = useState<Record<string, number>>({});
+  const { lengths, reading } = useMediaLengths();
 
   return (
     <LibraryPicker
@@ -136,16 +148,7 @@ export function MediaPicker({
       Delete={DeleteMediaModal}
       tile={(file) => (
         <>
-          <MediaThumbnail
-            file={file.file}
-            onLength={(seconds) =>
-              setLengths((known) =>
-                Object.is(known[file.file], seconds)
-                  ? known
-                  : { ...known, [file.file]: seconds },
-              )
-            }
-          />
+          <MediaThumbnail file={file.file} onLength={reading(file.file)} />
           <span className={styles.label}>
             {mediaKind(file.file) === "video" && (
               <FiFilm size={14} className={styles.video} aria-hidden />

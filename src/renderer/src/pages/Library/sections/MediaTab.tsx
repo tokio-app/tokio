@@ -7,6 +7,7 @@ import {
   MediaThumbnail,
   Modal,
   SoundLength,
+  useMediaLengths,
   useVideoURL,
 } from "@/components";
 import picker from "@/components/MediaPicker/mediapicker.module.css";
@@ -32,8 +33,7 @@ export function MediaTab({ media, empty, failed }: Props) {
   const [showing, setShowing] = useState<MediaFile | null>(null);
   // File waiting for the user to confirm it's deleted
   const [removing, setRemoving] = useState<MediaFile | null>(null);
-  // The videos' lengths in seconds, read by their thumbnails
-  const [lengths, setLengths] = useState<Record<string, number>>({});
+  const { lengths, reading } = useMediaLengths();
   // Apart from its thumbnail's, which is loaded too
   const fullVideo = useVideoURL(showing?.file ?? "");
 
@@ -87,13 +87,7 @@ export function MediaTab({ media, empty, failed }: Props) {
                 >
                   <MediaThumbnail
                     file={file.file}
-                    onLength={(seconds) =>
-                      setLengths((known) =>
-                        Object.is(known[file.file], seconds)
-                          ? known
-                          : { ...known, [file.file]: seconds },
-                      )
-                    }
+                    onLength={reading(file.file)}
                   />
                   <span className={picker.label}>
                     {mediaKind(file.file) === "video" && (
