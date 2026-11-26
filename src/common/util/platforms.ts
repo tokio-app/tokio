@@ -112,6 +112,25 @@ export const isPlatform = (value: unknown): value is Platform =>
 export const platformOf = (user?: Pick<UserData, "platform"> | null) =>
   user?.platform ?? "tiktok";
 
+type OnPlatform = Pick<UserData, "platform">;
+
+// Counts each platform's items as it's called, giving the one's place
+export const placer = () => {
+  const places = new Map<Platform, number>();
+  return (item: OnPlatform) => {
+    const platform = platformOf(item);
+    const place = (places.get(platform) ?? 0) + 1;
+    places.set(platform, place);
+    return place;
+  };
+};
+
+// The items within their platform's first `count`, in their order
+export const topOfEach = <T extends OnPlatform>(items: T[], count: number) => {
+  const place = placer();
+  return items.filter((item) => place(item) <= count);
+};
+
 // The platforms a trigger comes from, none for Music change
 export const platformsOf = (trigger: AlertTrigger): Platform[] =>
   PLATFORMS.filter((platform) => PLATFORM_TRIGGERS[platform].includes(trigger));

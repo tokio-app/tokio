@@ -22,7 +22,9 @@ import {
   GIFT_CURRENCY,
   inRange,
   idPlatform,
+  placer,
   platformOf,
+  topOfEach,
   platformParts,
   viewerMatcher,
 } from "@/common/util";
@@ -163,23 +165,6 @@ const addPart = (
   part.amount += amount;
   part.gifts += gifts;
   part.giftSubs += giftSubs;
-};
-
-// Counts each platform's gifters as it's called, giving the one's place
-const placer = () => {
-  const places = new Map<Platform, number>();
-  return (gifter: Gifter) => {
-    const platform = platformOf(gifter);
-    const place = (places.get(platform) ?? 0) + 1;
-    places.set(platform, place);
-    return place;
-  };
-};
-
-// The sorted gifters within their platform's first `count`, in their order
-const topOfEach = (sorted: Gifter[], count: number) => {
-  const place = placer();
-  return sorted.filter((gifter) => place(gifter) <= count);
 };
 
 // The two rankings LIVE history shows: who sent an amount, in byAmount

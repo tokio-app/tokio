@@ -5,7 +5,7 @@ import {
   TOKIO_EVENTS,
   UserData,
 } from "@/common/types";
-import { platformOf } from "@/common/util";
+import { platformOf, topOfEach } from "@/common/util";
 import Logger from "@/logger";
 import { join } from "node:path";
 import { z } from "zod";
@@ -68,17 +68,8 @@ const order = (a: Fan, b: Fan) =>
   b.seenAt - a.seenAt;
 
 // The last MAX_FANS of each platform, in the order they came
-function capped(fans: Fan[]): Fan[] {
-  const counts = new Map<Platform, number>();
-  return fans
-    .toReversed()
-    .filter((fan) => {
-      const count = (counts.get(platformOf(fan)) ?? 0) + 1;
-      counts.set(platformOf(fan), count);
-      return count <= MAX_FANS;
-    })
-    .toReversed();
-}
+const capped = (fans: Fan[]) =>
+  topOfEach(fans.toReversed(), MAX_FANS).toReversed();
 
 // Least recently seen first
 const FansFileSchema = z.object({ fans: z.array(FanSchema) });
