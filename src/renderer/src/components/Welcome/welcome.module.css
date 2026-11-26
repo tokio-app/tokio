@@ -1,0 +1,14 @@
+/* The account signed in to, in place of Twitch's sign-in */
+.account {
+  color: var(--font-primary);
+  font-weight: 500;
+}
+
+.note {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
+.link {
+  color: var(--accent-primary);
+}

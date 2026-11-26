@@ -4,8 +4,9 @@ import { forgetDecoded } from "@/helper/audio";
 import { useFlush } from "@/hooks/useEditableSettings";
 import { defaultProfile } from "@/common/util";
 import { createAudio } from "@test/audio";
+import { settingsReply } from "@test/fixtures";
 import { send, sent, sentEvents } from "@test/ipc";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { AppProvider } from ".";
@@ -80,6 +81,8 @@ describe("AppProvider", () => {
     await send(APP_EVENTS_RESPONSE.LOAD_APP, { success: true, newStore: true });
     const tour = screen.getByRole("dialog", { name: "Welcome to Tokio" });
     expect(tour).toBeInTheDocument();
+    // Only the tour, without the first-start dialog
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
 
     // A later load's reply doesn't say it, like StrictMode's second load
     await send(APP_EVENTS_RESPONSE.LOAD_APP, { success: true });
@@ -87,6 +90,59 @@ describe("AppProvider", () => {
 
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("asks a new user's platform first, then tours what they picked", async () => {
+    const user = userEvent.setup();
+    setup();
+
+    await send(APP_EVENTS_RESPONSE.LOAD_APP, {
+      success: true,
+      newStore: true,
+      welcome: true,
+    });
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    const welcome = screen.getByRole("dialog", { name: "Set up your stream" });
+
+    await send(APP_EVENTS_RESPONSE.GET_SETTINGS, settingsReply());
+    await user.click(within(welcome).getByRole("tab", { name: "Twitch" }));
+    await send(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT, {
+      success: true,
+      login: "streamer_tv",
+    });
+    await user.click(within(welcome).getByRole("button", { name: "Save" }));
+
+    expect(welcome).not.toBeInTheDocument();
+    const tour = within(
+      screen.getByRole("dialog", { name: "Welcome to Tokio" }),
+    );
+    while (!screen.queryByRole("dialog", { name: "Settings" })) {
+      await user.click(tour.getByRole("button", { name: "Next" }));
+    }
+    // Twitch's, signed in already
+    expect(
+      screen.getByText(/^Change Tokio's language, turn on the overlay server/),
+    ).toBeVisible();
+  });
+
+  it("tours TikTok after the first-start dialog is skipped", async () => {
+    const user = userEvent.setup();
+    setup();
+    await send(APP_EVENTS_RESPONSE.LOAD_APP, {
+      success: true,
+      newStore: true,
+      welcome: true,
+    });
+
+    await user.click(screen.getByRole("button", { name: "Skip" }));
+
+    const tour = within(
+      screen.getByRole("dialog", { name: "Welcome to Tokio" }),
+    );
+    while (!screen.queryByRole("dialog", { name: "Settings" })) {
+      await user.click(tour.getByRole("button", { name: "Next" }));
+    }
+    expect(screen.getByRole("link", { name: "Get a free key" })).toBeVisible();
   });
 
   it("opens no tour for a store that was already there", async () => {

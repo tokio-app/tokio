@@ -30,4 +30,5 @@ export * from "./TwitchSignIn";
 export * from "./UpdateButton";
 export * from "./VariableList";
 export * from "./VoiceSelect";
+export * from "./Welcome";
 export * from "./WhatsNew";
