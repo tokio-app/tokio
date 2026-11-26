@@ -415,6 +415,23 @@ describe("KickConnector", () => {
       expect(connector.isConnected()).toBe(false);
     });
 
+    it("ends a stream the viewers poll finds offline twice in a row, with no end in the feed", async () => {
+      kick.viewers = 120;
+      const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+      await connector.connect("streamer");
+      const lookups = () =>
+        kick.urls.filter((u) => u.endsWith("/channels/streamer")).length;
+      const before = lookups();
+
+      kick.viewers = null;
+      await vi.waitFor(() =>
+        expect(onDisconnected).toHaveBeenCalledWith({ reason: "ended" }),
+      );
+      // Not on the first offline answer
+      expect(lookups() - before).toBe(2);
+      expect(connector.isConnected()).toBe(false);
+    });
+
     it("emits DISCONNECTED without a reason on disconnect, after the events sent", async () => {
       const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
       await connector.connect("streamer");

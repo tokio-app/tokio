@@ -31,6 +31,9 @@ type Connection = {
   // Live at connect or since, so the stream's end ends the connection
   wasLive: boolean;
   poll?: NodeJS.Timeout;
+  // The viewers poll's offline answers in a row: two end the stream, in case
+  // the feed missed its end
+  offline: number;
   // The wait before a connect's or a reconnect's next try, and its end
   retry?: NodeJS.Timeout;
   wake?: () => void;
@@ -150,6 +153,7 @@ export class KickConnector extends ConnectorProvider {
       reconnecting: false,
       live: false,
       wasLive: false,
+      offline: 0,
       ids: new Map(),
       socket: new KickSocket(this._config, {
         publication: (_feed, event, data) => this._notify(conn, event, data),
@@ -190,12 +194,17 @@ export class KickConnector extends ConnectorProvider {
 
   private _goLive(conn: Connection, viewers?: number) {
     conn.live = conn.wasLive = true;
+    conn.offline = 0;
     if (viewers !== undefined) this._viewers(viewers);
     conn.poll ??= setInterval(() => {
       lookup(this._config, conn.slug).then(
         ({ viewers: count }) => {
-          if (this._conn === conn && conn.live && count !== null) {
+          if (this._conn !== conn || !conn.live) return;
+          if (count !== null) {
+            conn.offline = 0;
             this._viewers(count);
+          } else if (++conn.offline === 2) {
+            this._offline(conn);
           }
         },
         (err) =>
