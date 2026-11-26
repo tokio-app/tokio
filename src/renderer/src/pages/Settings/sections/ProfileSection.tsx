@@ -8,6 +8,7 @@ import {
   FiDownload,
   FiEdit2,
   FiPlus,
+  FiTrash2,
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
@@ -20,6 +21,7 @@ interface Props {
   onNew: () => void;
   onClone: () => void;
   onRename: () => void;
+  onDelete: () => void;
 }
 
 export function ProfileSection({
@@ -29,8 +31,11 @@ export function ProfileSection({
   onNew,
   onClone,
   onRename,
+  onDelete,
 }: Props) {
   const t = useT();
+  // The active one can't go, and the only profile always is
+  const only = profiles.length < 2;
   return (
     <Section
       icon={<FiUsers />}
@@ -100,6 +105,18 @@ export function ProfileSection({
             }
           >
             <FiUpload aria-hidden />
+          </Btn>
+          <Btn
+            aria-label={t("settings.profiles.delete")}
+            title={t(
+              only
+                ? "settings.profiles.deleteOnly"
+                : "settings.profiles.delete",
+            )}
+            disabled={only}
+            onClick={onDelete}
+          >
+            <FiTrash2 aria-hidden />
           </Btn>
         </div>
       </div>

@@ -5,7 +5,7 @@ import {
   ControlAction,
 } from "@/common/types";
 import { defaultStoreData } from "@/common/util";
-import { Modal, Page } from "@/components";
+import { DeleteProfileModal, Modal, Page } from "@/components";
 import {
   useImmerState,
   useIpcListener,
@@ -35,7 +35,11 @@ import { UpdatesSection } from "./sections/UpdatesSection";
 import { VoiceKeysSection } from "./sections/VoiceKeysSection";
 
 type ModalType =
-  "newProfile" | "cloneProfile" | "renameProfile" | "confirmDebug";
+  | "newProfile"
+  | "cloneProfile"
+  | "renameProfile"
+  | "deleteProfile"
+  | "confirmDebug";
 
 export function Settings() {
   const t = useT();
@@ -142,6 +146,15 @@ export function Settings() {
         />
       )}
 
+      {modal === "deleteProfile" && (
+        <DeleteProfileModal
+          profiles={store.profiles.filter(
+            (p) => p.file !== store.settings.activeProfile.file,
+          )}
+          onClose={closeModal}
+        />
+      )}
+
       <Page width="wide" layout="aside">
         {/* First: connecting needs its key */}
         {platforms.includes("tiktok") && (
@@ -160,6 +173,7 @@ export function Settings() {
           onNew={() => setModal("newProfile")}
           onClone={() => setModal("cloneProfile")}
           onRename={() => setModal("renameProfile")}
+          onDelete={() => setModal("deleteProfile")}
         />
 
         <VoiceKeysSection />
