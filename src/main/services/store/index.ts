@@ -22,14 +22,16 @@ import {
   TwitchAccount,
 } from "@/common/schemas";
 import type { MessageKey } from "@/common/i18n";
-import { Emotes } from "@/common/types";
+import { Emotes, Platform } from "@/common/types";
 import {
   AUDIO_EXTENSIONS,
   defaultProfile,
   formatError,
+  idPlatform,
   IMAGE_EXTENSIONS,
   MEDIA_EXTENSIONS,
   studioElements,
+  triggersOf,
 } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
@@ -73,6 +75,10 @@ export const profileSlug = (name: string) =>
 // How long live events go without reading again an active profile that failed
 export const LOAD_RETRY_MS = 30_000;
 
+// The most saved emotes per platform that no alert, game action or Studio
+// item uses (the user's call): past it, those seen longest ago go
+const MAX_UNUSED_EMOTES = 300;
+
 export class StoreManagerService extends Service {
   private _jsonManagerService!: JSONManagerService;
   private _pathManagerService!: PathManagerService;
@@ -88,6 +94,10 @@ export class StoreManagerService extends Service {
   private _saving: Promise<boolean> = Promise.resolve(true);
   // Emotes whose image was already compared since the app started
   private _checkedEmotes = new Set<string>();
+  // When each emote was last in a chat this run (a count, never saved), so
+  // the cap drops those seen longest ago
+  private _emotesSeen = new Map<string, number>();
+  private _emoteClock = 0;
   // Saved key (encrypted, in base64) → the key. Filled at startup and as keys
   // change, so reads don't wait for safeStorage's async calls.
   private _keys = new Map<string, string>();
@@ -819,14 +829,16 @@ export class StoreManagerService extends Service {
     const profile = await this.getProfileData();
     if (!profile) return { success: false };
 
-    const saved = [...profile.emotes];
+    let saved = [...profile.emotes];
     let changed = false;
+    let added = false;
     // Marked once saved, so an image a failed save lost is compared again
     const checked: string[] = [];
     const markChecked = () => {
       for (const id of checked) this._checkedEmotes.add(id);
     };
     for (const { emoteID: id, images } of emotes) {
+      if (id) this._emotesSeen.set(id, ++this._emoteClock);
       const image = images[0];
       if (!id || !image) continue;
 
@@ -834,6 +846,7 @@ export class StoreManagerService extends Service {
       if (index === -1) {
         saved.push({ id, image });
         changed = true;
+        added = true;
       } else if (!this._checkedEmotes.has(id) && saved[index].image !== image) {
         // Once per run, in case TikTok moves the image.
         saved[index] = { id, image };
@@ -846,6 +859,7 @@ export class StoreManagerService extends Service {
       markChecked();
       return { success: true };
     }
+    if (added) saved = this._capEmotes(saved, profile);
     const file = this._activeProfileFile();
     const failed = this._failedEmotes;
     if (
@@ -861,6 +875,62 @@ export class StoreManagerService extends Service {
     this._failedEmotes = null;
     markChecked();
     return { success: true, data: saved };
+  }
+
+  // Drops the unused emotes past MAX_UNUSED_EMOTES on each platform, those
+  // not seen this run first, in file order, then the ones seen longest ago
+  private _capEmotes(saved: SavedEmote[], profile: Profile): SavedEmote[] {
+    const counts = new Map<Platform, number>();
+    for (const { id } of saved) {
+      counts.set(idPlatform(id), (counts.get(idPlatform(id)) ?? 0) + 1);
+    }
+    const over = [...counts].filter(([, n]) => n > MAX_UNUSED_EMOTES);
+    if (!over.length) return saved;
+
+    const used = this._usedEmotes(profile);
+    const seen = (id: string) => this._emotesSeen.get(id) ?? 0;
+    const dropped = new Set<string>();
+    for (const [platform] of over) {
+      const unused = saved.filter(
+        ({ id }) => idPlatform(id) === platform && !used.has(id),
+      );
+      // sort is stable, so the unseen keep their file order
+      unused
+        .sort((a, b) => seen(a.id) - seen(b.id))
+        .slice(0, Math.max(0, unused.length - MAX_UNUSED_EMOTES))
+        .forEach(({ id }) => dropped.add(id));
+    }
+    return saved.filter(({ id }) => !dropped.has(id));
+  }
+
+  // The emotes an alert, a game action or a Studio item names
+  private _usedEmotes(profile: Profile): Set<string> {
+    const triggers: { emotes: string[] }[] = [
+      ...profile.alerts.items.flatMap((item) => triggersOf(item)),
+      ...profile.games.actions.map((action) => action.trigger),
+    ];
+    // A Studio item's triggers but its goals, which name no emotes
+    const reacting = (item: StudioOverlay["items"][number]) =>
+      triggersOf(item).flatMap((trigger) =>
+        "emotes" in trigger ? [trigger] : [],
+      );
+    const used = new Set<string>();
+    for (const overlay of this.getStudio()) {
+      triggers.push(...overlay.counters.map((counter) => counter.trigger));
+      for (const item of overlay.items) {
+        if (item.kind === "group") triggers.push(...reacting(item));
+      }
+      for (const element of studioElements(overlay)) {
+        triggers.push(...reacting(element));
+        if (element.kind === "emote" && element.emote) {
+          used.add(element.emote.id);
+        }
+      }
+    }
+    for (const trigger of triggers) {
+      for (const id of trigger.emotes) used.add(id);
+    }
+    return used;
   }
 
   // Not saved on their own: they ride along with the store's next save, and

@@ -4,10 +4,22 @@ import {
   EMOTE_TRIGGER,
   PLATFORMS,
   TOKIO_EVENTS,
-  type Platform,
 } from "../types/connector";
 import { defaultAlertName, mediaKind } from "../util/alerts";
 import { ColorSchema, FONT_MAX_LENGTH, TimerProfileSchema } from "./timer";
+
+// A z.preprocess step that leaves out what a newer Tokio saved for a platform
+// this one doesn't know, so it still loads: a list's platforms, or a record's
+// keys (before its z.partialRecord) outside its key enum's options
+export const knownPlatforms =
+  (known: readonly string[] = PLATFORMS) =>
+  (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.filter((p) => known.includes(p));
+    if (!value || typeof value !== "object") return value;
+    return Object.fromEntries(
+      Object.entries(value).filter(([key]) => known.includes(key)),
+    );
+  };
 
 // Twitch's, YouTube's or Kick's own rules: superfans are its subscribers or
 // members, vips Twitch's and Kick's VIPs. One without them allows everyone
@@ -18,6 +30,8 @@ const PlatformPermissionsSchema = z.object({
   moderators: z.boolean().default(false),
   vips: z.boolean().default(false),
 });
+
+const OTHER_PLATFORMS = z.enum(PLATFORMS).exclude(["tiktok"]);
 
 // The rules are TikTok's, which an older Tokio still reads, and platforms has
 // the others'. The lists hold handles on any platform.
@@ -36,9 +50,9 @@ const PermissionsSchema = z.object({
     black: z.array(z.string()),
   }),
   platforms: z
-    .partialRecord(
-      z.enum(PLATFORMS).exclude(["tiktok"]),
-      PlatformPermissionsSchema,
+    .preprocess(
+      knownPlatforms(OTHER_PLATFORMS.options),
+      z.partialRecord(OTHER_PLATFORMS, PlatformPermissionsSchema),
     )
     .default({}),
 });
@@ -490,12 +504,7 @@ export const ProfileSchema = z.object({
   // The platforms Connect joins, picked on Home. One a newer Tokio saved
   // that this one doesn't know is left out, so the profile still loads.
   platforms: z
-    .array(z.string())
-    .transform((list) =>
-      list.filter((p): p is Platform =>
-        (PLATFORMS as readonly string[]).includes(p),
-      ),
-    )
+    .preprocess(knownPlatforms(), z.array(z.enum(PLATFORMS)))
     .default(["tiktok"]),
   // The channel typed for each platform that takes one, TikTok's username
   // aside (connector)

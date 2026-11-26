@@ -13,6 +13,7 @@ import {
   TopGifter,
   UserData,
 } from "@/common/types";
+import { knownPlatforms } from "@/common/schemas";
 import {
   allInRange,
   bySubs,
@@ -79,11 +80,21 @@ const LiveSummarySchema = z.object({
   endedAt: z.number(),
   coins: z.number(),
   gifts: z.number(),
-  // Each platform's part; older LIVEs, TikTok's alone, have none
+  // Each platform's part; older LIVEs, TikTok's alone, have none. A part on
+  // a platform this Tokio doesn't know is left out.
+  // shortcut: a LIVE only on such platforms loads with none, which
+  // platformParts reads as TikTok's alone; fine until a fifth platform ships
   platforms: z
-    .partialRecord(
-      z.enum(PLATFORMS),
-      z.object({ amount: z.number(), gifts: z.number(), giftSubs: z.number() }),
+    .preprocess(
+      knownPlatforms(),
+      z.partialRecord(
+        z.enum(PLATFORMS),
+        z.object({
+          amount: z.number(),
+          gifts: z.number(),
+          giftSubs: z.number(),
+        }),
+      ),
     )
     .default({}),
 }) satisfies z.ZodType<LiveSummary>;

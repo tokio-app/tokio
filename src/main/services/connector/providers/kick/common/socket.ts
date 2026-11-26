@@ -169,7 +169,14 @@ export class KickSocket {
       const event = pub?.data?.event;
       const data = decode(pub?.data?.data);
       if (reply.push.channel && event && data) {
-        this._handlers.publication(reply.push.channel, event, data);
+        // Thrown out of the listener, it would stop the feed (an error box too)
+        try {
+          this._handlers.publication(reply.push.channel, event, data);
+        } catch (err) {
+          this._handlers.warn(
+            `Kick couldn't read ${event}: ${formatError(err)}`,
+          );
+        }
       }
       return;
     }

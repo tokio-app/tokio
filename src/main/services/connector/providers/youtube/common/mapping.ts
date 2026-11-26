@@ -193,9 +193,11 @@ const fromMembership = (e: Membership): Mapped => ({
   },
 });
 
-// "Sent 20 Channel gift memberships": the count is the first number
+// "Sent 20 Channel gift memberships", "Sent a Channel gift membership": the
+// count comes right after "Sent", since the channel's name can hold digits
 function fromGiftPurchase(e: GiftPurchase): Mapped {
   const header = e.header?.liveChatSponsorshipsHeaderRenderer ?? {};
+  const digits = textOf(header.primaryText).match(/^Sent (\d[\d,]*) /)?.[1];
   return {
     event: TOKIO_EVENTS.GIFT_SUB,
     data: {
@@ -203,7 +205,7 @@ function fromGiftPurchase(e: GiftPurchase): Mapped {
         ...header,
         authorExternalChannelId: e.authorExternalChannelId,
       }),
-      count: firstNumber(header.primaryText),
+      count: digits ? Number(digits.replace(/,/g, "")) : 1,
       tier: "",
     },
   };

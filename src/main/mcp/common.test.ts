@@ -1,3 +1,4 @@
+import { ProfileSchema } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -205,6 +206,25 @@ describe("unknownKeys", () => {
   it("names an own __proto__ key from JSON", () => {
     expect(unknownKeys(schema, JSON.parse('{"__proto__": {"a": 1}}'))).toEqual([
       "__proto__",
+    ]);
+  });
+
+  it("names a record's key outside its enum, which the schema would drop", () => {
+    const changes = {
+      tts: {
+        permissions: {
+          platforms: {
+            twich: { all: false },
+            tiktok: {},
+            kick: { vips: true },
+          },
+        },
+      },
+    };
+
+    expect(unknownKeys(ProfileSchema, changes)).toEqual([
+      "tts.permissions.platforms.twich",
+      "tts.permissions.platforms.tiktok",
     ]);
   });
 

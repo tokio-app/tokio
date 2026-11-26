@@ -8,7 +8,7 @@ import {
   StudioGroupSchema,
   StudioOverlaySchema,
 } from "@/common/schemas";
-import { TOKIO_EVENTS } from "@/common/types";
+import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
 import { safeStorage } from "@test/electron";
 import { defaultProfile } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
@@ -1883,6 +1883,121 @@ describe("StoreManagerService", () => {
       await store.updateActiveProfile("stream.json");
       const res = await store.recordEmotes([emote("e3")]);
       expect(res).toEqual({ success: true, data: [saved("e3")] });
+    });
+
+    describe("the cap", () => {
+      const unused = (count: number) =>
+        Array.from({ length: count }, (_, n) => saved(`n${n}`));
+      const emoteTrigger = (...emotes: string[]) => ({
+        type: EMOTE_TRIGGER,
+        gifts: [],
+        emotes,
+      });
+      const withEmotes = (emotes: object[], profile: object = {}) =>
+        writeFile(
+          defaultProfileFile,
+          JSON.stringify({ ...defaultProfile, ...profile, emotes }),
+        );
+      const ids = (res: { data?: { id: string }[] }) =>
+        res.data?.map((e) => e.id);
+
+      it("keeps 300 unused emotes per platform, and every one a row uses", async () => {
+        const used = Array.from({ length: 20 }, (_, n) => `u${n}`);
+        const twitch = ["twitch:1", "twitch:2"].map(saved);
+        await withEmotes([...used.map(saved), ...unused(300), ...twitch], {
+          alerts: {
+            ...defaultProfile.alerts,
+            items: [
+              {
+                id: "a",
+                enabled: true,
+                trigger: emoteTrigger(...used.slice(0, 10)),
+                also_triggers: [emoteTrigger(...used.slice(10, 15))],
+                sound: { name: "Ding", file: "ding.mp3" },
+                volume: 100,
+              },
+            ],
+          },
+          games: {
+            ...defaultProfile.games,
+            actions: [
+              {
+                id: "g",
+                enabled: true,
+                trigger: emoteTrigger(...used.slice(15)),
+                steps: [],
+              },
+            ],
+          },
+        });
+        const store = await init();
+
+        const res = await store.recordEmotes([emote("new")]);
+
+        expect(ids(res)).toEqual([
+          ...used,
+          ...unused(300)
+            .slice(1)
+            .map((e) => e.id),
+          "twitch:1",
+          "twitch:2",
+          "new",
+        ]);
+        expect((await readJSON(defaultProfileFile)).emotes).toEqual(res.data);
+      });
+
+      it("keeps the emotes a Studio group, counter or emote element uses", async () => {
+        const studioIds = ["g", "c", "el", "also"];
+        await withEmotes([...studioIds.map(saved), ...unused(300)]);
+        const store = await init();
+        await store.addStudioOverlay(
+          "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f",
+          "Main",
+          StudioOverlaySchema.parse({
+            id: "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f",
+            counters: [{ name: "hearts", trigger: emoteTrigger("c") }],
+            items: [
+              StudioGroupSchema.parse({
+                kind: "group",
+                id: "group",
+                trigger: emoteTrigger("g"),
+                elements: [
+                  StudioElementSchema.parse({
+                    id: "emote",
+                    kind: "emote",
+                    x: 0,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                    emote: saved("el"),
+                    also_triggers: [emoteTrigger("also")],
+                  }),
+                ],
+              }),
+            ],
+          }),
+        );
+
+        const res = await store.recordEmotes([emote("new")]);
+
+        expect(ids(res)?.slice(0, 4)).toEqual(studioIds);
+        expect(ids(res)).not.toContain("n0");
+        expect(ids(res)).toHaveLength(304);
+      });
+
+      it("drops the emote seen longest ago, not one seen again this run", async () => {
+        await withEmotes(unused(300));
+        const store = await init();
+
+        expect(await store.recordEmotes([emote("n0")])).toEqual({
+          success: true,
+        });
+        const res = await store.recordEmotes([emote("new")]);
+
+        expect(ids(res)).toContain("n0");
+        expect(ids(res)).not.toContain("n1");
+        expect(ids(res)).toHaveLength(300);
+      });
     });
   });
 

@@ -10,6 +10,32 @@ import {
 } from "./profile";
 
 describe("ProfileSchema", () => {
+  it("leaves out permissions for a platform it doesn't know, or for TikTok", () => {
+    const saved = structuredClone(defaultProfile);
+    const rules = {
+      all: false,
+      superfans: true,
+      moderators: false,
+      vips: false,
+    };
+    const platforms = { twitch: rules, rumble: rules, tiktok: rules };
+
+    const { tts, music } = ProfileSchema.parse({
+      ...saved,
+      tts: {
+        ...saved.tts,
+        permissions: { ...saved.tts.permissions, platforms },
+      },
+      music: {
+        ...saved.music,
+        permissions: { ...saved.music.permissions, platforms },
+      },
+    });
+
+    expect(tts.permissions.platforms).toEqual({ twitch: rules });
+    expect(music.permissions.platforms).toEqual({ twitch: rules });
+  });
+
   it("gives a profile saved before the countdown timer the timer's defaults", () => {
     const saved: Partial<Profile> = structuredClone(defaultProfile);
     delete saved.timer;

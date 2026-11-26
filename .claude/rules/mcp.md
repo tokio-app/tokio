@@ -19,7 +19,7 @@ paths:
 
 - `defs.ts` holds the contract, `registry.ts` the generic tools (`get_status`, `get_settings`, `describe`, `update_settings`, `list`, `get`, `save_item`, `test`, `remove`), and `tools/<area>.ts` each area's sections, kinds and verbs. An area imports `../defs` and `../common`, never `../registry` (a cycle).
 - Keep the tool count low, since some clients cap it around 40. A new setting is a section field, a new item a kind; a tool of its own is only for a verb.
-- Every input is a strict, plain `z.object`, so it converts to JSON Schema. The stored data is checked again with its real schema before it's saved: some store setters keep what they get, and one bad value makes every later save fail. `refuseUnknown` refuses keys Zod would strip, which would report success and change nothing.
+- Every input is a strict, plain `z.object`, so it converts to JSON Schema. The stored data is checked again with its real schema before it's saved: some store setters keep what they get, and one bad value makes every later save fail. `refuseUnknown` refuses keys Zod would strip, which would report success and change nothing, and a record's key outside its enum's options (`permissions.platforms.twich`), which the schema drops as a platform this Tokio doesn't know.
 - Every tool sets all four annotations: MCP's defaults are destructive and open-world.
 
 ## Reads and writes

@@ -177,8 +177,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 /**
  * The dotted paths in `changes` that `schema` has no field for. Zod drops
- * them without a word, so a typo would report success: refuse them. Arrays
- * and records are checked by the schema itself.
+ * them without a word, so a typo would report success: refuse them, a
+ * record's key outside its enum too. Arrays are checked by the schema itself.
  */
 export function unknownKeys(
   schema: z.core.$ZodType,
@@ -197,8 +197,13 @@ export function unknownKeys(
       : each.reduce((a, b) => (b.length < a.length ? b : a));
   }
   if (inner instanceof z.ZodRecord) {
+    // An enum's record drops the other keys before it's checked (a platform
+    // this Tokio doesn't know), so a typo would be dropped too
+    const keys = inner.keyType instanceof z.ZodEnum ? inner.keyType : null;
     return Object.entries(changes).flatMap(([key, value]) =>
-      unknownKeys(inner.valueType, value, `${prefix}${key}.`),
+      keys && !keys.options.includes(key)
+        ? [`${prefix}${key}`]
+        : unknownKeys(inner.valueType, value, `${prefix}${key}.`),
     );
   }
   if (!(inner instanceof z.ZodObject)) return [];

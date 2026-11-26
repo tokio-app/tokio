@@ -147,6 +147,16 @@ describe("toChat", () => {
     ]);
   });
 
+  it("drops a message of cheermotes alone, whose Bits come on their own", () => {
+    const event = chat([
+      { type: "cheermote", text: "Cheer100" },
+      text(" "),
+      { type: "cheermote", text: "Cheer50" },
+    ]);
+
+    expect(toChat(event, "1")).toBeNull();
+  });
+
   it("drops other channels' messages in a Shared Chat", () => {
     expect(
       toChat(chat([text("hi")], { source_broadcaster_user_id: "999" }), "1"),

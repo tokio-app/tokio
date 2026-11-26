@@ -7,6 +7,7 @@ import {
   TokioEventMap,
   UserData,
 } from "@/common/types";
+import { slugOf } from "./api";
 
 type Sender = {
   id: number;
@@ -84,8 +85,8 @@ const emotePicture = (id: string) =>
 function named(username: string): UserData {
   return {
     username,
-    // A slug is its username in lowercase
-    handle: username.toLowerCase(),
+    // Chat's handle is the slug, which slugOf makes of a username
+    handle: slugOf(username),
     profilePictures: [],
     // Kick's feed doesn't say who follows
     follower: false,
@@ -142,7 +143,11 @@ export function fromPublication(event: string, data: any): Mapped | null {
   switch (eventName(event)) {
     case "ChatMessageEvent": {
       const e: ChatMessage = data;
-      if (typeof e.content !== "string" || !e.sender) return null;
+      if (
+        typeof e.content !== "string" ||
+        typeof e.sender?.username !== "string"
+      )
+        return null;
       return { event: TOKIO_EVENTS.CHAT, data: toChat(e) };
     }
     case "SubscriptionEvent": {
@@ -170,14 +175,18 @@ export function fromPublication(event: string, data: any): Mapped | null {
     }
     case "KicksGifted": {
       const e: KicksGifted = data;
-      if (!e.sender || !e.gift) return null;
+      if (
+        typeof e.sender?.username !== "string" ||
+        typeof e.gift?.amount !== "number"
+      )
+        return null;
       const picture = e.sender.profile_picture;
       return {
         event: TOKIO_EVENTS.KICKS,
         data: {
           user: {
             username: e.sender.username,
-            handle: e.sender.username.toLowerCase(),
+            handle: slugOf(e.sender.username),
             profilePictures: picture ? [picture] : [],
             follower: false,
             userId: `kick:${e.sender.id}`,
