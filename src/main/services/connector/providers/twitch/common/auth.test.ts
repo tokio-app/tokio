@@ -1,3 +1,4 @@
+import { hasPending } from "@/helper/quit";
 import {
   afterEach,
   beforeEach,
@@ -225,6 +226,24 @@ describe("TwitchAuth", () => {
       expect(failure).toMatchObject({
         kind: "rateLimited",
         retryAfterSeconds: expect.toBeOneOf([30, 31]),
+      });
+    });
+
+    it("keeps a quit waiting until the new token is saved", async () => {
+      let answer!: (res: Response) => void;
+      stubFetch(() => new Promise((r) => (answer = r)));
+      auth.setAccount({ id: "1", login: "streamer", key: "refresh-1" });
+
+      const refreshing = auth.refresh();
+      expect(hasPending()).toBe(true);
+      answer(json(200, { access_token: "a", refresh_token: "refresh-2" }));
+      await refreshing;
+
+      await vi.waitFor(() => expect(hasPending()).toBe(false));
+      expect(saved).toHaveBeenCalledWith({
+        id: "1",
+        login: "streamer",
+        key: "refresh-2",
       });
     });
   });
