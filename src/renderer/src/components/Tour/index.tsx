@@ -6,18 +6,31 @@ import { Fragment, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Btn } from "../Elements";
 import { Modal } from "../Modal";
-import { placeTour, TOUR_STEPS, tourTexts, type TourPlace } from "./helper";
+import {
+  placeTour,
+  TOUR_STEPS,
+  tourTexts,
+  type TourDone,
+  type TourPlace,
+} from "./helper";
 import styles from "./tour.module.css";
+
+export type { TourDone };
 
 type Props = {
   onClose: () => void;
+  // The profile's platforms until a reply says them, for a tour that opens
+  // after Home's GET_PROFILE reply came (the first-start dialog's)
+  platforms?: readonly Platform[];
+  // What the first-start dialog did, which the steps then leave out
+  done?: TourDone;
 };
 
 /**
  * Shows the window one piece at a time, the sidebar's pages and then Home's
  * switches and connect box, each lit with a card beside it.
  */
-export function Tour({ onClose }: Props) {
+export function Tour({ onClose, platforms: start, done }: Props) {
   const t = useT();
   const [index, setIndex] = useState(0);
   // Whether the step's piece was found, with where it and the card go
@@ -26,7 +39,7 @@ export function Tour({ onClose }: Props) {
   // The profile's platforms, from the replies Home asks for: the tour always
   // opens over Home, and asking here would answer the pages too
   const [platforms, setPlatforms] = useState<readonly Platform[]>(
-    defaultProfile.platforms,
+    start ?? defaultProfile.platforms,
   );
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
@@ -84,7 +97,7 @@ export function Tour({ onClose }: Props) {
         description={
           // Read out as each step comes
           <span className={styles.text} aria-live="polite">
-            {tourTexts(step, platforms).map((text, i) => (
+            {tourTexts(step, platforms, done).map((text, i) => (
               <Fragment key={text}>
                 {i > 0 && " "}
                 {rich(t(text), {

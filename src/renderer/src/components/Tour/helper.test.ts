@@ -42,6 +42,29 @@ describe("tourTexts", () => {
     ]);
   });
 
+  it("leaves out the key and Twitch's sign-in once the first-start dialog did them", () => {
+    expect(tourTexts(settings, ["tiktok"], { key: true })).toEqual([
+      "components.tour.settingsOther",
+    ]);
+    expect(tourTexts(settings, ["tiktok", "twitch"], { key: true })).toEqual([
+      "components.tour.settingsTwitch",
+    ]);
+    expect(tourTexts(settings, ["tiktok", "twitch"], { twitch: true })).toEqual(
+      ["components.tour.settings"],
+    );
+    expect(tourTexts(settings, ["twitch"], { twitch: true })).toEqual([
+      "components.tour.settingsOther",
+    ]);
+    expect(tourTexts(connect, ["twitch"], { twitch: true })).toEqual([
+      "components.tour.connect",
+      "components.tour.connectEnd",
+    ]);
+    // A done that doesn't apply changes nothing
+    expect(tourTexts(settings, ["twitch"], { key: true })).toEqual([
+      "components.tour.settingsTwitch",
+    ]);
+  });
+
   it("keeps the other steps' text", () => {
     const tts = stepOf("components.tour.tts");
     expect(tourTexts(tts, ["kick"])).toEqual(["components.tour.tts"]);

@@ -47,37 +47,42 @@ const CONNECT: Record<Platform, MessageKey> = {
   kick: "components.tour.connectKick",
 };
 
+// What the first-start dialog already did: the Euler key, Twitch's sign-in
+export type TourDone = { key?: boolean; twitch?: boolean };
+
 /**
  * The sentences a step says for the profile's platforms: TikTok LIVE Studio,
- * the Euler key and Twitch's sign-in only where they apply, and in Connect
- * what each of the profile's tabs needs, in Home's order.
+ * the Euler key and Twitch's sign-in only where they apply and aren't `done`,
+ * and in Connect what each of the profile's tabs needs, in Home's order.
  */
 export function tourTexts(
   step: TourStep,
   platforms: readonly Platform[],
+  done: TourDone = {},
 ): MessageKey[] {
   const tiktok = platforms.includes("tiktok");
-  const twitch = platforms.includes("twitch");
+  const key = tiktok && !done.key;
+  const signIn = platforms.includes("twitch") && !done.twitch;
   switch (step.text) {
     case "components.tour.overlays":
       return [tiktok ? step.text : "components.tour.overlaysObs"];
     case "components.tour.settings":
-      if (tiktok) {
-        return twitch
+      if (key) {
+        return signIn
           ? [step.text, "components.tour.settingsTwitchToo"]
           : [step.text];
       }
       return [
-        twitch
+        signIn
           ? "components.tour.settingsTwitch"
           : "components.tour.settingsOther",
       ];
     case "components.tour.connect":
       return [
         step.text,
-        ...PLATFORMS.filter((p) => platforms.includes(p)).map(
-          (p) => CONNECT[p],
-        ),
+        ...PLATFORMS.filter(
+          (p) => platforms.includes(p) && (p !== "twitch" || signIn),
+        ).map((p) => CONNECT[p]),
         "components.tour.connectEnd",
       ];
     default:

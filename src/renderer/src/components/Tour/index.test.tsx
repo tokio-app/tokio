@@ -109,6 +109,26 @@ describe("Tour", () => {
     ).toBeVisible();
   });
 
+  it("starts from the first-start dialog's platform and what it did, then follows the replies", async () => {
+    const user = userEvent.setup();
+    render(
+      <Tour onClose={vi.fn()} platforms={["twitch"]} done={{ twitch: true }} />,
+    );
+
+    while (!screen.queryByRole("dialog", { name: "Settings" })) {
+      await user.click(card().getByRole("button", { name: "Next" }));
+    }
+    expect(
+      card().getByText(/^Change Tokio's language, turn on the overlay server/),
+    ).toBeVisible();
+
+    await send(APP_EVENTS_RESPONSE.SET_PLATFORMS, {
+      success: true,
+      platforms: ["tiktok"],
+    });
+    expect(card().getByRole("link", { name: "Get a free key" })).toBeVisible();
+  });
+
   it("links the Settings step to Euler Stream's sign-up", async () => {
     const user = userEvent.setup();
     render(<Tour onClose={vi.fn()} />);
