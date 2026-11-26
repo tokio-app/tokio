@@ -152,7 +152,7 @@ test("sets the production CSP on the page loaded from disk", async () => {
 
 test("opens every page from the sidebar", async () => {
   const pages = [
-    ["Overlays", "Overlay gallery"],
+    ["Overlays", "Overlays"],
     ["TTS", "Voice"],
     ["Alerts", "Alerts"],
     ["Music", "Controls"],
