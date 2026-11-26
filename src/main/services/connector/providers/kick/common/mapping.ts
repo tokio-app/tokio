@@ -143,7 +143,11 @@ export function fromPublication(event: string, data: any): Mapped | null {
   switch (eventName(event)) {
     case "ChatMessageEvent": {
       const e: ChatMessage = data;
-      if (typeof e.content !== "string" || !e.sender) return null;
+      if (
+        typeof e.content !== "string" ||
+        typeof e.sender?.username !== "string"
+      )
+        return null;
       return { event: TOKIO_EVENTS.CHAT, data: toChat(e) };
     }
     case "SubscriptionEvent": {
@@ -171,7 +175,11 @@ export function fromPublication(event: string, data: any): Mapped | null {
     }
     case "KicksGifted": {
       const e: KicksGifted = data;
-      if (!e.sender || !e.gift) return null;
+      if (
+        typeof e.sender?.username !== "string" ||
+        typeof e.gift?.amount !== "number"
+      )
+        return null;
       const picture = e.sender.profile_picture;
       return {
         event: TOKIO_EVENTS.KICKS,

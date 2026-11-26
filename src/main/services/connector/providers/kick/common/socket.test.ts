@@ -131,6 +131,29 @@ describe("KickSocket", () => {
     ]);
   });
 
+  it("warns when a publication's handler throws, and keeps reading", async () => {
+    handlers.publication.mockImplementationOnce(() => {
+      throw new Error("bad event");
+    });
+    await socket.open(url, "token-1", FEEDS);
+    const push = (id: number) =>
+      JSON.stringify({
+        push: {
+          channel: "channel.10",
+          pub: { data: { event: "StreamerIsLive", data: { id } } },
+        },
+      });
+
+    client().ws.send(`${push(1)}\n${push(2)}`);
+
+    await vi.waitFor(() =>
+      expect(handlers.publication).toHaveBeenCalledTimes(2),
+    );
+    expect(handlers.warn).toHaveBeenCalledWith(
+      expect.stringContaining("bad event"),
+    );
+  });
+
   it("sends a new token before the last one lapses", async () => {
     answer = (command) =>
       command.connect

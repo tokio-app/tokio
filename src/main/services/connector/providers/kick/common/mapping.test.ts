@@ -324,4 +324,25 @@ describe("Kick mapping", () => {
     }
     expect(fromPublication("App\\Events\\ChatMessageEvent", null)).toBeNull();
   });
+
+  it("drops a chat without a username, and Kicks without an amount", () => {
+    expect(
+      fromPublication("ChatMessageEvent", {
+        content: "hi",
+        sender: { id: 1, slug: "a" },
+      }),
+    ).toBeNull();
+    expect(
+      fromPublication("KicksGifted", {
+        sender: { id: 1, username: "Kicker" },
+        gift: { gift_id: "hype", name: "Hype" },
+      }),
+    ).toBeNull();
+    expect(
+      fromPublication("KicksGifted", {
+        sender: { id: 1 },
+        gift: { gift_id: "hype", name: "Hype", amount: 50 },
+      }),
+    ).toBeNull();
+  });
 });
