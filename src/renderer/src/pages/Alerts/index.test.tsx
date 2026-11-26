@@ -243,6 +243,15 @@ describe("Alerts", () => {
     expect(summary(1)).toHaveTextContent("Big gifts");
   });
 
+  it("offers the search only once there are alerts", async () => {
+    const { user } = await load([]);
+    expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
+
+    await user.click(addAlert());
+
+    expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
+  });
+
   it("finds alerts by name, and shows a new one", async () => {
     const { user } = await load([alert("Welcome"), alert("Big gifts")]);
 

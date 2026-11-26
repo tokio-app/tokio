@@ -54,11 +54,14 @@ export function GallerySection({
       divider
       actions={
         <>
-          <SearchToggle
-            placeholder={t("overlays.gallery.search")}
-            value={search}
-            onChange={setSearch}
-          />
+          {/* Once there's something to find, and while it still hides some */}
+          {(overlays.length > 0 || search !== "") && (
+            <SearchToggle
+              placeholder={t("overlays.gallery.search")}
+              value={search}
+              onChange={setSearch}
+            />
+          )}
           <OfficialButton overlays={overlays} />
           <Btn
             ref={importRef}

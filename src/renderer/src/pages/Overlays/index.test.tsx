@@ -115,6 +115,16 @@ describe("Overlays", () => {
     ).toBeInTheDocument();
   });
 
+  it("offers the search only once there are overlays", async () => {
+    await renderApp("/overlays");
+    await overlays();
+    expect(page().queryByRole("button", { name: "Search" })).toBeNull();
+
+    await overlays(GIFT_JAR);
+
+    expect(page().getByRole("button", { name: "Search" })).toBeInTheDocument();
+  });
+
   it("searches the overlays by name", async () => {
     const { user } = await renderApp("/overlays");
     await overlays(GIFT_JAR, TOP_LIKES);
@@ -147,6 +157,7 @@ describe("Overlays", () => {
 
   it("puts the focus in the search when it opens", async () => {
     const { user } = await renderApp("/overlays");
+    await overlays(GIFT_JAR);
 
     await user.click(page().getByRole("button", { name: "Search" }));
 
