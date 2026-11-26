@@ -149,6 +149,8 @@ export function toChat(
   }
   // Only emotes and cheermotes, as TikTok sends an emote-only comment
   if (!content.trim()) {
+    // A bare "Cheer100": its Bits come from channel.bits.use
+    if (!emotes.length) return null;
     content = "";
     emotes = emotes.map((emote) => ({ ...emote, index: 0 }));
   }
