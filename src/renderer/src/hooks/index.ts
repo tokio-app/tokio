@@ -12,6 +12,7 @@ export * from "./useIpcListener";
 export * from "./useIpcRequest";
 export * from "./useNotifications";
 export * from "./usePopover";
+export * from "./useProfilePlatforms";
 export * from "./useServerEnabled";
 export * from "./useServerSwitch";
 export * from "./useTranslationLanguage";

@@ -4,12 +4,13 @@ import {
   CONTROL_ACTIONS,
   ControlAction,
 } from "@/common/types";
-import { defaultProfile, defaultStoreData } from "@/common/util";
+import { defaultStoreData } from "@/common/util";
 import { Modal, Page } from "@/components";
 import {
   useImmerState,
   useIpcListener,
   useIpcRequest,
+  useProfilePlatforms,
   useServerSwitch,
 } from "@/hooks";
 import { useT } from "@/ui/i18n";
@@ -43,7 +44,7 @@ export function Settings() {
   // The shortcuts another app holds, from main's last answer
   const [taken, setTaken] = useState<ControlAction[]>([]);
   // The active profile's platforms: a platform's sections show only with it
-  const [platforms, setPlatforms] = useState(defaultProfile.platforms);
+  const platforms = useProfilePlatforms();
 
   const setServerEnabled = (enabled: boolean) =>
     updateStore((s) => {
@@ -58,12 +59,6 @@ export function Settings() {
 
   useIpcRequest(APP_EVENTS.GET_SETTINGS);
   useIpcRequest(APP_EVENTS.IS_CONNECTED);
-  useIpcRequest(APP_EVENTS.GET_PROFILE);
-
-  // Also answers profile switches
-  useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
-    if (res?.success && res.profile) setPlatforms(res.profile.platforms);
-  });
 
   useIpcListener(APP_EVENTS_RESPONSE.CONNECTED, (res) => {
     if (res) setConnected(res.success);
