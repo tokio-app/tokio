@@ -20,8 +20,11 @@ export function formatStat(value: number, language: string) {
     };
     formats.set(language, format);
   }
+  const short = format.short.format(value);
   return {
-    short: format.short.format(value),
+    // ICU writes Spanish "3.5 K" below 10,000 but "52.4 k" above, so one
+    // row would mix them: "K" throughout
+    short: language.startsWith("es") ? short.replace(/k$/, "K") : short,
     full: format.full.format(value),
   };
 }

@@ -35,6 +35,12 @@ describe("formatStat", () => {
     });
   });
 
+  it("writes Spanish thousands with a capital K, above 10,000 too", () => {
+    expect(formatStat(52_400, "es-419").short).toMatch(/^52\.4\sK$/);
+    expect(formatStat(3500, "es-419").short).toMatch(/^3\.5\sK$/);
+    expect(formatStat(52_400, "en").short).toBe("52.4K");
+  });
+
   it("leaves small numbers as they are", () => {
     expect(formatStat(0, "en")).toEqual({ short: "0", full: "0" });
     expect(formatStat(999, "en")).toEqual({ short: "999", full: "999" });
