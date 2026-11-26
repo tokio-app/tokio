@@ -80,8 +80,7 @@ function CountdownSection({
   const [minutes, setMinutes] = useState(5);
   const [resetting, setResetting] = useState(false);
   const seconds = Math.round(minutes * 60);
-  // In idle the starting time is what to change
-  const canAdjust = status !== "idle" && seconds > 0;
+  const canAdjust = seconds > 0;
   const adjust = (sign: 1 | -1) => {
     // So added time is capped by the cap being typed
     flushSettings();
@@ -126,22 +125,25 @@ function CountdownSection({
         </div>
       </div>
 
-      <div className={styles.row}>
-        <NumberInput
-          className={styles.minutes}
-          aria-label={t("tools.countdown.adjust")}
-          min={0}
-          value={minutes}
-          onChange={setMinutes}
-        />
-        <span className={styles.unit}>{t("tools.countdown.minutes")}</span>
-        <Btn disabled={!canAdjust} onClick={() => adjust(-1)}>
-          <FiMinus size={16} /> {t("common.remove")}
-        </Btn>
-        <Btn disabled={!canAdjust} onClick={() => adjust(1)}>
-          <FiPlus size={16} /> {t("common.add")}
-        </Btn>
-      </div>
+      {/* Not while idle: the starting time, right under, is what to change */}
+      {status !== "idle" && (
+        <div className={styles.row}>
+          <NumberInput
+            className={styles.minutes}
+            aria-label={t("tools.countdown.adjust")}
+            min={0}
+            value={minutes}
+            onChange={setMinutes}
+          />
+          <span className={styles.unit}>{t("tools.countdown.minutes")}</span>
+          <Btn disabled={!canAdjust} onClick={() => adjust(-1)}>
+            <FiMinus size={16} /> {t("common.remove")}
+          </Btn>
+          <Btn disabled={!canAdjust} onClick={() => adjust(1)}>
+            <FiPlus size={16} /> {t("common.add")}
+          </Btn>
+        </div>
+      )}
 
       <FormGrid>
         <Field
@@ -375,7 +377,10 @@ function TimeAddedSection({ settings, update }: SectionProps) {
       description={t("tools.added.description")}
     >
       <FormGrid>
-        <Field label={t("tools.added.multiplier")} hint="(×)">
+        <Field
+          label={t("tools.added.multiplier")}
+          hint={t("tools.added.multiplierHint")}
+        >
           <NumberInput
             min={0}
             value={settings.multiplier}
@@ -439,18 +444,25 @@ function TimeAddedSection({ settings, update }: SectionProps) {
               </span>
               {key === "chat" && (
                 <>
-                  {/* Matched like chat alerts' keywords */}
-                  <Input
-                    aria-label={t("tools.added.keyword")}
-                    placeholder={t("common.anyMessage")}
-                    value={settings.chat.keyword}
-                    onChange={(e) => {
-                      const keyword = e.target.value;
-                      chat((c) => {
-                        c.keyword = keyword;
-                      });
-                    }}
-                  />
+                  <span className={styles.trigger_rule}>
+                    {rich(t("tools.rules.keyword"), {
+                      // Matched like chat alerts' keywords
+                      input: (
+                        <Input
+                          className={styles.keyword}
+                          aria-label={t("tools.added.keyword")}
+                          placeholder={t("common.anyMessage")}
+                          value={settings.chat.keyword}
+                          onChange={(e) => {
+                            const keyword = e.target.value;
+                            chat((c) => {
+                              c.keyword = keyword;
+                            });
+                          }}
+                        />
+                      ),
+                    })}
+                  </span>
                   <span className={styles.trigger_rule}>
                     {rich(t("tools.rules.cooldown"), {
                       input: (

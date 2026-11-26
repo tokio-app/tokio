@@ -177,7 +177,7 @@ describe("Tools", () => {
     });
     await wait(5000);
     expect(clock().getByText("00:00:09")).toBeVisible();
-    expect(clock().getByText("Paused")).toBeVisible();
+    expect(clock().getByText("Paused, still adding time")).toBeVisible();
   });
 
   it("warms the timer's row only while it runs", async () => {

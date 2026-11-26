@@ -4,7 +4,8 @@ import { BackButton, Page, Section, Spinner } from "@/components";
 import { PlatformsContext } from "@/context/platforms";
 import { useIpcListener, useIpcRequest, useServerEnabled } from "@/hooks";
 import toolsStyles from "@/pages/Tools/tools.module.css";
-import { useT } from "@/ui/i18n";
+import { rich, useT } from "@/ui/i18n";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTimerPush } from "./helper";
 import { TimerSections } from "./sections/TimerSections";
@@ -25,7 +26,11 @@ export function CountdownTimer() {
     <PlatformsContext value={platforms}>
       <Page width="wide" layout="aside">
         {!serverEnabled && (
-          <p className={toolsStyles.notice}>{t("tools.countdown.serverOff")}</p>
+          <p className={toolsStyles.notice}>
+            {rich(t("tools.countdown.serverOff"), {
+              link: (text) => <Link to="/settings">{text}</Link>,
+            })}
+          </p>
         )}
 
         {timer ? (

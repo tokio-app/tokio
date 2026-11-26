@@ -9,7 +9,7 @@ describe("timerStatusText", () => {
       "Time's up",
     );
     expect(timerStatusText({ status: "stopped", remaining: 1 }, "en")).toBe(
-      "Stopped",
+      "Stopped, adding no time",
     );
     expect(timerStatusText({ status: "idle", remaining: 0 }, "en")).toBe(
       "Ready",

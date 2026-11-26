@@ -22,9 +22,9 @@ const running = (remaining: number) =>
   });
 
 const titleInput = () =>
-  within(
-    section("Timer look").getByRole("group", { name: /optional/ }),
-  ).getByRole("textbox");
+  within(section("Look").getByRole("group", { name: /optional/ })).getByRole(
+    "textbox",
+  );
 const button = (name: string) => screen.getByRole("button", { name });
 const clock = () => screen.getByRole("timer");
 const wait = (ms: number) => act(() => vi.advanceTimersByTime(ms));
@@ -130,8 +130,11 @@ describe("CountdownTimer", () => {
 
   it("warns while the overlay server is off", async () => {
     renderWithProviders(<CountdownTimer />);
-    const notice =
-      "The overlay server is off. Enable it in Settings to show the timer on stream.";
+    // Its text runs around a link to Settings
+    const notice = (_: string, el: Element | null) =>
+      el?.tagName === "P" &&
+      el.textContent ===
+        "The overlay server is off. Enable it in Settings to show the countdown on stream.";
     await timer();
     expect(screen.queryByText(notice)).not.toBeInTheDocument();
 
@@ -141,7 +144,9 @@ describe("CountdownTimer", () => {
         s.settings.server.enabled = false;
       }),
     );
-    expect(screen.getByText(notice)).toBeInTheDocument();
+    expect(
+      within(screen.getByText(notice)).getByRole("link", { name: "Settings" }),
+    ).toHaveAttribute("href", "/settings");
     // Once, above the sections
     expect(section("Countdown").queryByText(notice)).toBeNull();
 
@@ -171,7 +176,7 @@ describe("CountdownTimer", () => {
     await timer();
     expect(clock()).toHaveTextContent("01:00:00");
     expect(screen.getByText("Ready")).toBeInTheDocument();
-    expect(screen.getByTitle("Copy the timer's URL")).toHaveTextContent(
+    expect(screen.getByTitle("Copy the countdown's URL")).toHaveTextContent(
       getOverlayURL(TIMER_PATH),
     );
 
@@ -182,12 +187,18 @@ describe("CountdownTimer", () => {
   it("enables the controls that apply to each status", async () => {
     renderWithProviders(<CountdownTimer />);
     const enabled = () =>
-      ["Start", "Pause", "Stop", "Reset", "Remove", "Add"].filter(
-        (name) => !button(name).matches(":disabled"),
-      );
+      ["Start", "Pause", "Stop", "Reset", "Remove", "Add"].filter((name) => {
+        const shown = screen.queryByRole("button", { name });
+        return shown && !shown.matches(":disabled");
+      });
 
     await timer();
     expect(enabled()).toEqual(["Start"]);
+    // Ready changes the starting time instead
+    expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+    expect(
+      screen.queryByRole("spinbutton", { name: "Minutes to add or remove" }),
+    ).toBeNull();
 
     await running(60_000);
     expect(screen.getByText("Running")).toBeInTheDocument();
@@ -196,13 +207,13 @@ describe("CountdownTimer", () => {
     await timer((t) => {
       t.state = { status: "paused", remaining: 60_000 };
     });
-    expect(screen.getByText("Paused")).toBeInTheDocument();
+    expect(screen.getByText("Paused, still adding time")).toBeInTheDocument();
     expect(enabled()).toEqual(["Start", "Stop", "Reset", "Remove", "Add"]);
 
     await timer((t) => {
       t.state = { status: "stopped", remaining: 60_000 };
     });
-    expect(screen.getByText("Stopped")).toBeInTheDocument();
+    expect(screen.getByText("Stopped, adding no time")).toBeInTheDocument();
     expect(enabled()).toEqual(["Start", "Reset", "Remove", "Add"]);
 
     // Start can't carry on from 0
@@ -273,7 +284,7 @@ describe("CountdownTimer", () => {
     await running(60_000);
 
     await user.click(button("Reset"));
-    const dialog = screen.getByRole("dialog", { name: "Reset the timer?" });
+    const dialog = screen.getByRole("dialog", { name: "Reset the countdown?" });
     expect(dialog).toHaveAccessibleDescription(
       "It goes back to the starting time, 1:00:00. The time added so far is lost.",
     );
@@ -310,13 +321,13 @@ describe("CountdownTimer", () => {
     expect(saves[0].settings.seconds.follow).toBe(31);
   });
 
-  it("puts Timer look right after the countdown, where the preview shows", async () => {
+  it("puts Look right after the countdown, where the preview shows", async () => {
     renderWithProviders(<CountdownTimer />);
     await timer();
 
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
-    ).toEqual(["Countdown", "Timer look", "Time added"]);
+    ).toEqual(["Countdown", "Look", "Time added"]);
   });
 
   it("gives chat a keyword and a cooldown, and no boxes, joins or envelopes", async () => {
@@ -335,6 +346,7 @@ describe("CountdownTimer", () => {
 
     const keyword = added.getByRole("textbox", { name: "Keyword or phrase" });
     expect(keyword).toHaveAttribute("placeholder", "Any message");
+    expect(keyword.parentElement).toHaveTextContent(/^only messages with$/);
     await user.type(keyword, "!time");
     const cooldown = added.getByRole("spinbutton", {
       name: "Seconds between a viewer's messages",
@@ -361,7 +373,7 @@ describe("CountdownTimer", () => {
         superfan: 0,
       };
     });
-    const look = section("Timer look");
+    const look = section("Look");
     const names = () =>
       within(look.getByRole("list", { name: "Names on stream" }));
     expect(look.queryByRole("list", { name: "Names on stream" })).toBeNull();
@@ -400,7 +412,7 @@ describe("CountdownTimer", () => {
     await timer((t) => {
       t.settings.multiplier = 0;
     });
-    const look = section("Timer look");
+    const look = section("Look");
 
     await user.click(
       look.getByRole("checkbox", { name: "Show the triggers, one at a time" }),
@@ -434,7 +446,7 @@ describe("CountdownTimer", () => {
     await timer((t) => {
       t.settings.multiplier = 2;
     });
-    const look = section("Timer look");
+    const look = section("Look");
     expect(screen.getByText("×2")).toBeInTheDocument();
     await user.type(titleInput(), "Subathon");
     await user.click(

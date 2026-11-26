@@ -56,5 +56,6 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
 ## The page
 
 - One `useAutosave(timer.settings)` feeds the three timer sections. Its delay keys on `prevSaved`, so main's pushes (a new but equal `settings` every 250 ms on a busy LIVE) don't keep restarting it.
+- The statuses' texts say how each treats time ("Paused, still adding time", "Stopped, adding no time"), and Tools' row shows them too. Add and Remove don't show while idle, when **Starting time** under them is what changes.
 - The controls call `flushSettings()` before `TIMER_CONTROL` or `ADJUST_TIMER`, so a setting still waiting to save, like the starting time, reaches main first.
 - The preview and Tools' timer row count down from the last push's `at` (`timeLeft`, `helper.ts`), ticking only while running. While idle, the preview shows the starting time as typed.
