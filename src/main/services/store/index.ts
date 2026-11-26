@@ -77,7 +77,7 @@ export const LOAD_RETRY_MS = 30_000;
 
 // The most saved emotes per platform that no alert, game action or Studio
 // item uses (the user's call): past it, those seen longest ago go
-export const MAX_UNUSED_EMOTES = 300;
+const MAX_UNUSED_EMOTES = 300;
 
 export class StoreManagerService extends Service {
   private _jsonManagerService!: JSONManagerService;
