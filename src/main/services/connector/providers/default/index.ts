@@ -6,6 +6,7 @@ import {
   UserData,
 } from "@/common/types";
 import {
+  AbortError,
   EulerSigner,
   isConnectorError,
   isStreakable,
@@ -157,7 +158,8 @@ export class TikTokLiveConnector extends ConnectorProvider {
             `<Connector> Connecting again in ${CONNECT_RETRY_MS / 1000} s -- ${formatError(err)}`,
             this._logFile,
           );
-          if (!(await this._pause(CONNECT_RETRY_MS))) throw err;
+          // disconnect() ended the wait: canceled, not the last try's failure
+          if (!(await this._pause(CONNECT_RETRY_MS))) throw new AbortError();
         }
       }
     } catch (err) {
@@ -558,6 +560,9 @@ function toFailure(error: unknown): ConnectorFailure {
   switch (error.code) {
     case "OFFLINE":
       return fail("offline");
+    // disconnect() interrupted the connect
+    case "ABORTED":
+      return fail("canceled");
     case "ROOM_NOT_FOUND":
       // Every lookup failed on the network, which doesn't mean no such user
       return fail(error.retryable ? "network" : "notFound");

@@ -30,6 +30,10 @@ describe("Kick's API", () => {
     expect(parseInput("kick.com/streamer")).toBe("streamer");
     expect(parseInput("https://www.kick.com/Streamer/")).toBe("streamer");
     expect(parseInput("http://kick.com/streamer?clip=1")).toBe("streamer");
+    // The popout chat streamers dock in OBS
+    expect(parseInput("https://kick.com/popout/streamer/chat")).toBe(
+      "streamer",
+    );
     expect(parseInput("")).toBeNull();
     expect(parseInput("kick.com")).toBeNull();
     expect(parseInput("two words")).toBeNull();

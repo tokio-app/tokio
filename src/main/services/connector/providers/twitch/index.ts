@@ -62,6 +62,8 @@ type Connection = {
   // The wait before a connect's or a reconnect's next try, and its end
   retry?: NodeJS.Timeout;
   wake?: () => void;
+  // Events waiting for their picture, which a stop sends without it
+  held: Set<Mapped>;
 };
 
 /**
@@ -80,6 +82,9 @@ export class TwitchConnector
   private _connecting: Promise<ConnectorResponse> | null = null;
   // Viewers' pictures by Twitch id, the last looked up kept
   private _pictures = new Map<string, string>();
+  // The picture lookups of the minute since lookupsSince
+  private _lookups = 0;
+  private _lookupsSince = 0;
   // When each repeating error was last logged
   private _logged = new Map<string, number>();
 
@@ -123,9 +128,13 @@ export class TwitchConnector
 
   // The channel is the account's own, whatever the profile names
   public connect(_channel?: string): Promise<ConnectorResponse> {
-    return (this._connecting ??= this._connect().finally(() => {
-      this._connecting = null;
+    // A connect a Disconnect stopped can still be finishing its requests: a
+    // new Connect starts over instead of getting its "canceled"
+    if (this._conn === null) this._connecting = null;
+    const connecting = (this._connecting ??= this._connect().finally(() => {
+      if (this._connecting === connecting) this._connecting = null;
     }));
+    return connecting;
   }
 
   public async disconnect(): Promise<void> {
@@ -161,7 +170,7 @@ export class TwitchConnector
 
     const conn = this._connection();
     this._conn = conn;
-    let viewers: number | null;
+    let viewers: number | null | undefined;
     try {
       for (let tries = 1; ; tries++) {
         try {
@@ -185,11 +194,20 @@ export class TwitchConnector
         }
       }
     } catch (err) {
+      // A Disconnect closed the socket or woke the pause; a sign-out also
+      // stops the connection but says so itself
+      if (this._conn !== conn && !this._auth.lost) {
+        return fail("canceled", "Disconnected while connecting.");
+      }
       this._stop(conn);
       return { success: false, error: toFailure(err) };
     }
+    // A stop between _start's answer and this, like a sign-out from a picture
+    // lookup's refresh: going up would start timers nothing stops
     if (this._conn !== conn) {
-      return fail("unknown", "Disconnected while connecting.");
+      return this._auth.lost
+        ? fail("badKey", "Twitch signed the account out.")
+        : fail("canceled", "Disconnected while connecting.");
     }
 
     conn.up = true;
@@ -197,12 +215,19 @@ export class TwitchConnector
       () => this._revalidate(conn),
       this._config.VALIDATE_MS,
     );
+    const live =
+      viewers === undefined
+        ? ", live status unknown"
+        : viewers !== null
+          ? ", live"
+          : ", not live";
     Logger.info(
-      `<Twitch> Connected to @${this._auth.account.login}${viewers !== null ? ", live" : ", not live"}.`,
+      `<Twitch> Connected to @${this._auth.account.login}${live}.`,
       this._logFile,
     );
     this.emit(TOKIO_EVENTS.CONNECTED);
-    if (viewers !== null) this._goLive(conn, viewers);
+    if (viewers === undefined) this._recheck(conn);
+    else if (viewers !== null) this._goLive(conn, viewers);
     return { success: true };
   }
 
@@ -213,9 +238,11 @@ export class TwitchConnector
       reconnecting: false,
       live: false,
       wasLive: false,
+      held: new Set(),
       eventsub: new EventSub(
         this._config.EVENTSUB_URL,
         this._config.KEEPALIVE_GRACE_MS,
+        this._config.REQUEST_TIMEOUT_MS,
         {
           notification: (type, event) => this._notify(conn, type, event),
           revocation: (sub) => {
@@ -240,11 +267,15 @@ export class TwitchConnector
 
   /**
    * A fresh socket with its subscriptions, and whether the channel is live:
-   * its viewers, or null. Throws when it couldn't, or the socket dropped
-   * meanwhile.
+   * its viewers, null when it isn't, undefined when the check failed. Throws
+   * when it couldn't, or the socket dropped meanwhile.
    */
-  private async _start(conn: Connection): Promise<number | null> {
+  private async _start(conn: Connection): Promise<number | null | undefined> {
     const { userId, login } = await this._auth.validate();
+    // Stopped meanwhile: a socket opened now would never be closed
+    if (this._conn !== conn) {
+      throw connectFailure("canceled", "Disconnected while connecting.");
+    }
     conn.userId = userId;
     const session = await conn.eventsub.open();
     await this._subscribe(session, userId);
@@ -253,7 +284,7 @@ export class TwitchConnector
         "streams",
         `Couldn't check whether @${login} is live -- ${formatError(err)}`,
       );
-      return null;
+      return undefined;
     });
     // Checked last, with nothing awaited after: a drop before it fails the
     // try, and one after it reconnects
@@ -274,16 +305,27 @@ export class TwitchConnector
           broadcaster_user_id: userId,
         };
         if (as) condition[as] = userId;
-        const res = await this._auth.request(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type,
-            version,
-            condition,
-            transport: { method: "websocket", session_id: session },
-          }),
-        });
+        let res: Response;
+        try {
+          res = await this._auth.request(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type,
+              version,
+              condition,
+              transport: { method: "websocket", session_id: session },
+            }),
+          });
+        } catch (err) {
+          // A 429 skips the event like a 403; the network fails the try
+          if (type === CHAT || kindOf(err) !== "rateLimited") throw err;
+          this._logOnce(
+            `subscribe:${type}`,
+            `Skipped ${type} -- ${formatError(err)}`,
+          );
+          return;
+        }
         if (res.ok) return;
         const failure = await failureOf(res, `subscription to ${type}`);
         if (type === CHAT) throw failure;
@@ -306,7 +348,8 @@ export class TwitchConnector
   private _goLive(conn: Connection, viewers?: number) {
     conn.live = conn.wasLive = true;
     if (viewers !== undefined) this._viewers(viewers);
-    conn.poll ??= setInterval(() => {
+    clearInterval(conn.poll);
+    conn.poll = setInterval(() => {
       this._streams(conn).then(
         (count) => {
           if (this._conn === conn && conn.live && count !== null) {
@@ -320,6 +363,27 @@ export class TwitchConnector
           ),
       );
     }, this._config.STREAMS_POLL_MS);
+  }
+
+  // After a live check that failed: asks again until Twitch answers, as a
+  // failed check is neither live nor offline
+  private _recheck(conn: Connection) {
+    if (conn.poll) return; // a stream.online during _start decided
+    const timer = setInterval(() => {
+      this._streams(conn).then(
+        (viewers) => {
+          if (this._conn !== conn || conn.poll !== timer) return;
+          if (viewers !== null) this._goLive(conn, viewers);
+          else this._offline(conn);
+        },
+        (err) =>
+          this._logOnce(
+            "streams",
+            `Couldn't check whether the stream is live -- ${formatError(err)}`,
+          ),
+      );
+    }, this._config.STREAMS_POLL_MS);
+    conn.poll = timer;
   }
 
   private _viewers(viewers: number) {
@@ -352,8 +416,11 @@ export class TwitchConnector
     }
     const mapped = MAPPERS[type]?.(event);
     if (!mapped) return;
+    conn.held.add(mapped);
     void this._picture(mapped.data.user).then(() => {
-      if (this._conn === conn) this.emit(mapped.event, mapped.data);
+      if (conn.held.delete(mapped) && this._conn === conn) {
+        this.emit(mapped.event, mapped.data);
+      }
     });
   }
 
@@ -364,6 +431,14 @@ export class TwitchConnector
     if (!id || user.profilePictures.length) return;
     let url = this._pictures.get(id);
     if (url === undefined) {
+      const now = Date.now();
+      if (now - this._lookupsSince >= 60_000) {
+        this._lookupsSince = now;
+        this._lookups = 0;
+      }
+      // Past the minute's lookups, it goes out without its picture
+      if (this._lookups >= this._config.PICTURE_LOOKUPS) return;
+      this._lookups++;
       try {
         const res = await this._auth.request(
           `${this._config.HELIX_URL}/users?id=${id}`,
@@ -416,7 +491,7 @@ export class TwitchConnector
   // Tries again until it's back or the user disconnects, the wait doubling
   // up to RECONNECT_MAX_MS. A fresh socket subscribes again.
   private async _reconnect(conn: Connection) {
-    let viewers: number | null;
+    let viewers: number | null | undefined;
     for (let attempt = 0; ; attempt++) {
       const { RECONNECT_MIN_MS, RECONNECT_MAX_MS } = this._config;
       const delay = Math.min(RECONNECT_MAX_MS, RECONNECT_MIN_MS * 2 ** attempt);
@@ -441,9 +516,11 @@ export class TwitchConnector
       this._logFile,
     );
     this._onReconnect?.("reconnected");
-    // The stream ended or started while away
-    if (viewers !== null) this._goLive(conn, viewers);
-    else if (conn.wasLive) this._offline(conn);
+    // The stream ended or started while away. A stream.online during _start
+    // already started the poll, and Helix lags behind EventSub.
+    if (viewers === undefined) this._recheck(conn);
+    else if (viewers !== null) this._goLive(conn, viewers);
+    else if (conn.wasLive && !conn.poll) this._offline(conn);
   }
 
   // The wait between tries: false when a stop ended it
@@ -465,6 +542,9 @@ export class TwitchConnector
     clearTimeout(conn.retry);
     conn.wake?.();
     if (!conn.up) return;
+    // Before DISCONNECTED, as they came before the stop
+    for (const mapped of conn.held) this.emit(mapped.event, mapped.data);
+    conn.held.clear();
     const why =
       reason === "ended"
         ? " -- the stream ended"

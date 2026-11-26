@@ -43,12 +43,16 @@ export class EventSub {
     reject: (error: Error) => void;
   } | null = null;
   private _watchdog?: NodeJS.Timeout;
+  // open()'s wait for its welcome, which the keepalive watchdog can't cover
+  // before the first message
+  private _welcome?: NodeJS.Timeout;
   private _keepaliveMs = 10_000;
   private _seen = new Set<string>();
 
   constructor(
     private _url: string,
     private _graceMs: number,
+    private _welcomeMs: number,
     private _handlers: EventSubHandlers,
   ) {}
 
@@ -61,13 +65,28 @@ export class EventSub {
   public open(): Promise<string> {
     this.close();
     return new Promise((resolve, reject) => {
-      this._opening = { resolve, reject };
-      this._socket = this._attach(new WebSocket(this._url));
+      const opening = { resolve, reject };
+      this._opening = opening;
+      const socket = this._attach(new WebSocket(this._url));
+      this._socket = socket;
+      this._welcome = setTimeout(() => {
+        if (this._opening !== opening) return;
+        this._opening = null;
+        this._socket = null;
+        discard(socket);
+        reject(
+          connectFailure(
+            "network",
+            `No welcome came on the EventSub socket in ${this._welcomeMs / 1000} s.`,
+          ),
+        );
+      }, this._welcomeMs);
     });
   }
 
   public close() {
     clearTimeout(this._watchdog);
+    clearTimeout(this._welcome);
     discard(this._socket);
     discard(this._next);
     this._socket = this._next = null;
@@ -142,6 +161,7 @@ export class EventSub {
           discard(this._socket);
           this._socket = socket;
         } else if (socket === this._socket && this._opening) {
+          clearTimeout(this._welcome);
           this._opening.resolve(session.id);
           this._opening = null;
         }

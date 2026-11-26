@@ -16,6 +16,8 @@ export type ConnectErrorKind =
   // The LIVE has its chat turned off
   | "noChat"
   | "network"
+  // The user disconnected before the connect finished: nothing to tell them
+  | "canceled"
   | "unknown";
 export type ConnectorFailure = Error & {
   kind: ConnectErrorKind;

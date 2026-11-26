@@ -1,5 +1,6 @@
 import { ChatEvent, TOKIO_EVENTS } from "@/common/types";
 import {
+  AbortError,
   ConnectorError,
   InvalidUsernameError,
   OfflineError,
@@ -275,6 +276,8 @@ describe("TikTokLiveConnector", () => {
       [new WebSocketError("Closed"), "network"],
       [new ConnectorError("NETWORK", "Offline"), "network"],
       [new ConnectorError("PROTOCOL", "Garbled"), "unknown"],
+      // disconnect() interrupted the connect
+      [new AbortError(), "canceled"],
       [new Error("A bug"), "unknown"],
     ])("reports %s as %s and stops listening", async (error, kind) => {
       // A network failure is tried again first
@@ -358,7 +361,11 @@ describe("TikTokLiveConnector", () => {
       await vi.advanceTimersByTimeAsync(0);
       await connector.disconnect();
 
-      expect((await pending).success).toBe(false);
+      // Canceled, not the last try's network failure: nothing to tell
+      expect(await pending).toMatchObject({
+        success: false,
+        error: { kind: "canceled" },
+      });
       await vi.advanceTimersByTimeAsync(10_000);
       expect(live.listening).toHaveLength(1);
       expect(connector.isConnected()).toBe(false);

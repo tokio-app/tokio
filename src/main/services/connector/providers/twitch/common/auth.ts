@@ -2,6 +2,7 @@
 // secret), its refresh tokens, and the requests made with the access token.
 // From Twitch's authentication docs.
 import { formatError } from "@/common/util";
+import { track } from "@/helper/quit";
 import Logger from "@/logger";
 import {
   connectFailure,
@@ -205,15 +206,18 @@ export class TwitchAuth {
   /**
    * A new access token. Refresh tokens work once, so every caller waiting
    * shares one refresh, and one whose token was already replaced gets the
-   * new one: two 401s at once would otherwise burn the token.
+   * new one: two 401s at once would otherwise burn the token. A quit
+   * waits for it, or the spent token's replacement is never saved.
    */
   public refresh(stale = this._token): Promise<string> {
     if (this._token && this._token !== stale) {
       return Promise.resolve(this._token);
     }
-    return (this._refreshing ??= this._refresh().finally(() => {
-      this._refreshing = null;
-    }));
+    return (this._refreshing ??= track(
+      this._refresh().finally(() => {
+        this._refreshing = null;
+      }),
+    ));
   }
 
   // The account's login and id, checked at connect and every hour, as

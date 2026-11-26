@@ -682,6 +682,27 @@ describe("live MCP tools", () => {
       });
     });
 
+    it("refuses no platforms, and platforms the profile doesn't use", async () => {
+      const { h, profile } = setup(undefined, "streamer");
+      profile.platforms = ["tiktok", "kick"];
+      const invoke = vi.spyOn(h.handler, "invoke");
+      const { call } = await mcpClient(h.handler);
+
+      expect(
+        await call("live", { action: "connect", platforms: [] }),
+      ).toMatchObject({ isError: true });
+      expect(
+        await call("live", {
+          action: "connect",
+          platforms: ["kick", "youtube", "twitch"],
+        }),
+      ).toMatchObject({
+        isError: true,
+        text: "The profile doesn't use YouTube and Twitch. Add them to its platforms first (settings section platforms).",
+      });
+      expect(invoke).not.toHaveBeenCalled();
+    });
+
     it("disconnects one platform", async () => {
       const { h } = setup();
       const invoke = vi.spyOn(h.handler, "invoke");

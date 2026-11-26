@@ -18,8 +18,9 @@ const kick = {
   // The client id of each realtime request
   clients: [] as string[],
   urls: [] as string[],
-  // Answers a request instead, until it gives undefined
-  override: undefined as ((url: string) => Response | undefined) | undefined,
+  // Answers a request instead, until it gives undefined; a promise holds it
+  override: undefined as
+    ((url: string) => Response | Promise<Response> | undefined) | undefined,
 };
 
 const socket = () => kick.sockets[kick.sockets.length - 1];
@@ -207,6 +208,74 @@ describe("KickConnector", () => {
       expect(kick.urls).toHaveLength(3);
       expect(connector.isConnected()).toBe(false);
     });
+
+    it("opens no socket for a connect a Disconnect stopped, and calls it canceled", async () => {
+      const onConnected = capture(TOKIO_EVENTS.CONNECTED);
+      // The tab's Disconnect while the lookup is out
+      kick.override = (url) => {
+        if (url.endsWith("/channels/streamer")) void connector.disconnect();
+        return undefined;
+      };
+
+      expect(await connector.connect("streamer")).toMatchObject({
+        success: false,
+        error: { kind: "canceled" },
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(kick.sockets).toHaveLength(0);
+      expect(onConnected).not.toHaveBeenCalled();
+      expect(connector.isConnected()).toBe(false);
+    });
+
+    it("calls a connect stopped while it waits to try again canceled", async () => {
+      kick.override = (url) => {
+        if (!url.endsWith("/auth/connection")) return undefined;
+        setTimeout(() => void connector.disconnect(), 0);
+        throw new TypeError("fetch failed");
+      };
+
+      expect((await connector.connect("streamer")).error?.kind).toBe(
+        "canceled",
+      );
+      expect(
+        kick.urls.filter((u) => u.endsWith("/channels/streamer")),
+      ).toHaveLength(1);
+    });
+
+    it("starts over on a Connect right after a Disconnect, while the stopped one finishes", async () => {
+      const onConnected = capture(TOKIO_EVENTS.CONNECTED);
+      // The first lookup waits until after the tab's Disconnect and Connect
+      const held: { release?: () => void } = {};
+      kick.override = (url) => {
+        if (!url.endsWith("/channels/streamer") || held.release) {
+          return undefined;
+        }
+        return new Promise<Response>((resolve) => {
+          held.release = () =>
+            resolve(
+              json(200, {
+                id: 10,
+                slug: "streamer",
+                chatroom: { id: 20 },
+                livestream: null,
+                user: { username: "Streamer" },
+              }),
+            );
+        });
+      };
+
+      const first = connector.connect("streamer");
+      await vi.waitFor(() => expect(held.release).toBeDefined());
+      await connector.disconnect();
+      const again = connector.connect("streamer");
+      held.release!();
+
+      expect((await first).error?.kind).toBe("canceled");
+      expect(await again).toEqual({ success: true });
+      expect(onConnected).toHaveBeenCalledTimes(1);
+      expect(kick.sockets).toHaveLength(1);
+      expect(connector.isConnected()).toBe(true);
+    });
   });
 
   describe("events", () => {
@@ -379,6 +448,23 @@ describe("KickConnector", () => {
       await vi.waitFor(() =>
         expect(onDisconnected).toHaveBeenCalledWith({ reason: "ended" }),
       );
+      expect(connector.isConnected()).toBe(false);
+    });
+
+    it("ends a stream the viewers poll finds offline twice in a row, with no end in the feed", async () => {
+      kick.viewers = 120;
+      const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+      await connector.connect("streamer");
+      const lookups = () =>
+        kick.urls.filter((u) => u.endsWith("/channels/streamer")).length;
+      const before = lookups();
+
+      kick.viewers = null;
+      await vi.waitFor(() =>
+        expect(onDisconnected).toHaveBeenCalledWith({ reason: "ended" }),
+      );
+      // Not on the first offline answer
+      expect(lookups() - before).toBe(2);
       expect(connector.isConnected()).toBe(false);
     });
 

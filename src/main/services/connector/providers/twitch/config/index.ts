@@ -14,7 +14,8 @@ const config = {
 
   // A keepalive can come this late before the socket counts as dropped
   KEEPALIVE_GRACE_MS: 5000,
-  // Each request, so a dead network fails a connect instead of holding it
+  // Each request and the EventSub socket's welcome, so a dead network fails
+  // a connect instead of holding it
   REQUEST_TIMEOUT_MS: 10_000,
   // How often the viewers are asked for while the stream is live
   STREAMS_POLL_MS: 30_000,
@@ -32,6 +33,9 @@ const config = {
 
   // Viewers whose pictures are kept, the last ones looked up
   PICTURES_KEPT: 500,
+  // Pictures looked up a minute at most, a quarter of Helix's 800 requests
+  // a minute, so a follow train leaves the rest for the connection
+  PICTURE_LOOKUPS: 200,
   // A repeating error is logged at most this often
   LOG_REPEAT_MS: 30_000,
 };

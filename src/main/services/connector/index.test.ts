@@ -146,6 +146,24 @@ describe("ConnectorService", () => {
     );
   });
 
+  it("logs a connect a Disconnect stopped at info, as the user's", async () => {
+    const error = vi.spyOn(Logger, "error");
+    const info = vi.spyOn(Logger, "info");
+    const { service, provider } = setup();
+    const cause = connectFailure("canceled", "Disconnected while connecting.");
+    provider.connect.mockResolvedValue({ success: false, error: cause });
+
+    expect(await service.connect({ tiktok: "streamer" })).toEqual({
+      success: false,
+      error: cause,
+    });
+    expect(error).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledWith(
+      "<Connector> Stopped connecting to streamer: the user disconnected.",
+      "connector.log",
+    );
+  });
+
   it("passes everything else to the active provider", async () => {
     const { service, provider } = setup();
     const listener = vi.fn();
@@ -413,6 +431,20 @@ describe("ConnectorService", () => {
       ]);
     });
 
+    it("remembers the platform that ended the session, before telling it", () => {
+      const { service, tiktok, twitch, disconnected } = both();
+      const seen: unknown[] = [];
+      disconnected.mockImplementation(() => seen.push(service.endedBy()));
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+
+      tiktok.fire(TOKIO_EVENTS.DISCONNECTED, { reason: "lost" });
+      twitch.fire(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+
+      expect(seen).toEqual(["twitch"]);
+      expect(service.endedBy()).toBe("twitch");
+    });
+
     it("tells no platform's stop while a Disconnect stops them all", async () => {
       const { service, tiktok, twitch, disconnected, onPlatform } = both();
       tiktok.fire(TOKIO_EVENTS.CONNECTED);
@@ -530,6 +562,18 @@ describe("ConnectorService", () => {
       expect(service.isWaiting()).toBe(true);
       waiting.mockReturnValue(false);
       expect(service.isWaiting()).toBe(false);
+    });
+
+    it("says TikTok is connected once its look found the LIVE, while the look still runs", () => {
+      const { service, tiktok, connected } = both();
+      vi.spyOn(tiktok, "isWaiting").mockReturnValue(true);
+      const seen: unknown[] = [];
+      connected.mockImplementation(() => seen.push(service.status()));
+
+      // The library sends CONNECTED from inside the look's connect
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+
+      expect(seen).toEqual([{ tiktok: "connected", twitch: "connecting" }]);
     });
 
     it("names the session after the platform that started it", async () => {

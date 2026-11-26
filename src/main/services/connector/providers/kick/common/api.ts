@@ -29,7 +29,9 @@ export function parseInput(input: string): string | null {
   let slug = text;
   if (KICK_URL.test(text)) {
     const url = new URL(/^https?:/i.test(text) ? text : `https://${text}`);
-    slug = url.pathname.split("/").find(Boolean) ?? "";
+    const parts = url.pathname.split("/").filter(Boolean);
+    // The popout chat's link: kick.com/popout/<slug>/chat
+    slug = (parts[0]?.toLowerCase() === "popout" ? parts[1] : parts[0]) ?? "";
   }
   return SLUG.test(slug) ? slug.toLowerCase() : null;
 }

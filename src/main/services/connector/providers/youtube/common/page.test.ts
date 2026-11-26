@@ -30,6 +30,12 @@ describe("parseInput", () => {
     expect(parseInput("https://www.youtube.com/channel/UCmadeup")).toEqual({
       path: "/channel/UCmadeup",
     });
+    expect(parseInput("https://www.youtube.com/c/MadeUp")).toEqual({
+      path: "/c/MadeUp",
+    });
+    expect(parseInput("https://www.youtube.com/user/MadeUp/videos")).toEqual({
+      path: "/user/MadeUp",
+    });
   });
 
   it("reads a LIVE's links", () => {
@@ -38,6 +44,9 @@ describe("parseInput", () => {
       "https://www.youtube.com/watch?v=abcdefghijk&t=10s",
       "https://youtu.be/abcdefghijk",
       "https://www.youtube.com/live/abcdefghijk?si=x",
+      // The popout chat streamers dock in OBS, and YouTube Studio's LIVE
+      "https://www.youtube.com/live_chat?is_popout=1&v=abcdefghijk",
+      "https://studio.youtube.com/video/abcdefghijk/livestreaming",
     ]) {
       expect(parseInput(link)).toEqual({ videoId: "abcdefghijk" });
     }

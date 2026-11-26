@@ -66,9 +66,15 @@ export class YouTubeConnector extends ConnectorProvider {
   public setKey() {}
 
   public connect(channel: string): Promise<ConnectorResponse> {
-    return (this._connecting ??= this._connect(channel).finally(() => {
-      this._connecting = null;
-    }));
+    // A connect a Disconnect stopped can still be finishing its requests: a
+    // new Connect starts over instead of getting its "canceled"
+    if (this._conn === null) this._connecting = null;
+    const connecting = (this._connecting ??= this._connect(channel).finally(
+      () => {
+        if (this._connecting === connecting) this._connecting = null;
+      },
+    ));
+    return connecting;
   }
 
   public async disconnect(): Promise<void> {
@@ -132,11 +138,16 @@ export class YouTubeConnector extends ConnectorProvider {
         }
       }
     } catch (err) {
+      // A Disconnect woke the pause or came during a request: not the network
+      if (this._conn !== conn) {
+        return fail("canceled", "Disconnected while connecting.");
+      }
       this._stop(conn);
       return { success: false, error: toFailure(err) };
     }
+    // Its requests went on after a Disconnect
     if (this._conn !== conn) {
-      return fail("unknown", "Disconnected while connecting.");
+      return fail("canceled", "Disconnected while connecting.");
     }
 
     conn.up = true;

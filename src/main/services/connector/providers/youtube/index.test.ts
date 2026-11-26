@@ -122,6 +122,22 @@ describe("YouTubeConnector", () => {
       expect(youtube.state.urls).toHaveLength(1);
     });
 
+    it("tries a page whose body broke again, as the network", async () => {
+      youtube.state.override = (url) =>
+        url.includes("/@madeup/live")
+          ? new Response(
+              new ReadableStream({
+                start(controller) {
+                  controller.error(new TypeError("terminated"));
+                },
+              }),
+            )
+          : undefined;
+
+      expect((await connector.connect("madeup")).error?.kind).toBe("network");
+      expect(youtube.state.urls).toHaveLength(3);
+    });
+
     it("tries a network failure again", async () => {
       let failures = 2;
       youtube.state.override = () => {
@@ -140,6 +156,39 @@ describe("YouTubeConnector", () => {
       expect((await connector.connect("madeup")).error?.kind).toBe("network");
       expect(youtube.state.urls).toHaveLength(3);
       expect(connector.isConnected()).toBe(false);
+    });
+
+    it("calls a connect a Disconnect stopped canceled", async () => {
+      const onConnected = capture(TOKIO_EVENTS.CONNECTED);
+      const connecting = connector.connect("madeup");
+      await connector.disconnect();
+
+      expect(await connecting).toMatchObject({
+        success: false,
+        error: { kind: "canceled" },
+      });
+      expect(onConnected).not.toHaveBeenCalled();
+      expect(connector.isConnected()).toBe(false);
+    });
+
+    it("calls a connect stopped while it waits to try again canceled", async () => {
+      youtube.state.override = () => {
+        setTimeout(() => void connector.disconnect(), 0);
+        throw new TypeError("fetch failed");
+      };
+
+      expect((await connector.connect("madeup")).error?.kind).toBe("canceled");
+      expect(youtube.state.urls).toHaveLength(1);
+    });
+
+    it("starts over on a Connect right after a Disconnect, while the stopped one finishes", async () => {
+      const first = connector.connect("madeup");
+      await connector.disconnect();
+      const again = connector.connect("madeup");
+
+      expect((await first).error?.kind).toBe("canceled");
+      expect(await again).toEqual({ success: true });
+      expect(connector.isConnected()).toBe(true);
     });
   });
 

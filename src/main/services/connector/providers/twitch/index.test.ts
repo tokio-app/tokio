@@ -13,7 +13,7 @@ import {
 import { WebSocket, WebSocketServer } from "ws";
 import type { PlatformAccount, ReconnectState } from "../../common";
 import { NO_ACCOUNT } from "./common/auth";
-import config from "./config";
+import config, { type TwitchConfig } from "./config";
 import { TwitchConnector } from "./index";
 
 const BROADCASTER = "1971641";
@@ -47,6 +47,8 @@ const twitch = {
   // The keepalive each new socket's welcome says, in seconds
   keepalive: [] as number[],
   live: null as number | null,
+  // false: a new socket is taken but never welcomed
+  welcome: true,
   // Answers a request instead, until it gives undefined
   override: undefined as
     ((url: string) => Response | Promise<Response> | undefined) | undefined,
@@ -95,6 +97,25 @@ describe("TwitchConnector", () => {
   let saved: Mock<(account: PlatformAccount) => Promise<boolean>>;
   let states: ReconnectState[];
 
+  // The suite's connector, with the delays short and these options
+  const make = (options: Partial<TwitchConfig> = {}) => {
+    connector = new TwitchConnector({
+      CLIENT_ID: "client",
+      EVENTSUB_URL: `ws://127.0.0.1:${port}/ws`,
+      KEEPALIVE_GRACE_MS: 0,
+      CONNECT_RETRY_MS: 10,
+      RECONNECT_MIN_MS: 10,
+      RECONNECT_MAX_MS: 40,
+      STREAMS_POLL_MS: 50,
+      ...options,
+    });
+    connector.setAccount(ACCOUNT);
+    saved = vi.fn(async () => true);
+    connector.onAccount(saved);
+    states = [];
+    connector.onReconnect((state) => states.push(state));
+  };
+
   const capture = (event: TOKIO_EVENTS) => {
     const listener = vi.fn();
     connector.on(event, listener);
@@ -108,6 +129,7 @@ describe("TwitchConnector", () => {
       subStatus: {},
       keepalive: [],
       live: null,
+      welcome: true,
       override: undefined,
       calls: [],
     });
@@ -118,6 +140,7 @@ describe("TwitchConnector", () => {
     server.on("connection", (ws, req) => {
       const url = req.url ?? "";
       twitch.sockets.push({ socket: ws, url });
+      if (!twitch.welcome) return;
       // A reconnect's socket keeps the session
       const id = url.includes("reconnect")
         ? "session-1"
@@ -171,20 +194,7 @@ describe("TwitchConnector", () => {
       }),
     );
 
-    connector = new TwitchConnector({
-      CLIENT_ID: "client",
-      EVENTSUB_URL: `ws://127.0.0.1:${port}/ws`,
-      KEEPALIVE_GRACE_MS: 0,
-      CONNECT_RETRY_MS: 10,
-      RECONNECT_MIN_MS: 10,
-      RECONNECT_MAX_MS: 40,
-      STREAMS_POLL_MS: 50,
-    });
-    connector.setAccount(ACCOUNT);
-    saved = vi.fn(async () => true);
-    connector.onAccount(saved);
-    states = [];
-    connector.onReconnect((state) => states.push(state));
+    make();
   });
 
   afterEach(async () => {
@@ -276,6 +286,130 @@ describe("TwitchConnector", () => {
       expect(connector.isConnected()).toBe(false);
     });
 
+    it("skips an event Twitch rate limits, but not chat", async () => {
+      twitch.subStatus["channel.follow"] = 429;
+      expect(await connector.connect("")).toEqual({ success: true });
+      await connector.disconnect();
+
+      twitch.subStatus["channel.chat.message"] = 429;
+      const res = await connector.connect("");
+
+      expect(res.error?.kind).toBe("rateLimited");
+      expect(connector.isConnected()).toBe(false);
+    });
+
+    it("fails a try on a socket Twitch never welcomes", async () => {
+      twitch.welcome = false;
+      make({ REQUEST_TIMEOUT_MS: 50 });
+
+      const res = await connector.connect("");
+
+      expect(res.error?.kind).toBe("network");
+      expect(res.error?.message).toContain("welcome");
+      expect(twitch.sockets).toHaveLength(config.CONNECT_TRIES);
+      expect(connector.isConnected()).toBe(false);
+    });
+
+    describe("a Disconnect while connecting cancels it", () => {
+      // Holds the first token check until release()
+      const hold = () => {
+        let release: (() => void) | undefined;
+        twitch.override = (url) => {
+          if (url !== config.VALIDATE_URL || release) return undefined;
+          return new Promise((resolve) => {
+            release = () =>
+              resolve(json(200, { login: "streamer", user_id: BROADCASTER }));
+          });
+        };
+        return () => release;
+      };
+
+      it("during the token check, opening no socket", async () => {
+        const released = hold();
+        const connecting = connector.connect("");
+        await vi.waitFor(() => expect(released()).toBeDefined());
+
+        await connector.disconnect();
+        released()!();
+
+        const res = await connecting;
+        expect(res.success).toBe(false);
+        expect(res.error?.kind).toBe("canceled");
+        await new Promise((r) => setTimeout(r, 50));
+        expect(twitch.sockets).toHaveLength(0);
+        expect(twitch.subscriptions).toHaveLength(0);
+        expect(connector.isConnected()).toBe(false);
+      });
+
+      it("then a Connect starts over instead of getting its result", async () => {
+        const released = hold();
+        const first = connector.connect("");
+        await vi.waitFor(() => expect(released()).toBeDefined());
+        await connector.disconnect();
+        const again = connector.connect("");
+        released()!();
+
+        expect((await first).error?.kind).toBe("canceled");
+        expect(await again).toEqual({ success: true });
+        expect(twitch.sockets).toHaveLength(1);
+        expect(connector.isConnected()).toBe(true);
+      });
+
+      it("during the welcome wait", async () => {
+        twitch.welcome = false;
+        const connecting = connector.connect("");
+        await vi.waitFor(() => expect(twitch.sockets).toHaveLength(1));
+
+        await connector.disconnect();
+
+        expect((await connecting).error?.kind).toBe("canceled");
+      });
+
+      it("during the wait before trying again", async () => {
+        make({ CONNECT_RETRY_MS: 60_000 });
+        const info = vi.spyOn(Logger, "info");
+        twitch.override = (url) => {
+          if (url === config.VALIDATE_URL) throw new TypeError("fetch failed");
+          return undefined;
+        };
+        const connecting = connector.connect("");
+        await vi.waitFor(() =>
+          expect(info).toHaveBeenCalledWith(
+            expect.stringContaining("Connecting again"),
+            expect.anything(),
+          ),
+        );
+
+        await connector.disconnect();
+
+        expect((await connecting).error?.kind).toBe("canceled");
+      });
+
+      it("but a sign-out keeps its own failure", async () => {
+        twitch.override = (url) =>
+          url === config.TOKEN_URL
+            ? json(400, { message: "Invalid refresh token" })
+            : undefined;
+
+        expect((await connector.connect("")).error?.kind).toBe("badKey");
+        expect(connector.isConnected()).toBe(false);
+      });
+
+      it("during a reconnect's token check, opening no socket", async () => {
+        await connector.connect("");
+        const released = hold();
+        socket().terminate();
+        await vi.waitFor(() => expect(released()).toBeDefined());
+
+        await connector.disconnect();
+        released()!();
+
+        await new Promise((r) => setTimeout(r, 50));
+        expect(twitch.sockets).toHaveLength(1);
+        expect(twitch.subscriptions).toHaveLength(7);
+      });
+    });
+
     it("tells a rate limit", async () => {
       twitch.override = (url) =>
         url === config.TOKEN_URL ? json(429, {}) : undefined;
@@ -333,6 +467,50 @@ describe("TwitchConnector", () => {
         profilePictures: ["https://pic/4145994.png"],
       });
       expect(onChat.mock.calls[0][0].comment.content).toBe("hi");
+    });
+
+    it("looks up at most PICTURE_LOOKUPS pictures a minute, sending every event", async () => {
+      make({ PICTURE_LOOKUPS: 10 });
+      const onFollow = capture(TOKIO_EVENTS.FOLLOW);
+      await connector.connect("");
+
+      for (let i = 0; i < 50; i++) {
+        notify("channel.follow", { ...viewer, user_id: `${1000 + i}` });
+      }
+
+      await vi.waitFor(() => expect(onFollow).toHaveBeenCalledTimes(50));
+      expect(twitch.calls.filter((u) => u.includes("/users?id="))).toHaveLength(
+        10,
+      );
+      const pictured = onFollow.mock.calls.filter(
+        ([follow]) => follow.user.profilePictures.length,
+      );
+      expect(pictured).toHaveLength(10);
+    });
+
+    it("sends an event still waiting for its picture when the stream ends", async () => {
+      const order: string[] = [];
+      connector.on(TOKIO_EVENTS.CHEER, () => order.push("cheer"));
+      connector.on(TOKIO_EVENTS.DISCONNECTED, () => order.push("disconnected"));
+      await connector.connect("");
+      let release: (() => void) | undefined;
+      twitch.override = (url) =>
+        url.includes("/users?id=")
+          ? new Promise((resolve) => {
+              release = () =>
+                resolve(json(200, { data: [{ profile_image_url: "x" }] }));
+            })
+          : undefined;
+
+      notify("stream.online", { broadcaster_user_id: BROADCASTER });
+      notify("channel.bits.use", { ...viewer, bits: 500, type: "cheer" });
+      await vi.waitFor(() => expect(release).toBeDefined());
+      notify("stream.offline", { broadcaster_user_id: BROADCASTER });
+      await vi.waitFor(() => expect(order).toContain("disconnected"));
+      release!();
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(order).toEqual(["cheer", "disconnected"]);
     });
 
     it("sends the viewers while live, and ends with the stream", async () => {
@@ -410,6 +588,124 @@ describe("TwitchConnector", () => {
 
       await new Promise((r) => setImmediate(r));
       expect(onDisconnected).toHaveBeenCalledWith(undefined);
+    });
+  });
+
+  describe("a live check that failed", () => {
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const streamsCalls = () =>
+      twitch.calls.filter((u) => u.includes("/streams?")).length;
+    const failStreams = () => {
+      twitch.override = (url) =>
+        url.includes("/streams?") ? json(503, {}) : undefined;
+    };
+
+    it("keeps the LIVE after a drop, and the recheck ends it", async () => {
+      twitch.live = 120;
+      const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+      await connector.connect("");
+
+      failStreams();
+      socket().terminate();
+      await vi.waitFor(() => expect(states).toContain("reconnected"));
+      await sleep(150);
+      expect(onDisconnected).not.toHaveBeenCalled();
+      expect(connector.isConnected()).toBe(true);
+
+      twitch.override = undefined;
+      twitch.live = null;
+      await vi.waitFor(() =>
+        expect(onDisconnected).toHaveBeenCalledWith({ reason: "ended" }),
+      );
+    });
+
+    it("after a drop, goes on live with the recheck's viewers", async () => {
+      twitch.live = 120;
+      const onRoom = capture(TOKIO_EVENTS.ROOM_USER);
+      const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+      await connector.connect("");
+
+      failStreams();
+      socket().terminate();
+      await vi.waitFor(() => expect(states).toContain("reconnected"));
+      twitch.override = undefined;
+      twitch.live = 130;
+
+      await vi.waitFor(() =>
+        expect(onRoom).toHaveBeenCalledWith({
+          ranks: [],
+          viewers: 130,
+          views: 0,
+        }),
+      );
+      notify("stream.offline", { broadcaster_user_id: BROADCASTER });
+      await vi.waitFor(() =>
+        expect(onDisconnected).toHaveBeenCalledWith({ reason: "ended" }),
+      );
+    });
+
+    it("at connect, isn't live until the recheck says so", async () => {
+      failStreams();
+      const onRoom = capture(TOKIO_EVENTS.ROOM_USER);
+      const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+      expect(await connector.connect("")).toEqual({ success: true });
+
+      const failed = streamsCalls();
+      twitch.override = undefined;
+      await vi.waitFor(() => expect(streamsCalls()).toBeGreaterThan(failed));
+      await sleep(150);
+      // The recheck said offline once, then stopped
+      expect(streamsCalls()).toBe(failed + 1);
+      notify("stream.offline", { broadcaster_user_id: BROADCASTER });
+      await sleep(50);
+
+      expect(onRoom).not.toHaveBeenCalled();
+      expect(onDisconnected).not.toHaveBeenCalled();
+      expect(connector.isConnected()).toBe(true);
+    });
+
+    it("lets a stream.online during the recheck win over its empty answer", async () => {
+      failStreams();
+      const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+      await connector.connect("");
+      const held: (() => void)[] = [];
+      twitch.override = (url) =>
+        url.includes("/streams?")
+          ? new Promise((resolve) => {
+              held.push(() => resolve(json(200, { data: [] })));
+            })
+          : undefined;
+      await vi.waitFor(() => expect(held.length).toBeGreaterThan(0));
+
+      notify("stream.online", { broadcaster_user_id: BROADCASTER });
+      await sleep(50);
+      twitch.override = undefined;
+      for (const release of held) release();
+      await sleep(100);
+
+      expect(onDisconnected).not.toHaveBeenCalled();
+      expect(connector.isConnected()).toBe(true);
+    });
+
+    it("leaves no check running after Disconnect when the stream went live during the connect", async () => {
+      let answer: ((res: Response) => void) | undefined;
+      twitch.override = (url) =>
+        url.includes("/streams?") && !answer
+          ? new Promise((resolve) => (answer = resolve))
+          : undefined;
+      const connecting = connector.connect("");
+      await vi.waitFor(() => expect(answer).toBeDefined());
+      notify("stream.online", { broadcaster_user_id: BROADCASTER });
+      await sleep(50);
+      answer!(json(503, {}));
+      await connecting;
+      await sleep(120);
+
+      await connector.disconnect();
+      const calls = streamsCalls();
+      await sleep(150);
+
+      expect(streamsCalls()).toBe(calls);
     });
   });
 

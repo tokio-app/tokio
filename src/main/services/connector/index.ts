@@ -62,6 +62,8 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
   private _rooms = new Map<Platform, RoomUserEvent>();
   // A Disconnect is stopping them all, so their stops aren't told one by one
   private _stopping = false;
+  // The platform whose stop ended the last session
+  private _endedBy?: Platform;
   private _channels: Partial<Record<Platform, string>> = {};
   private _username = "";
   private _chatStage?: ChatStage;
@@ -213,15 +215,21 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
     const status: Partial<Record<Platform, PlatformStatus>> = {};
     for (const [platform, p] of this._sources()) {
       if (!p.isConnected()) continue;
-      status[platform] = p.isWaiting()
-        ? "waiting"
-        : p.isReconnecting()
+      // Up first: TikTok's look sends CONNECTED while it's still waiting
+      status[platform] = this._up.has(platform)
+        ? p.isReconnecting()
           ? "reconnecting"
-          : this._up.has(platform)
-            ? "connected"
-            : "connecting";
+          : "connected"
+        : p.isWaiting()
+          ? "waiting"
+          : "connecting";
     }
     return status;
+  }
+
+  // The platform whose stop ended the session, set before its DISCONNECTED
+  public endedBy(): Platform | undefined {
+    return this._endedBy;
   }
 
   /** Each platform's viewers now, from its last room numbers. */
@@ -340,7 +348,12 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
     this._channels[platform] = channel;
     Logger.debug(`<Connector> Connecting to: ${named}`, this._logFile);
     const res = await provider.connect(channel);
-    if (!res.success) {
+    if (res.error?.kind === "canceled") {
+      Logger.info(
+        `<Connector> Stopped connecting to ${named}: the user disconnected.`,
+        this._logFile,
+      );
+    } else if (!res.success) {
       Logger.error(
         `<Connector> Unable to connect to ${named} -- ${formatError(res.error)}`,
         this._logFile,
@@ -419,6 +432,7 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
     this._rooms.delete(platform);
     if (this._up.size === 0) {
       this._stopping = false;
+      this._endedBy = platform;
       this._events.send(TOKIO_EVENTS.DISCONNECTED, data);
       return;
     }

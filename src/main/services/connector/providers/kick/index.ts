@@ -3,6 +3,7 @@ import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import { randomUUID } from "node:crypto";
 import {
+  connectFailure,
   ConnectorProvider,
   ConnectorResponse,
   fail,
@@ -30,6 +31,9 @@ type Connection = {
   // Live at connect or since, so the stream's end ends the connection
   wasLive: boolean;
   poll?: NodeJS.Timeout;
+  // The viewers poll's offline answers in a row: two end the stream, in case
+  // the feed missed its end
+  offline: number;
   // The wait before a connect's or a reconnect's next try, and its end
   retry?: NodeJS.Timeout;
   wake?: () => void;
@@ -61,9 +65,15 @@ export class KickConnector extends ConnectorProvider {
   public setKey() {}
 
   public connect(channel: string): Promise<ConnectorResponse> {
-    return (this._connecting ??= this._connect(channel).finally(() => {
-      this._connecting = null;
-    }));
+    // A connect a Disconnect stopped can still be finishing its requests: a
+    // new Connect starts over instead of getting its "canceled"
+    if (this._conn === null) this._connecting = null;
+    const connecting = (this._connecting ??= this._connect(channel).finally(
+      () => {
+        if (this._connecting === connecting) this._connecting = null;
+      },
+    ));
+    return connecting;
   }
 
   public async disconnect(): Promise<void> {
@@ -117,11 +127,16 @@ export class KickConnector extends ConnectorProvider {
         }
       }
     } catch (err) {
+      // A Disconnect closed the socket or woke the pause: not the network
+      if (this._conn !== conn) {
+        return fail("canceled", "Disconnected while connecting.");
+      }
       this._stop(conn);
       return { success: false, error: toFailure(err) };
     }
+    // A stop between _start resolving and this
     if (this._conn !== conn) {
-      return fail("unknown", "Disconnected while connecting.");
+      return fail("canceled", "Disconnected while connecting.");
     }
 
     conn.up = true;
@@ -144,6 +159,7 @@ export class KickConnector extends ConnectorProvider {
       reconnecting: false,
       live: false,
       wasLive: false,
+      offline: 0,
       ids: new Map(),
       socket: new KickSocket(this._config, {
         publication: (_feed, event, data) => this._notify(conn, event, data),
@@ -168,6 +184,10 @@ export class KickConnector extends ConnectorProvider {
     conn.chatroomId = channel.chatroomId;
     const url = await realtime(this._config, conn.clientId);
     const token = await guestToken(this._config, conn.clientId);
+    // A stop meanwhile already closed the socket: opening it would leak it
+    if (this._conn !== conn) {
+      throw connectFailure("canceled", "Disconnected while connecting.");
+    }
     // Chat's first. Never chatrooms.<id>: it repeats the hosts.
     await conn.socket.open(url, token, [
       `chatrooms.${channel.chatroomId}.v2`,
@@ -180,12 +200,17 @@ export class KickConnector extends ConnectorProvider {
 
   private _goLive(conn: Connection, viewers?: number) {
     conn.live = conn.wasLive = true;
+    conn.offline = 0;
     if (viewers !== undefined) this._viewers(viewers);
     conn.poll ??= setInterval(() => {
       lookup(this._config, conn.slug).then(
         ({ viewers: count }) => {
-          if (this._conn === conn && conn.live && count !== null) {
+          if (this._conn !== conn || !conn.live) return;
+          if (count !== null) {
+            conn.offline = 0;
             this._viewers(count);
+          } else if (++conn.offline === 2) {
+            this._offline(conn);
           }
         },
         (err) =>
