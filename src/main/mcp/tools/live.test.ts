@@ -27,14 +27,13 @@ describe("live MCP tools", () => {
         return true;
       });
       const setPlatforms = vi.fn();
+      const settings = { activeProfile: { name: "Main", file: "main.json" } };
       const h = createHandler(
         {
           storeManagerService: {
             getProfileData: async () => profile,
             getProfiles: () => [],
-            getSettings: () => ({
-              activeProfile: { name: "Main", file: "main.json" },
-            }),
+            getSettings: () => settings,
             updateProfileData,
           },
           connectorService: { status: () => on },
@@ -42,16 +41,110 @@ describe("live MCP tools", () => {
         },
         { stack: home },
       );
-      return { h, updateProfileData, setPlatforms };
+      const invoked = vi.spyOn(h.handler, "invoke");
+      const events = () => invoked.mock.calls.map(([event]) => event);
+      return { h, updateProfileData, setPlatforms, settings, events };
     };
 
-    it("reads the profile's platforms", async () => {
-      const { h } = setup();
+    it("reads the profile's platforms and names", async () => {
+      const { h, updateProfileData } = setup();
+      await updateProfileData({
+        connector: { username: "streamer" },
+        channels: { kick: "kickname" },
+      });
       const { call } = await mcpClient(h.handler);
 
       const res = await call("get_settings", { section: "platforms" });
 
-      expect(res.value).toEqual({ values: { platforms: ["tiktok"] } });
+      expect(res.value).toEqual({
+        values: {
+          platforms: ["tiktok"],
+          username: "streamer",
+          youtube: "",
+          kick: "kickname",
+        },
+      });
+    });
+
+    it("saves only the names sent, through SET_CHANNELS", async () => {
+      const { h, updateProfileData, setPlatforms, events } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("update_settings", {
+        section: "platforms",
+        changes: {
+          username: "https://www.tiktok.com/@streamer/live",
+          kick: "kick.com/me",
+        },
+      });
+
+      expect(res).toMatchObject({ isError: false, text: "Saved." });
+      expect(events()).toContain(APP_EVENTS.SET_CHANNELS);
+      expect(events()).not.toContain(APP_EVENTS.SET_PLATFORMS);
+      expect(updateProfileData).toHaveBeenCalledExactlyOnceWith({
+        connector: { username: "streamer" },
+        channels: { ...defaultProfile.channels, kick: "kick.com/me" },
+      });
+      expect(setPlatforms).not.toHaveBeenCalled();
+      expect(h.pushed(APP_EVENTS_RESPONSE.GET_PROFILE)).toHaveLength(1);
+    });
+
+    it("saves the platforms, then the names, in the profile it read", async () => {
+      const { h, updateProfileData, events } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("update_settings", {
+        section: "platforms",
+        changes: { platforms: ["youtube"], youtube: "@me" },
+      });
+
+      expect(res).toMatchObject({ isError: false, text: "Saved." });
+      expect(
+        events().filter((e) =>
+          [APP_EVENTS.SET_PLATFORMS, APP_EVENTS.SET_CHANNELS].includes(e),
+        ),
+      ).toEqual([APP_EVENTS.SET_PLATFORMS, APP_EVENTS.SET_CHANNELS]);
+      expect(updateProfileData.mock.calls).toEqual([
+        [{ platforms: ["youtube"] }],
+        [{ channels: { ...defaultProfile.channels, youtube: "@me" } }],
+      ]);
+    });
+
+    it("saves no names once another profile is active", async () => {
+      const { h, updateProfileData, setPlatforms, settings } = setup();
+      setPlatforms.mockImplementation(() => {
+        settings.activeProfile = { name: "Other", file: "other.json" };
+      });
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("update_settings", {
+        section: "platforms",
+        changes: { platforms: ["kick"], kick: "me" },
+      });
+
+      expect(res.isError).toBe(true);
+      expect(res.text).toContain("The active profile changed");
+      expect(updateProfileData).toHaveBeenCalledExactlyOnceWith({
+        platforms: ["kick"],
+      });
+    });
+
+    it("keeps the name a platform that's on is connected to, and says so", async () => {
+      const { h, updateProfileData } = setup({ kick: "connected" });
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("update_settings", {
+        section: "platforms",
+        changes: { kick: "other", youtube: "@me" },
+      });
+
+      expect(res).toMatchObject({
+        isError: true,
+        text: "Kick keeps the name it's connected to until it's disconnected; the rest was saved.",
+      });
+      expect(updateProfileData).toHaveBeenCalledExactlyOnceWith({
+        channels: { ...defaultProfile.channels, youtube: "@me" },
+      });
     });
 
     it("saves them through SET_PLATFORMS, then sends the profile", async () => {
