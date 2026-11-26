@@ -102,6 +102,13 @@
   gap: var(--space-2);
 }
 
+/* Square, as wide as the select is tall. The element in the selector outranks
+   the button's own padding, whichever stylesheet loads last. */
+.buttons > button {
+  width: var(--control-height);
+  padding: 0;
+}
+
 /* When this computer has no network address */
 .no_address {
   color: var(--font-secondary);

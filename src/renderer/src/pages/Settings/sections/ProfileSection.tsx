@@ -56,24 +56,42 @@ export function ProfileSection({
           />
         </Field>
 
+        {/* Icons only (the user's call): each names its action to screen
+            readers and on hover */}
         <div className={styles.buttons}>
-          <Btn title={t("settings.profiles.newTitle")} onClick={onNew}>
-            <FiPlus /> {t("settings.profiles.new")}
-          </Btn>
-          <Btn title={t("settings.profiles.cloneHint")} onClick={onClone}>
-            <FiCopy /> {t("settings.profiles.clone")}
-          </Btn>
-          <Btn onClick={onRename}>
-            <FiEdit2 /> {t("settings.profiles.rename")}
+          <Btn
+            aria-label={t("settings.profiles.new")}
+            title={t("settings.profiles.newTitle")}
+            onClick={onNew}
+          >
+            <FiPlus aria-hidden />
           </Btn>
           <Btn
+            aria-label={t("settings.profiles.clone")}
+            title={t("settings.profiles.cloneHint")}
+            onClick={onClone}
+          >
+            <FiCopy aria-hidden />
+          </Btn>
+          <Btn
+            aria-label={t("settings.profiles.rename")}
+            title={t("settings.profiles.renameTitle")}
+            onClick={onRename}
+          >
+            <FiEdit2 aria-hidden />
+          </Btn>
+          <Btn
+            aria-label={t("common.import")}
+            title={t("common.import")}
             onClick={() =>
               window.api.emit(APP_EVENTS.IMPORT_ENTITY, { type: "profile" })
             }
           >
-            <FiDownload /> {t("common.import")}
+            <FiDownload aria-hidden />
           </Btn>
           <Btn
+            aria-label={t("common.export")}
+            title={t("common.export")}
             onClick={() =>
               window.api.emit(APP_EVENTS.EXPORT_ENTITY, {
                 type: "profile",
@@ -81,7 +99,7 @@ export function ProfileSection({
               })
             }
           >
-            <FiUpload /> {t("common.export")}
+            <FiUpload aria-hidden />
           </Btn>
         </div>
       </div>
