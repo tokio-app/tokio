@@ -577,6 +577,124 @@ describe("TwitchConnector", () => {
     });
   });
 
+  describe("a live check that failed", () => {
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const streamsCalls = () =>
+      twitch.calls.filter((u) => u.includes("/streams?")).length;
+    const failStreams = () => {
+      twitch.override = (url) =>
+        url.includes("/streams?") ? json(503, {}) : undefined;
+    };
+
+    it("keeps the LIVE after a drop, and the recheck ends it", async () => {
+      twitch.live = 120;
+      const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+      await connector.connect("");
+
+      failStreams();
+      socket().terminate();
+      await vi.waitFor(() => expect(states).toContain("reconnected"));
+      await sleep(150);
+      expect(onDisconnected).not.toHaveBeenCalled();
+      expect(connector.isConnected()).toBe(true);
+
+      twitch.override = undefined;
+      twitch.live = null;
+      await vi.waitFor(() =>
+        expect(onDisconnected).toHaveBeenCalledWith({ reason: "ended" }),
+      );
+    });
+
+    it("after a drop, goes on live with the recheck's viewers", async () => {
+      twitch.live = 120;
+      const onRoom = capture(TOKIO_EVENTS.ROOM_USER);
+      const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+      await connector.connect("");
+
+      failStreams();
+      socket().terminate();
+      await vi.waitFor(() => expect(states).toContain("reconnected"));
+      twitch.override = undefined;
+      twitch.live = 130;
+
+      await vi.waitFor(() =>
+        expect(onRoom).toHaveBeenCalledWith({
+          ranks: [],
+          viewers: 130,
+          views: 0,
+        }),
+      );
+      notify("stream.offline", { broadcaster_user_id: BROADCASTER });
+      await vi.waitFor(() =>
+        expect(onDisconnected).toHaveBeenCalledWith({ reason: "ended" }),
+      );
+    });
+
+    it("at connect, isn't live until the recheck says so", async () => {
+      failStreams();
+      const onRoom = capture(TOKIO_EVENTS.ROOM_USER);
+      const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+      expect(await connector.connect("")).toEqual({ success: true });
+
+      const failed = streamsCalls();
+      twitch.override = undefined;
+      await vi.waitFor(() => expect(streamsCalls()).toBeGreaterThan(failed));
+      await sleep(150);
+      // The recheck said offline once, then stopped
+      expect(streamsCalls()).toBe(failed + 1);
+      notify("stream.offline", { broadcaster_user_id: BROADCASTER });
+      await sleep(50);
+
+      expect(onRoom).not.toHaveBeenCalled();
+      expect(onDisconnected).not.toHaveBeenCalled();
+      expect(connector.isConnected()).toBe(true);
+    });
+
+    it("lets a stream.online during the recheck win over its empty answer", async () => {
+      failStreams();
+      const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+      await connector.connect("");
+      const held: (() => void)[] = [];
+      twitch.override = (url) =>
+        url.includes("/streams?")
+          ? new Promise((resolve) => {
+              held.push(() => resolve(json(200, { data: [] })));
+            })
+          : undefined;
+      await vi.waitFor(() => expect(held.length).toBeGreaterThan(0));
+
+      notify("stream.online", { broadcaster_user_id: BROADCASTER });
+      await sleep(50);
+      twitch.override = undefined;
+      for (const release of held) release();
+      await sleep(100);
+
+      expect(onDisconnected).not.toHaveBeenCalled();
+      expect(connector.isConnected()).toBe(true);
+    });
+
+    it("leaves no check running after Disconnect when the stream went live during the connect", async () => {
+      let answer: ((res: Response) => void) | undefined;
+      twitch.override = (url) =>
+        url.includes("/streams?") && !answer
+          ? new Promise((resolve) => (answer = resolve))
+          : undefined;
+      const connecting = connector.connect("");
+      await vi.waitFor(() => expect(answer).toBeDefined());
+      notify("stream.online", { broadcaster_user_id: BROADCASTER });
+      await sleep(50);
+      answer!(json(503, {}));
+      await connecting;
+      await sleep(120);
+
+      await connector.disconnect();
+      const calls = streamsCalls();
+      await sleep(150);
+
+      expect(streamsCalls()).toBe(calls);
+    });
+  });
+
   describe("reconnects", () => {
     it("after a keepalive that never came, subscribing again", async () => {
       twitch.keepalive = [0.1];

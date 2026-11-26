@@ -166,7 +166,7 @@ export class TwitchConnector
 
     const conn = this._connection();
     this._conn = conn;
-    let viewers: number | null;
+    let viewers: number | null | undefined;
     try {
       for (let tries = 1; ; tries++) {
         try {
@@ -204,12 +204,19 @@ export class TwitchConnector
       () => this._revalidate(conn),
       this._config.VALIDATE_MS,
     );
+    const live =
+      viewers === undefined
+        ? ", live or not unknown"
+        : viewers !== null
+          ? ", live"
+          : ", not live";
     Logger.info(
-      `<Twitch> Connected to @${this._auth.account.login}${viewers !== null ? ", live" : ", not live"}.`,
+      `<Twitch> Connected to @${this._auth.account.login}${live}.`,
       this._logFile,
     );
     this.emit(TOKIO_EVENTS.CONNECTED);
-    if (viewers !== null) this._goLive(conn, viewers);
+    if (viewers === undefined) this._recheck(conn);
+    else if (viewers !== null) this._goLive(conn, viewers);
     return { success: true };
   }
 
@@ -249,10 +256,10 @@ export class TwitchConnector
 
   /**
    * A fresh socket with its subscriptions, and whether the channel is live:
-   * its viewers, or null. Throws when it couldn't, or the socket dropped
-   * meanwhile.
+   * its viewers, null when it isn't, undefined when the check failed. Throws
+   * when it couldn't, or the socket dropped meanwhile.
    */
-  private async _start(conn: Connection): Promise<number | null> {
+  private async _start(conn: Connection): Promise<number | null | undefined> {
     const { userId, login } = await this._auth.validate();
     // Stopped meanwhile: a socket opened now would never be closed
     if (this._conn !== conn) {
@@ -266,7 +273,7 @@ export class TwitchConnector
         "streams",
         `Couldn't check whether @${login} is live -- ${formatError(err)}`,
       );
-      return null;
+      return undefined;
     });
     // Checked last, with nothing awaited after: a drop before it fails the
     // try, and one after it reconnects
@@ -330,7 +337,8 @@ export class TwitchConnector
   private _goLive(conn: Connection, viewers?: number) {
     conn.live = conn.wasLive = true;
     if (viewers !== undefined) this._viewers(viewers);
-    conn.poll ??= setInterval(() => {
+    clearInterval(conn.poll);
+    conn.poll = setInterval(() => {
       this._streams(conn).then(
         (count) => {
           if (this._conn === conn && conn.live && count !== null) {
@@ -344,6 +352,27 @@ export class TwitchConnector
           ),
       );
     }, this._config.STREAMS_POLL_MS);
+  }
+
+  // After a live check that failed: asks again until Twitch answers, as a
+  // failed check is neither live nor offline
+  private _recheck(conn: Connection) {
+    if (conn.poll) return; // a stream.online during _start decided
+    const timer = setInterval(() => {
+      this._streams(conn).then(
+        (viewers) => {
+          if (this._conn !== conn || conn.poll !== timer) return;
+          if (viewers !== null) this._goLive(conn, viewers);
+          else this._offline(conn);
+        },
+        (err) =>
+          this._logOnce(
+            "streams",
+            `Couldn't check whether the stream is live -- ${formatError(err)}`,
+          ),
+      );
+    }, this._config.STREAMS_POLL_MS);
+    conn.poll = timer;
   }
 
   private _viewers(viewers: number) {
@@ -451,7 +480,7 @@ export class TwitchConnector
   // Tries again until it's back or the user disconnects, the wait doubling
   // up to RECONNECT_MAX_MS. A fresh socket subscribes again.
   private async _reconnect(conn: Connection) {
-    let viewers: number | null;
+    let viewers: number | null | undefined;
     for (let attempt = 0; ; attempt++) {
       const { RECONNECT_MIN_MS, RECONNECT_MAX_MS } = this._config;
       const delay = Math.min(RECONNECT_MAX_MS, RECONNECT_MIN_MS * 2 ** attempt);
@@ -476,9 +505,11 @@ export class TwitchConnector
       this._logFile,
     );
     this._onReconnect?.("reconnected");
-    // The stream ended or started while away
-    if (viewers !== null) this._goLive(conn, viewers);
-    else if (conn.wasLive) this._offline(conn);
+    // The stream ended or started while away. A stream.online during _start
+    // already started the poll, and Helix lags behind EventSub.
+    if (viewers === undefined) this._recheck(conn);
+    else if (viewers !== null) this._goLive(conn, viewers);
+    else if (conn.wasLive && !conn.poll) this._offline(conn);
   }
 
   // The wait between tries: false when a stop ended it
