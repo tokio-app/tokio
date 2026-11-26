@@ -1,0 +1,27 @@
+/* The four platforms split the dialog's width. [role] outranks the pill
+   switch's own fit-content and padding, whichever stylesheet loads last. */
+.platforms[role="tablist"] {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%;
+}
+
+.platforms[role="tablist"] > [role="tab"] {
+  min-width: 0;
+  padding-inline: var(--space-2);
+}
+
+/* The account signed in to, in place of Twitch's sign-in */
+.account {
+  color: var(--font-primary);
+  font-weight: 500;
+}
+
+.note {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
+.link {
+  color: var(--accent-primary);
+}

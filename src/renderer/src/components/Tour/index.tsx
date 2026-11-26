@@ -1,12 +1,9 @@
-import { APP_EVENTS_RESPONSE, Platform } from "@/common/types";
-import { defaultProfile, EULER_SIGNUP_URL } from "@/common/util";
-import { useIpcListener } from "@/hooks";
-import { rich, useT } from "@/ui/i18n";
-import { Fragment, useLayoutEffect, useRef, useState } from "react";
+import { useT } from "@/ui/i18n";
+import { useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Btn } from "../Elements";
 import { Modal } from "../Modal";
-import { placeTour, TOUR_STEPS, tourTexts, type TourPlace } from "./helper";
+import { placeTour, TOUR_STEPS, type TourPlace } from "./helper";
 import styles from "./tour.module.css";
 
 type Props = {
@@ -15,7 +12,8 @@ type Props = {
 
 /**
  * Shows the window one piece at a time, the sidebar's pages and then Home's
- * switches and connect box, each lit with a card beside it.
+ * switches and connect box, each lit with a card beside it. Its words fit
+ * every platform (the user's call).
  */
 export function Tour({ onClose }: Props) {
   const t = useT();
@@ -23,19 +21,6 @@ export function Tour({ onClose }: Props) {
   // Whether the step's piece was found, with where it and the card go
   const [place, setPlace] = useState<TourPlace & { lit: boolean }>();
   const nextRef = useRef<HTMLButtonElement>(null);
-  // The profile's platforms, from the replies Home asks for: the tour always
-  // opens over Home, and asking here would answer the pages too
-  const [platforms, setPlatforms] = useState<readonly Platform[]>(
-    defaultProfile.platforms,
-  );
-
-  useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
-    if (res?.success && res.profile) setPlatforms(res.profile.platforms);
-  });
-
-  useIpcListener(APP_EVENTS_RESPONSE.SET_PLATFORMS, (res) => {
-    if (res) setPlatforms(res.platforms);
-  });
 
   const step = TOUR_STEPS[index];
   const last = index === TOUR_STEPS.length - 1;
@@ -84,18 +69,7 @@ export function Tour({ onClose }: Props) {
         description={
           // Read out as each step comes
           <span className={styles.text} aria-live="polite">
-            {tourTexts(step, platforms).map((text, i) => (
-              <Fragment key={text}>
-                {i > 0 && " "}
-                {rich(t(text), {
-                  link: (label) => (
-                    <a href={EULER_SIGNUP_URL} target="_blank" rel="noreferrer">
-                      {label}
-                    </a>
-                  ),
-                })}
-              </Fragment>
-            ))}
+            {t(step.text)}
           </span>
         }
         onClose={onClose}

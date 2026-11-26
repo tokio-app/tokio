@@ -1486,6 +1486,16 @@ events.push(
         storeManagerService.wasRebuilt() &&
         !storeManagerService.corruptedBackup()) ||
       undefined;
+    // The first-start dialog only over a profile nothing was saved in yet:
+    // a store rebuilt over the user's profiles gets only the tour
+    const profile = newStore && (await storeManagerService.getProfileData());
+    const welcome =
+      (profile &&
+        profile.platforms.length === 1 &&
+        profile.platforms[0] === "tiktok" &&
+        profile.connector.username === "" &&
+        !Object.values(profile.channels).some(Boolean)) ||
+      undefined;
 
     // On every load, so a reloaded window gets it too
     e.reply(APP_EVENTS_RESPONSE.LANGUAGE, language());
@@ -1493,6 +1503,7 @@ events.push(
       success: true,
       updatedFrom,
       newStore,
+      welcome,
     });
     if (!first) {
       // The window reloaded, dropping the TTS it was playing

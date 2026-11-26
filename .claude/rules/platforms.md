@@ -9,6 +9,8 @@ paths:
   - "src/renderer/src/context/platforms/**"
   - "src/renderer/src/pages/Home/sections/DashboardSection.tsx"
   - "src/renderer/src/pages/Settings/sections/TwitchSection.tsx"
+  - "src/renderer/src/components/TwitchSignIn/**"
+  - "src/main/events/pages/home.ts"
 ---
 
 # Platforms
@@ -76,7 +78,7 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - A community gift counts once, from its `community_sub_gift` notice. Each `sub_gift` that carries a `community_gift_id` is dropped.
 - A **Redeem** row's keyword is the reward's title, matched in any case, empty for any (`matchesTrigger`).
 - Anonymous gifters and cheerers get a user with `platform` and no id.
-- The sign-in code stays hidden until **Show** (`TwitchSection`): streamers show their screen, and a viewer who typed it would sign Tokio into their own account. Sign-in and sign-out are never in MCP (`.claude/rules/mcp.md`), since they need the streamer at a browser, and Sign out is refused while Twitch is connected.
+- The sign-in code stays hidden until **Show** (`TwitchSignIn`, which Settings and the first-start dialog share): streamers show their screen, and a viewer who typed it would sign Tokio into their own account. Sign-in and sign-out are never in MCP (`.claude/rules/mcp.md`), since they need the streamer at a browser, and Sign out is refused while Twitch is connected.
 - `CLIENT_ID` in `providers/twitch/config` is the Tokio app the user registered on dev.twitch.tv: a public client (no secret), its only redirect `http://localhost`, which the device flow never uses. It isn't a secret.
 
 ## YouTube
@@ -114,6 +116,7 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 ## The window
 
 - `PlatformsContext` (`src/renderer/src/context/platforms`) gives the trigger pickers the active profile's platforms. A page provides it from `useEditableSettings`' `onLoad(profile)`, or from one page-level `GET_PROFILE` (the Studio editor, Countdown; Settings and Official overlays read the platforms the same way). Never ask `GET_PROFILE` per component: its reply drops the page's unsaved autosave.
+- A profile's names are saved by `CONNECT`, and without connecting by `SET_CHANNELS` (the first-start dialog, MCP's `platforms` section), both through `saveNames` in `home.ts`: TikTok's @username through `toUsername`, the channels as typed. `SET_CHANNELS` leaves a platform that's on alone. Home takes its reply like a `GET_PROFILE`, never into a field being typed in.
 - **The window shows a platform's settings only while the active profile uses it** (the user's call). Settings shows **TikTok LIVE** (its key) and **Chat translation** (only TikTok's chat is translated) with TikTok, and Twitch's sign-in with Twitch; a hidden account stays signed in. The TTS page's **Read translations** and `{translation}` need TikTok too (`.claude/rules/translation.md`).
 - Home's top is a tab per platform, one platform included (the user's calls), in Home's order (`DashboardSection`). A platform's tab holds its connection: a normal field (Twitch's account or its sign-in) with its state under it and its own Connect or Disconnect; alone, its Connect is Home's, rose until it's on. Removing a platform is closing its tab, with a muted × like a browser tab's (`Tabs`' `onClose`), never on one that's on or the only one (the user found a × beside Connect clunky). A `+` after the tabs lists the platforms the profile doesn't use and opens the one added. With two or more, Connect all or Disconnect all sits beside the status above the tabs, at full height, not squeezed into the tab row (the user's call). The tab's logo is rose while it's connected. A `SET_PLATFORMS` reply resyncs the tabs to what main holds.
 - Connect never does nothing: a platform missing its channel, or Twitch without its sign-in, says so in its tab (`needs`), whose name turns red, the ready ones connect, and Home opens the first one that needs something with its field focused. The message goes once it's given.

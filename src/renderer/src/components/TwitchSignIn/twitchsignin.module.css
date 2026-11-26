@@ -1,0 +1,40 @@
+/* The sign-in's code, while it waits for the streamer at Twitch's page */
+
+.code {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.label {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-weight: 500;
+}
+
+.value {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* The code as Twitch's page shows it, in the readout */
+.digits {
+  min-width: 8ch;
+  color: var(--font-primary);
+  font-size: var(--font-2xl);
+  font-stretch: var(--stretch-readout);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.note {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
+.link {
+  color: var(--accent-primary);
+}

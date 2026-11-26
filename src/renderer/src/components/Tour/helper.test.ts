@@ -1,52 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { placeTour, TOUR_STEPS, tourTexts } from "./helper";
-
-const stepOf = (text: string) => TOUR_STEPS.find((s) => s.text === text)!;
-
-describe("tourTexts", () => {
-  const overlays = stepOf("components.tour.overlays");
-  const settings = stepOf("components.tour.settings");
-  const connect = stepOf("components.tour.connect");
-
-  it("names TikTok LIVE Studio and the Euler key only with TikTok", () => {
-    expect(tourTexts(overlays, ["tiktok"])).toEqual([
-      "components.tour.overlays",
-    ]);
-    expect(tourTexts(overlays, ["kick"])).toEqual([
-      "components.tour.overlaysObs",
-    ]);
-    expect(tourTexts(settings, ["tiktok"])).toEqual([
-      "components.tour.settings",
-    ]);
-  });
-
-  it("names Twitch's sign-in only with Twitch", () => {
-    expect(tourTexts(settings, ["tiktok", "twitch"])).toEqual([
-      "components.tour.settings",
-      "components.tour.settingsTwitchToo",
-    ]);
-    expect(tourTexts(settings, ["twitch", "kick"])).toEqual([
-      "components.tour.settingsTwitch",
-    ]);
-    expect(tourTexts(settings, ["youtube", "kick"])).toEqual([
-      "components.tour.settingsOther",
-    ]);
-  });
-
-  it("says what each of the profile's tabs needs, in Home's order", () => {
-    expect(tourTexts(connect, ["kick", "tiktok"])).toEqual([
-      "components.tour.connect",
-      "components.tour.connectTiktok",
-      "components.tour.connectKick",
-      "components.tour.connectEnd",
-    ]);
-  });
-
-  it("keeps the other steps' text", () => {
-    const tts = stepOf("components.tour.tts");
-    expect(tourTexts(tts, ["kick"])).toEqual(["components.tour.tts"]);
-  });
-});
+import { placeTour } from "./helper";
 
 // A sidebar icon, 20px square, at the given top
 const icon = (top: number) => ({ top, left: 14, width: 20, height: 20 });

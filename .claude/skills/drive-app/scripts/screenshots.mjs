@@ -332,8 +332,12 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     }, file);
 
   await page.getByRole("heading", { name: tr("Dashboard") }).waitFor();
-  // A new data folder opens the tour, which covers the window
-  if (await dialog.isVisible()) await page.keyboard.press("Escape");
+  // A new data folder opens the first-start dialog, then the tour, which
+  // cover the window: Escape skips the one and closes the other
+  for (let i = 0; i < 3 && (await dialog.first().isVisible()); i++) {
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+  }
   await dialog.waitFor({ state: "detached" });
 
   // The overlay server, through IPC as e2e/app.spec.ts does: the Settings

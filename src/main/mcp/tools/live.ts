@@ -41,30 +41,90 @@ import {
 
 export const sections: Sections = {
   platforms: defineSection({
-    schema: z.object({ platforms: z.array(z.enum(PLATFORMS)) }).strict(),
-    read: async (handler) => ({
-      platforms: [...(await profileOf(handler)).platforms],
-    }),
-    write: async (handler, { platforms }) => {
-      const { error, data } = await invokeOk(
-        handler,
-        APP_EVENTS.SET_PLATFORMS,
-        { platforms },
-        APP_EVENTS_RESPONSE.SET_PLATFORMS,
+    schema: z
+      .object({
+        platforms: z.array(z.enum(PLATFORMS)),
+        username: z.string(),
+        youtube: z.string(),
+        kick: z.string(),
+      })
+      .strict(),
+    read: async (handler) => {
+      const { platforms, connector, channels } = await profileOf(handler);
+      return {
+        platforms: [...platforms],
+        username: connector.username,
+        youtube: channels.youtube ?? "",
+        kick: channels.kick ?? "",
+      };
+    },
+    // Only the handlers for the fields sent, each in the profile read
+    write: async (handler, values, changes) => {
+      const changed = guardProfile(handler);
+      const notes: string[] = [];
+      const done = async (error?: CallToolResult) => {
+        // Home resyncs
+        await pushProfile(handler);
+        if (error) return error;
+        return notes.length
+          ? fail(`${notes.join("; ")}; the rest was saved.`)
+          : ok("Saved.");
+      };
+      const labels = (list: Platform[]) =>
+        list.map((p) => PLATFORM_LABELS[p]).join(", ");
+
+      if ("platforms" in changes) {
+        const { error, data } = await invokeOk(
+          handler,
+          APP_EVENTS.SET_PLATFORMS,
+          { platforms: values.platforms },
+          APP_EVENTS_RESPONSE.SET_PLATFORMS,
+        );
+        if (error) return done(error);
+        // Main keeps a platform that's on
+        const kept = data.platforms.filter(
+          (p) => !values.platforms.includes(p),
+        );
+        if (kept.length) {
+          notes.push(`Disconnect from ${labels(kept)} before removing it`);
+        }
+      }
+
+      const names = (
+        [
+          ["username", "tiktok"],
+          ["youtube", "youtube"],
+          ["kick", "kick"],
+        ] as const
+      ).filter(([field]) => field in changes);
+      if (!names.length) return done();
+      const refused = changed();
+      if (refused) return done(refused);
+      const on = handler.connectorService.status();
+      const busy = names.map(([, p]) => p).filter((p) => on[p]);
+      if (busy.length) {
+        notes.push(
+          `${labels(busy)} keeps the name it's connected to until it's disconnected`,
+        );
+      }
+      const channels = Object.fromEntries(
+        names.flatMap(([field, p]) =>
+          field === "username" ? [] : [[p, values[field]]],
+        ),
       );
-      // Home's list resyncs
-      await pushProfile(handler);
-      if (error) return error;
-      // Main keeps a platform that's on
-      const kept = data.platforms.filter((p) => !platforms.includes(p));
-      return kept.length
-        ? fail(
-            `Disconnect from ${kept.map((p) => PLATFORM_LABELS[p]).join(", ")} before removing it; the rest was saved.`,
-          )
-        : ok("Saved.");
+      const { error } = await invokeOk(
+        handler,
+        APP_EVENTS.SET_CHANNELS,
+        {
+          ...("username" in changes && { username: values.username }),
+          ...(Object.keys(channels).length > 0 && { channels }),
+        },
+        APP_EVENTS_RESPONSE.SET_CHANNELS,
+      );
+      return done(error);
     },
     notes:
-      "The platforms the active profile's Connect joins, as one LIVE: tiktok (the profile's @username), twitch (the account signed in to in Settings, see get_status live.twitch), youtube (the profile's YouTube channel) and kick (the profile's Kick channel). A platform can be added while connected; one that's on stays until it's disconnected (live disconnect with `platform`). An empty list connects TikTok.",
+      "The platforms the active profile's Connect joins, as one LIVE: tiktok (the profile's `username`), twitch (the account signed in to in Settings, see get_status live.twitch), youtube (the profile's `youtube` channel) and kick (its `kick` channel). A platform can be added while connected; one that's on stays until it's disconnected (live disconnect with `platform`). An empty list connects TikTok. username (a TikTok @username or LIVE link, saved as the @username), youtube (a channel handle or LIVE link) and kick (a channel name or kick.com link) are saved without connecting; a platform that's on keeps the one it's connected to.",
   }),
 };
 

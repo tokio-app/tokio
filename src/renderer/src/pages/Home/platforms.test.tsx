@@ -193,6 +193,33 @@ describe("Home's platforms", () => {
     ]);
   });
 
+  it("takes the names saved without connecting, but not into a field being typed in", async () => {
+    const { user } = await renderApp();
+    await usingPlatforms(["tiktok", "youtube"]);
+
+    await send(APP_EVENTS_RESPONSE.SET_CHANNELS, {
+      success: true,
+      username: "@saved",
+      channels: { youtube: "@savedyt" },
+    });
+    expect(page().getByPlaceholderText("@username")).toHaveValue("@saved");
+
+    await user.click(tab("YouTube"));
+    const channel = page().getByPlaceholderText("@channel or LIVE link");
+    expect(channel).toHaveValue("@savedyt");
+
+    await user.clear(channel);
+    await user.type(channel, "@typed");
+    await send(APP_EVENTS_RESPONSE.SET_CHANNELS, {
+      success: true,
+      username: "@other",
+      channels: { youtube: "@pushed" },
+    });
+    expect(channel).toHaveValue("@typed");
+    await user.click(tab("TikTok"));
+    expect(page().getByPlaceholderText("@username")).toHaveValue("@other");
+  });
+
   it("connects the ready ones and opens the first that needs something", async () => {
     const { user } = await renderApp();
     await usingPlatforms(["tiktok", "youtube", "kick"], { kick: "westcol" });
