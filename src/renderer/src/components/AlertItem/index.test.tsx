@@ -165,7 +165,7 @@ describe("AlertItem", () => {
   it("removes itself", async () => {
     const { user, onRemove } = setup(alert());
 
-    await user.click(screen.getByRole("button", { name: "Remove" }));
+    await user.click(screen.getByRole("button", { name: "Remove alert-1" }));
 
     expect(onRemove).toHaveBeenCalledOnce();
   });
@@ -173,7 +173,7 @@ describe("AlertItem", () => {
   it("turns itself off and on", async () => {
     const item = alert();
     const { user, onChange } = setup(item);
-    const toggle = screen.getByRole("checkbox", { name: "Enabled" });
+    const toggle = screen.getByRole("checkbox", { name: "Enable alert-1" });
     expect(toggle).toBeChecked();
 
     await user.click(toggle);
@@ -280,7 +280,7 @@ describe("AlertItem", () => {
   it("names its sound and how long it plays, or says it has none", () => {
     const { unmount } = setup(alert());
     expect(summary()).toHaveTextContent("No sound");
-    expect(summary()).toHaveTextContent("No media");
+    expect(summary()).toHaveTextContent("No image or video");
     unmount();
 
     const cut = setup(

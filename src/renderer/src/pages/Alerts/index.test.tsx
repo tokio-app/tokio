@@ -89,7 +89,7 @@ const saves = () =>
 // An alert's row, where its Remove button sits
 const rows = () =>
   screen
-    .queryAllByRole("button", { name: "Remove" })
+    .queryAllByTitle("Remove")
     .filter((button) => !button.closest("[role=dialog]"))
     .map((button) => within(button.parentElement!));
 // What a row says about its alert, which opens its editor
@@ -101,7 +101,11 @@ const top = () => within(screen.getAllByRole("dialog").at(-1)!);
 const dialogs = () => screen.queryAllByRole("dialog");
 
 // Opens the editor of the alert in the row, on one of its tabs
-async function edit(user: UserEvent, row: number, tab?: "Sound" | "Media") {
+async function edit(
+  user: UserEvent,
+  row: number,
+  tab?: "Sound" | "Image or video",
+) {
   await user.click(summary(row));
   if (tab) await user.click(editor().getByRole("tab", { name: tab }));
   return editor();
@@ -134,7 +138,7 @@ async function download(user: UserEvent) {
     dialog.getByRole("button", { name: "Download and use this sound" }),
   );
 }
-const empty = "No alerts yet. Use the add button to create one.";
+const empty = "No alerts yet. Add one with the bell button at the top right.";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -237,6 +241,15 @@ describe("Alerts", () => {
         ?.items.map((a) => a.name),
     ).toEqual(["Welcome", "Big gifts"]);
     expect(summary(1)).toHaveTextContent("Big gifts");
+  });
+
+  it("offers the search only once there are alerts", async () => {
+    const { user } = await load([]);
+    expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
+
+    await user.click(addAlert());
+
+    expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
   });
 
   it("finds alerts by name, and shows a new one", async () => {
@@ -367,15 +380,43 @@ describe("Alerts", () => {
     expect(saves()[0].items[0].volume).toBe(30);
   });
 
-  it("turns an alert off and removes another", async () => {
+  it("turns an alert off and removes another once asked", async () => {
     const { user } = await load([alert("alert-1"), alert("alert-2")]);
 
     await user.click(rows()[0].getByRole("checkbox"));
-    await user.click(rows()[1].getByRole("button", { name: "Remove" }));
+    await user.click(rows()[1].getByRole("button", { name: /^Remove / }));
+    const dialog = screen.getByRole("dialog", { name: "Delete alert?" });
+    expect(dialog).toHaveTextContent(
+      '"alert-2" will be deleted from this profile. Its sound and its image or video stay in the library.',
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    expect(rows()).toHaveLength(1);
+    // On the row now last, as the deleted one's trash left with it
+    expect(rows()[0].getByRole("checkbox")).toHaveFocus();
+    await wait(300);
+    expect(saves()[0].items).toEqual([alert("alert-1", { enabled: false })]);
+  });
+
+  it("keeps an alert when its delete is canceled", async () => {
+    const { user } = await load([alert("alert-1")]);
+
+    await user.click(rows()[0].getByRole("button", { name: /^Remove / }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(rows()).toHaveLength(1);
     await wait(300);
-    expect(saves()[0].items).toEqual([alert("alert-1", { enabled: false })]);
+    expect(saves()).toEqual([]);
+  });
+
+  it("focuses the add button once the last alert is deleted", async () => {
+    const { user } = await load([alert("alert-1")]);
+
+    await user.click(rows()[0].getByRole("button", { name: /^Remove / }));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(rows()).toHaveLength(0);
+    expect(addAlert()).toHaveFocus();
   });
 
   it("plays alerts simultaneously and limits their queue", async () => {
@@ -964,9 +1005,9 @@ describe("Alerts", () => {
     // Opens the media picker of the alert in the row over its editor, with
     // the library listed
     async function openMedia(user: UserEvent, row: number) {
-      const opened = await edit(user, row, "Media");
+      const opened = await edit(user, row, "Image or video");
       await user.click(
-        opened.getByRole("button", { name: /^(Change|Choose media)\.\.\.$/ }),
+        opened.getByRole("button", { name: /^(Change|Choose a file)\.\.\.$/ }),
       );
       await send(APP_EVENTS_RESPONSE.GET_MEDIA, {
         success: true,
@@ -1031,7 +1072,7 @@ describe("Alerts", () => {
 
       expect(dialogs()).toHaveLength(1);
       expect(summary(0)).toHaveTextContent("Party");
-      expect(summary(1)).toHaveTextContent("No media");
+      expect(summary(1)).toHaveTextContent("No image or video");
     });
 
     it("takes a deleted file off the alerts it shows", async () => {
@@ -1050,7 +1091,7 @@ describe("Alerts", () => {
       });
 
       expect(summary(0)).toHaveTextContent("No sound");
-      expect(summary(0)).toHaveTextContent("No media");
+      expect(summary(0)).toHaveTextContent("No image or video");
       await wait(300);
       expect(saves().at(-1)?.items).toEqual([
         alert("alert-1", { sound: null }),
@@ -1092,7 +1133,7 @@ describe("Alerts", () => {
       const { user } = await load([
         alert("alert-1", { media: alertMedia(clip) }),
       ]);
-      await edit(user, 0, "Media");
+      await edit(user, 0, "Image or video");
       const video = screen.getByRole("dialog").querySelector("video")!;
       Object.defineProperty(video, "duration", { value: 7.4 });
       fireEvent.loadedMetadata(video);
@@ -1168,7 +1209,7 @@ describe("Alerts", () => {
         media: party,
       });
 
-      expect(summary(0)).toHaveTextContent("No media");
+      expect(summary(0)).toHaveTextContent("No image or video");
       await wait(300);
       expect(saves()).toEqual([]);
     });

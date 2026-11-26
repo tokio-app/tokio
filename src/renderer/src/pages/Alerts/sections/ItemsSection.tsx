@@ -1,9 +1,17 @@
 import { Alert, Profile } from "@/common/schemas";
 import { CustomGift } from "@/common/types";
 import { alertName } from "@/common/util";
-import { AlertItem, EmoteOption, EmptyState, TestState } from "@/components";
+import {
+  AlertItem,
+  DeleteAlertModal,
+  EmoteOption,
+  EmptyState,
+  TestState,
+  useFocusAfterDelete,
+} from "@/components";
 import { AlertTestRequest, Updater } from "@/hooks";
 import { useT } from "@/ui/i18n";
+import { RefObject, useRef, useState } from "react";
 import styles from "../alerts.module.css";
 
 type Props = {
@@ -18,6 +26,8 @@ type Props = {
   onTest: (req: AlertTestRequest) => void;
   update: Updater<Profile["alerts"]>;
   onEdit: (id: string) => void;
+  // Takes the focus when the last alert is deleted
+  addRef: RefObject<HTMLButtonElement | null>;
 };
 
 export function ItemsSection({
@@ -29,8 +39,17 @@ export function ItemsSection({
   onTest,
   update,
   onEdit,
+  addRef,
 }: Props) {
   const t = useT();
+  const list = useRef<HTMLDivElement>(null);
+  // The alert waiting for the user to confirm it's deleted, by its place in
+  // the rows shown
+  const [deleting, setDeleting] = useState<{
+    id: string;
+    name: string;
+    at: number;
+  } | null>(null);
   const needle = search.trim().toLowerCase();
   // Each keeps its place in the list, which its default name counts
   const shown = items
@@ -38,38 +57,61 @@ export function ItemsSection({
     .filter(({ alert, index }) =>
       alertName(alert.name, index).toLowerCase().includes(needle),
     );
+  const deleted = useFocusAfterDelete(
+    items.map((alert) => alert.id),
+    list,
+    addRef,
+  );
 
   return (
-    <div className={styles.items}>
+    <>
+      {/* On the page, as the other pages' empty lists */}
       {shown.length === 0 ? (
         <EmptyState>
           {t(items.length > 0 ? "alerts.items.notFound" : "alerts.items.empty")}
         </EmptyState>
       ) : (
-        shown.map(({ alert, index }) => (
-          <AlertItem
-            key={alert.id}
-            alert={alert}
-            index={index}
-            gifts={gifts}
-            emotes={emotes}
-            testing={testing}
-            onTest={onTest}
-            onChange={(changed) =>
-              update((s) => {
-                const at = s.items.findIndex((a) => a.id === changed.id);
-                if (at !== -1) s.items[at] = changed;
-              })
-            }
-            onEdit={() => onEdit(alert.id)}
-            onRemove={() =>
-              update((s) => {
-                s.items = s.items.filter((a) => a.id !== alert.id);
-              })
-            }
-          />
-        ))
+        <div ref={list} className={styles.items}>
+          {shown.map(({ alert, index }, place) => (
+            <AlertItem
+              key={alert.id}
+              alert={alert}
+              index={index}
+              gifts={gifts}
+              emotes={emotes}
+              testing={testing}
+              onTest={onTest}
+              onChange={(changed) =>
+                update((s) => {
+                  const at = s.items.findIndex((a) => a.id === changed.id);
+                  if (at !== -1) s.items[at] = changed;
+                })
+              }
+              onEdit={() => onEdit(alert.id)}
+              onRemove={() =>
+                setDeleting({
+                  id: alert.id,
+                  name: alertName(alert.name, index),
+                  at: place,
+                })
+              }
+            />
+          ))}
+        </div>
       )}
-    </div>
+      {deleting && (
+        <DeleteAlertModal
+          item={deleting}
+          onClose={() => setDeleting(null)}
+          onDelete={() => {
+            const { id } = deleting;
+            deleted(id, deleting.at);
+            update((s) => {
+              s.items = s.items.filter((a) => a.id !== id);
+            });
+          }}
+        />
+      )}
+    </>
   );
 }

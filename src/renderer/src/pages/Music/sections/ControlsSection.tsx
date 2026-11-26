@@ -42,6 +42,7 @@ export function ControlsSection({ controls, update }: Props) {
             </div>
             <Input
               className={styles.control_command}
+              aria-label={t(label)}
               placeholder={`!${key}`}
               value={controls[key].command}
               disabled={!controls[key].enabled}

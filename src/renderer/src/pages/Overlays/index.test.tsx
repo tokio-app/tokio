@@ -115,6 +115,16 @@ describe("Overlays", () => {
     ).toBeInTheDocument();
   });
 
+  it("offers the search only once there are overlays", async () => {
+    await renderApp("/overlays");
+    await overlays();
+    expect(page().queryByRole("button", { name: "Search" })).toBeNull();
+
+    await overlays(GIFT_JAR);
+
+    expect(page().getByRole("button", { name: "Search" })).toBeInTheDocument();
+  });
+
   it("searches the overlays by name", async () => {
     const { user } = await renderApp("/overlays");
     await overlays(GIFT_JAR, TOP_LIKES);
@@ -147,6 +157,7 @@ describe("Overlays", () => {
 
   it("puts the focus in the search when it opens", async () => {
     const { user } = await renderApp("/overlays");
+    await overlays(GIFT_JAR);
 
     await user.click(page().getByRole("button", { name: "Search" }));
 
@@ -248,12 +259,13 @@ describe("Overlays", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("closes the settings on Cancel without saving", async () => {
+  it("closes the settings on Cancel without saving, once the changes are discarded", async () => {
     const { user } = await customize();
     await loadConfig();
     await user.type(dialog().getByPlaceholderText("Type a title"), "!");
 
     await user.click(dialog().getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Discard" }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(sent(APP_EVENTS.SAVE_OVERLAY_CONFIG)).toEqual([]);
@@ -570,6 +582,23 @@ describe("Overlays", () => {
 
     expect(sent(APP_EVENTS.REMOVE_OVERLAY)).toEqual([{ id: overlay.id }]);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("puts the focus on the next card once the removed one leaves", async () => {
+    const { user } = await renderApp("/overlays");
+    await overlays(GIFT_JAR, MY_GOAL);
+
+    await user.click(card("Gift Jar").getByRole("button", { name: "Remove" }));
+    await user.click(dialog().getByRole("button", { name: "Remove" }));
+    await overlays(MY_GOAL);
+    expect(card("My Goal").getByRole("button", { name: "Test" })).toHaveFocus();
+
+    await user.click(card("My Goal").getByRole("button", { name: "Remove" }));
+    await user.click(dialog().getByRole("button", { name: "Remove" }));
+    await overlays();
+    expect(
+      page().getByRole("button", { name: "Import overlay" }),
+    ).toHaveFocus();
   });
 
   // Failed imports and removals send the current list

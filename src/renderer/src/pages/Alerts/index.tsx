@@ -180,6 +180,7 @@ export function Alerts() {
           queueLength={settings.queue_length}
           addRef={headerAdd}
           search={search}
+          empty={settings.items.length === 0}
           onSearch={setSearch}
           onAdd={addAlert}
           update={update}
@@ -194,6 +195,7 @@ export function Alerts() {
           onTest={test.toggle}
           update={update}
           onEdit={setEditing}
+          addRef={headerAdd}
         />
 
         {!headerAddShown && (

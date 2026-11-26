@@ -63,7 +63,8 @@ const saves = () =>
 // An action's panel, by its Remove button
 const panelElements = () =>
   screen
-    .queryAllByRole("button", { name: "Remove action" })
+    .queryAllByRole("button")
+    .filter((button) => button.title === "Remove action")
     .map((button) => button.closest("li")!);
 const panels = () => panelElements().map((panel) => within(panel));
 
@@ -269,9 +270,7 @@ describe("Games", () => {
   it("says when there are no actions", async () => {
     await load([]);
 
-    expect(
-      screen.getByText("No actions yet. Use the add button to create one."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("No actions yet.")).toBeInTheDocument();
   });
 
   it("adds and removes actions, and saves them", async () => {
@@ -307,15 +306,45 @@ describe("Games", () => {
       },
     ]);
 
-    await user.click(
-      panels()[0].getByRole("button", { name: "Remove action" }),
+    await user.click(panels()[0].getByTitle("Remove action"));
+    // Its row names it for screen readers
+    expect(
+      panels()[0].getByRole("checkbox", { name: "Enable Follow: Zombie" }),
+    ).toBeChecked();
+    expect(
+      panels()[0].getByRole("button", { name: "Remove Follow: Zombie" }),
+    ).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Delete action?" });
+    expect(dialog).toHaveTextContent(
+      '"Follow: Zombie" and its steps will be deleted from this profile.',
     );
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
     await wait(300);
     expect(panels()).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Add action" })).toHaveFocus();
     expect(saves().at(-1)).toEqual({
       actions: [],
       overlay: defaultProfile.games.overlay,
     });
+  });
+
+  it("keeps an action when its delete is canceled, and focuses the next one", async () => {
+    const { user } = await load([action("a1"), action("a2")]);
+
+    await user.click(panels()[0].getByTitle("Remove action"));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(panels()).toHaveLength(2);
+
+    await user.click(panels()[0].getByTitle("Remove action"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(panels()).toHaveLength(1);
+    expect(panels()[0].getAllByRole("checkbox")[0]).toHaveFocus();
+    await wait(300);
+    expect(
+      saves()
+        .at(-1)
+        ?.actions.map((a) => a.id),
+    ).toEqual(["a2"]);
   });
 
   it("adds, changes and removes steps", async () => {
@@ -1053,17 +1082,21 @@ describe("Games overlay", () => {
   const testButton = () =>
     screen.getByRole("button", { name: "Light up the next action" });
 
-  it("says when there are no actions, and has nothing to test", async () => {
+  it("says when there are no actions, and has nothing to test or style", async () => {
     await load([]);
 
     expect(
       section("Overlay").getByText("Add an action to put it on the overlay."),
     ).toBeInTheDocument();
+    // Only the URL until there's an action to show
+    expect(screen.getByTitle("Copy the overlay's URL")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Layout" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Font" })).toBeNull();
     expect(
-      section("Overlay").getByText(
+      section("Overlay").queryByText(
         "Pick a picture or name an action to show it here.",
       ),
-    ).toBeInTheDocument();
+    ).toBeNull();
     expect(testButton()).toBeDisabled();
   });
 

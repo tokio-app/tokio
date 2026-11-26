@@ -187,190 +187,204 @@ export function OverlaySection({
         )}
       </Field>
 
-      {/* A strip previews across the section, near its size on stream */}
-      {horizontal && preview}
+      {/* Until an action, the look has nothing to show */}
+      {actions.length === 0 ? (
+        <EmptyState>{t("games.overlay.empty")}</EmptyState>
+      ) : (
+        <>
+          {/* A strip previews across the section, near its size on stream */}
+          {horizontal && preview}
 
-      <div className={styles.overlay}>
-        <div className={styles.overlay_rows}>
-          {actions.length === 0 ? (
-            <EmptyState>{t("games.overlay.empty")}</EmptyState>
-          ) : (
-            <ul
-              className={cx(
-                styles.recipes,
-                look.columns > 1 && styles.recipes_columns,
-              )}
-              aria-label={t("games.overlay.rows")}
-              // Only a row's own drag drops here, not files or text
-              onDragOver={(e) => {
-                if (drag) e.preventDefault();
-              }}
-              onDrop={(e) => {
-                if (!drag) return;
-                e.preventDefault();
-                move(
-                  drag.id,
-                  actions.findIndex((a) => a.id === drag.over),
-                );
-                setDrag(null);
-              }}
-              // Also when it's cancelled or dropped elsewhere: nothing moves
-              onDragEnd={() => setDrag(null)}
-            >
-              {actions.map((action, index) => (
-                <RecipeRow
-                  key={action.id}
-                  action={action}
-                  columns={look.columns}
-                  horizontal={horizontal}
-                  pictureTurn={pictureTurn}
-                  gifts={gifts}
-                  emotes={emotes}
-                  dragged={index === from}
-                  drop={
-                    from === -1 || index === from || action.id !== drag?.over
-                      ? undefined
-                      : index > from
-                        ? "after"
-                        : "before"
-                  }
-                  onChange={(patch) => setItem(action.id, patch)}
-                  onPickPicture={() => onPickPicture(action.id)}
-                  onDragStart={() => setDrag({ id: action.id })}
-                  onDragEnter={() => {
-                    if (drag && drag.over !== action.id)
-                      setDrag({ ...drag, over: action.id });
-                  }}
-                  onStep={(by) => move(action.id, index + by)}
-                />
-              ))}
-            </ul>
-          )}
-        </div>
+          <div className={styles.overlay}>
+            <div className={styles.overlay_rows}>
+              <ul
+                className={cx(
+                  styles.recipes,
+                  look.columns > 1 && styles.recipes_columns,
+                )}
+                aria-label={t("games.overlay.rows")}
+                // Only a row's own drag drops here, not files or text
+                onDragOver={(e) => {
+                  if (drag) e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  if (!drag) return;
+                  e.preventDefault();
+                  move(
+                    drag.id,
+                    actions.findIndex((a) => a.id === drag.over),
+                  );
+                  setDrag(null);
+                }}
+                // Also when it's cancelled or dropped elsewhere: nothing moves
+                onDragEnd={() => setDrag(null)}
+              >
+                {actions.map((action, index) => (
+                  <RecipeRow
+                    key={action.id}
+                    action={action}
+                    columns={look.columns}
+                    horizontal={horizontal}
+                    pictureTurn={pictureTurn}
+                    gifts={gifts}
+                    emotes={emotes}
+                    dragged={index === from}
+                    drop={
+                      from === -1 || index === from || action.id !== drag?.over
+                        ? undefined
+                        : index > from
+                          ? "after"
+                          : "before"
+                    }
+                    onChange={(patch) => setItem(action.id, patch)}
+                    onPickPicture={() => onPickPicture(action.id)}
+                    onDragStart={() => setDrag({ id: action.id })}
+                    onDragEnter={() => {
+                      if (drag && drag.over !== action.id)
+                        setDrag({ ...drag, over: action.id });
+                    }}
+                    onStep={(by) => move(action.id, index + by)}
+                  />
+                ))}
+              </ul>
+            </div>
 
-        <div className={styles.overlay_side}>
-          {!horizontal && preview}
+            <div className={styles.overlay_side}>
+              {!horizontal && preview}
 
-          <div className={styles.look_choices}>
-            <Field label={t("games.overlay.layout")} className={styles.layouts}>
-              <RadioGroup
-                name="games-overlay-layout"
-                value={look.layout}
-                options={layouts}
-                onChange={(layout) =>
+              <div className={styles.look_choices}>
+                <Field
+                  label={t("games.overlay.layout")}
+                  className={styles.layouts}
+                >
+                  <RadioGroup
+                    name="games-overlay-layout"
+                    value={look.layout}
+                    options={layouts}
+                    onChange={(layout) =>
+                      setLook((l) => {
+                        l.layout = layout;
+                      })
+                    }
+                  />
+                </Field>
+                <Field
+                  label={t("games.overlay.format")}
+                  className={styles.layouts}
+                >
+                  <RadioGroup
+                    name="games-overlay-format"
+                    value={look.format}
+                    options={formats}
+                    onChange={(format) =>
+                      setLook((l) => {
+                        l.format = format;
+                      })
+                    }
+                  />
+                </Field>
+                <Field
+                  label={t(
+                    horizontal
+                      ? "games.overlay.rowCount"
+                      : "games.overlay.columns",
+                  )}
+                  className={styles.layouts}
+                >
+                  <RadioGroup
+                    name="games-overlay-columns"
+                    value={String(look.columns)}
+                    options={COLUMNS}
+                    onChange={(columns) =>
+                      setLook((l) => {
+                        l.columns = Number(columns);
+                      })
+                    }
+                  />
+                </Field>
+                <Field
+                  label={t("games.overlay.eventPictures")}
+                  className={styles.layouts}
+                >
+                  <RadioGroup
+                    name="games-overlay-event-size"
+                    value={look.event_size}
+                    options={sizes}
+                    onChange={(size) =>
+                      setLook((l) => {
+                        l.event_size = size;
+                      })
+                    }
+                  />
+                </Field>
+                <Field
+                  label={t("games.overlay.counts")}
+                  className={styles.layouts}
+                >
+                  <RadioGroup
+                    name="games-overlay-count-size"
+                    value={look.count_size}
+                    options={sizes}
+                    onChange={(size) =>
+                      setLook((l) => {
+                        l.count_size = size;
+                      })
+                    }
+                  />
+                </Field>
+              </div>
+              <Check
+                label={t("games.overlay.picturesOnly")}
+                checked={look.pictures_only}
+                onChange={(e) => {
+                  const only = e.target.checked;
                   setLook((l) => {
-                    l.layout = layout;
-                  })
-                }
+                    l.pictures_only = only;
+                  });
+                }}
               />
-            </Field>
-            <Field label={t("games.overlay.format")} className={styles.layouts}>
-              <RadioGroup
-                name="games-overlay-format"
-                value={look.format}
-                options={formats}
-                onChange={(format) =>
+              <Check
+                label={t("games.overlay.textBelow")}
+                checked={look.text_below}
+                onChange={(e) => {
+                  const below = e.target.checked;
                   setLook((l) => {
-                    l.format = format;
-                  })
-                }
+                    l.text_below = below;
+                  });
+                }}
               />
-            </Field>
-            <Field
-              label={t(
-                horizontal ? "games.overlay.rowCount" : "games.overlay.columns",
-              )}
-              className={styles.layouts}
-            >
-              <RadioGroup
-                name="games-overlay-columns"
-                value={String(look.columns)}
-                options={COLUMNS}
-                onChange={(columns) =>
-                  setLook((l) => {
-                    l.columns = Number(columns);
-                  })
-                }
-              />
-            </Field>
-            <Field
-              label={t("games.overlay.eventPictures")}
-              className={styles.layouts}
-            >
-              <RadioGroup
-                name="games-overlay-event-size"
-                value={look.event_size}
-                options={sizes}
-                onChange={(size) =>
-                  setLook((l) => {
-                    l.event_size = size;
-                  })
-                }
-              />
-            </Field>
-            <Field label={t("games.overlay.counts")} className={styles.layouts}>
-              <RadioGroup
-                name="games-overlay-count-size"
-                value={look.count_size}
-                options={sizes}
-                onChange={(size) =>
-                  setLook((l) => {
-                    l.count_size = size;
-                  })
-                }
-              />
-            </Field>
+              <div className={styles.look_fields}>
+                <Field label={t("games.overlay.font")}>
+                  <FontSelect
+                    value={look.font}
+                    onChange={(font) =>
+                      setLook((l) => {
+                        l.font = font;
+                      })
+                    }
+                  />
+                </Field>
+                {/* Stickers have no arrow */}
+                {COLORS.filter(
+                  ({ key }) => key !== "arrow_color" || look.format === "arrow",
+                ).map(({ key, label }) => (
+                  <Field key={key} label={t(label)} className={styles.color}>
+                    <Color
+                      value={look[key]}
+                      onChange={(color) =>
+                        setLook((l) => {
+                          l[key] = color;
+                        })
+                      }
+                    />
+                  </Field>
+                ))}
+              </div>
+              <p className={styles.note}>{t("common.fontsNote")}</p>
+            </div>
           </div>
-          <Check
-            label={t("games.overlay.picturesOnly")}
-            checked={look.pictures_only}
-            onChange={(e) => {
-              const only = e.target.checked;
-              setLook((l) => {
-                l.pictures_only = only;
-              });
-            }}
-          />
-          <Check
-            label={t("games.overlay.textBelow")}
-            checked={look.text_below}
-            onChange={(e) => {
-              const below = e.target.checked;
-              setLook((l) => {
-                l.text_below = below;
-              });
-            }}
-          />
-          <div className={styles.look_fields}>
-            <Field label={t("games.overlay.font")}>
-              <FontSelect
-                value={look.font}
-                onChange={(font) =>
-                  setLook((l) => {
-                    l.font = font;
-                  })
-                }
-              />
-            </Field>
-            {/* Stickers have no arrow */}
-            {COLORS.filter(
-              ({ key }) => key !== "arrow_color" || look.format === "arrow",
-            ).map(({ key, label }) => (
-              <Field key={key} label={t(label)}>
-                <Color
-                  value={look[key]}
-                  onChange={(color) =>
-                    setLook((l) => {
-                      l[key] = color;
-                    })
-                  }
-                />
-              </Field>
-            ))}
-          </div>
-          <p className={styles.note}>{t("common.fontsNote")}</p>
-        </div>
-      </div>
+        </>
+      )}
     </Section>
   );
 }

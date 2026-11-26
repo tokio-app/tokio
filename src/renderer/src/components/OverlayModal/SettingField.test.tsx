@@ -215,7 +215,7 @@ describe("SettingField", () => {
     expect(slider).toHaveAttribute("min", "10");
     expect(slider).toHaveAttribute("max", "90");
     expect(slider).toHaveValue("40");
-    expect(screen.getByText("40")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Size (40)" })).toBeVisible();
     expect(reset()).toBeEnabled();
 
     fireEvent.change(slider, { target: { value: "70" } });

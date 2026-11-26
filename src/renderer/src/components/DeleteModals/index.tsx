@@ -4,7 +4,7 @@ import { formatDate } from "@/helper/format";
 import { useLanguage, useT } from "@/ui/i18n";
 import { Modal } from "../Modal";
 import { EntityMetadata } from "@/common/schemas";
-import { useState } from "react";
+import { RefObject, useEffect, useRef, useState } from "react";
 import { Select } from "../Elements";
 import { Field } from "../Page";
 
@@ -199,4 +199,106 @@ export function RemoveOverlayModal({
       }}
     />
   );
+}
+
+// An alert of the profile, by its name as the list shows it. Its sound and
+// media stay in the library.
+export function DeleteAlertModal({
+  item,
+  onClose,
+  onDelete,
+}: Props<{ name: string }> & { onDelete: () => void }) {
+  const t = useT();
+  return (
+    <Modal
+      title={t("components.deleteModals.alertTitle")}
+      description={t("components.deleteModals.alertDescription", {
+        name: item.name,
+      })}
+      confirmText={t("common.delete")}
+      onClose={onClose}
+      onConfirm={() => {
+        onDelete();
+        onClose();
+      }}
+    />
+  );
+}
+
+// A game action of the profile, by its name (see actionName)
+export function DeleteActionModal({
+  item,
+  onClose,
+  onDelete,
+}: Props<{ name: string }> & { onDelete: () => void }) {
+  const t = useT();
+  return (
+    <Modal
+      title={t("components.deleteModals.actionTitle")}
+      description={t("components.deleteModals.actionDescription", {
+        name: item.name,
+      })}
+      confirmText={t("common.delete")}
+      onClose={onClose}
+      onConfirm={() => {
+        onDelete();
+        onClose();
+      }}
+    />
+  );
+}
+
+// A test overlay, whose id an overlay being built connects with
+export function DeleteTestOverlayModal({
+  item,
+  onClose,
+}: Props<{ id: string; name: string }>) {
+  const t = useT();
+  return (
+    <Modal
+      title={t("components.deleteModals.testOverlayTitle")}
+      description={t("components.deleteModals.testOverlayDescription", {
+        name: item.name,
+      })}
+      confirmText={t("common.delete")}
+      onClose={onClose}
+      onConfirm={() => {
+        window.api.emit(APP_EVENTS.REMOVE_TEST_OVERLAY, { id: item.id });
+        onClose();
+      }}
+    />
+  );
+}
+
+/**
+ * Puts the focus back in a list once a row the user deleted has left it.
+ * Its trash went with it, so Chromium dropped the focus on <body>: it goes
+ * to the row now in its place, else the last row, else to fallback. Call
+ * the function it returns with the row's id and place once its delete is
+ * asked for; rows are the list's children.
+ */
+export function useFocusAfterDelete(
+  ids: string[],
+  list: RefObject<HTMLElement | null>,
+  fallback: RefObject<HTMLElement | null>,
+) {
+  const deleted = useRef<{ id: string; index: number } | null>(null);
+  useEffect(() => {
+    const row = deleted.current;
+    if (!row || ids.includes(row.id)) return;
+    deleted.current = null;
+    // Only when the focus went with the row (jsdom keeps it on the detached
+    // button), not after a delete from elsewhere
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected) return;
+    const rows = [...(list.current?.children ?? [])];
+    const target =
+      rows[Math.min(row.index, rows.length - 1)]?.querySelector<HTMLElement>(
+        "input:not(:disabled), button:not(:disabled), a[href]",
+      ) ?? fallback.current;
+    target?.focus();
+  });
+  return (id: string, index: number) => {
+    deleted.current = { id, index };
+  };
 }

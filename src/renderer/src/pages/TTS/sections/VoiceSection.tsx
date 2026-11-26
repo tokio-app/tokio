@@ -127,7 +127,13 @@ export function VoiceSection({
         </Field>
       </FormGrid>
 
+      {/* The message, then the button that reads it */}
       <div className={styles.tester}>
+        <Input
+          placeholder={t("tts.voice.testPlaceholder")}
+          value={testMessage}
+          onChange={(e) => setTestMessage(e.target.value)}
+        />
         <Btn
           variant="accent"
           className={styles.tester_btn}
@@ -137,11 +143,6 @@ export function VoiceSection({
         >
           {t("tts.voice.test")}
         </Btn>
-        <Input
-          placeholder={t("tts.voice.testPlaceholder")}
-          value={testMessage}
-          onChange={(e) => setTestMessage(e.target.value)}
-        />
       </div>
 
       {cloning && cloners.length > 0 && (

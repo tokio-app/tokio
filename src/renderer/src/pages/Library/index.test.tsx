@@ -334,7 +334,7 @@ describe("Library", () => {
 
       await user.click(row("Party").getByRole("button", { name: "Delete" }));
       expect(sent(APP_EVENTS.REMOVE_MEDIA)).toEqual([]);
-      await user.click(confirmDelete("Delete media?"));
+      await user.click(confirmDelete("Delete file?"));
 
       expect(sent(APP_EVENTS.REMOVE_MEDIA)).toEqual([{ file: "party.png" }]);
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

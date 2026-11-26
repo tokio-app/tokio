@@ -119,6 +119,16 @@ describe("VoiceSelect", () => {
     expect(picker().getByPlaceholderText("Search voices...")).toHaveFocus();
   });
 
+  it("says it opens a dialog, which marks the current voice and names its filters", async () => {
+    const { field } = await openPicker();
+
+    expect(field).toHaveAttribute("aria-haspopup", "dialog");
+    expect(picker().getByTitle("Aria")).toHaveAttribute("aria-current", "true");
+    expect(picker().getByTitle("Bob")).not.toHaveAttribute("aria-current");
+    expect(picker().getByRole("combobox", { name: "Engine" })).toBeVisible();
+    expect(picker().getByRole("combobox", { name: "Language" })).toBeVisible();
+  });
+
   it("picks a voice and closes", async () => {
     const { user, onChange } = await openPicker();
 

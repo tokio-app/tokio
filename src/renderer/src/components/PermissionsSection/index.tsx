@@ -4,6 +4,7 @@ import { Platform, PLATFORMS } from "@/common/types";
 import { defaultPlatformPermissions, PLATFORM_LABELS } from "@/common/util";
 import { usePlatforms } from "@/context/platforms";
 import { PLATFORM_ICONS } from "@/helper";
+import { cx } from "@/helper/cx";
 import { Updater } from "@/hooks/useImmerState";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
@@ -14,7 +15,8 @@ import styles from "./permissionssection.module.css";
 interface Props {
   permissions: Permissions;
   update: Updater<Permissions>;
-  // Feature name shown in the description, in the window's language
+  // What the rules are for, in the window's language and inside a sentence:
+  // "song requests", "TTS"
   feature: string;
 }
 
@@ -58,14 +60,18 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
   const tab = (picked && tabs.includes(picked) ? picked : tabs[0]) ?? "tiktok";
   const several = tabs.length > 1;
 
+  // Allow everyone passes anyone, whatever the roles say
   let rules;
   if (tab === "tiktok") {
+    const everyone = permissions.all;
+    const levelShown = permissions.level.enabled;
     rules = (
       <div className={styles.grid}>
         {TIKTOK_ROLES.map(({ key, label }) => (
           <Check
             key={key}
             label={t(label)}
+            disabled={key !== "all" && everyone}
             checked={permissions[key]}
             onChange={(e) =>
               update((p) => {
@@ -77,6 +83,7 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
 
         <Check
           label={t("components.permissions.level")}
+          disabled={everyone}
           checked={permissions.level.enabled}
           onChange={(e) =>
             update((p) => {
@@ -86,12 +93,12 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
         />
         <NumberInput
           min={0}
-          className={styles.level}
+          className={cx(styles.level, !levelShown && styles.level_off)}
           value={permissions.level.value}
-          disabled={!permissions.level.enabled}
+          disabled={!levelShown || everyone}
           // Only CSS hides it while off, so keep it from screen readers too
-          tabIndex={permissions.level.enabled ? undefined : -1}
-          aria-hidden={!permissions.level.enabled || undefined}
+          tabIndex={levelShown ? undefined : -1}
+          aria-hidden={!levelShown || undefined}
           onChange={(level) =>
             update((p) => {
               p.level.value = level;
@@ -108,6 +115,7 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
           <Check
             key={key}
             label={t(label)}
+            disabled={key !== "all" && saved.all}
             checked={saved[key]}
             onChange={(e) =>
               update((p) => {
@@ -144,7 +152,19 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
           onChange={setPicked}
         />
       )}
-      {rules}
+      <div className={styles.rules}>
+        {rules}
+        {/* The roles and the level pass with any one of them, see
+            hasPermission */}
+        <p className={styles.rule}>
+          {t(
+            tab === "tiktok"
+              ? "components.permissions.ruleLevel"
+              : "components.permissions.rule",
+            { feature },
+          )}
+        </p>
+      </div>
 
       <div className={styles.lists}>
         <Check
@@ -178,6 +198,9 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
                 })
               }
             />
+            <p className={styles.rule}>
+              {t("components.permissions.allowListRule", { feature })}
+            </p>
           </Field>
           <Field
             label={t("components.permissions.blockList")}

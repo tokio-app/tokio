@@ -14,8 +14,9 @@ type Props = {
   // The page shows another add button under the alerts while this one is
   // scrolled out of view
   addRef: Ref<HTMLButtonElement>;
-  // Finds alerts by name
+  // Finds alerts by name, once there are some
   search: string;
+  empty: boolean;
   onSearch: (search: string) => void;
   onAdd: () => void;
   update: Updater<Profile["alerts"]>;
@@ -26,6 +27,7 @@ export function HeaderSection({
   queueLength,
   addRef,
   search,
+  empty,
   onSearch,
   onAdd,
   update,
@@ -38,11 +40,14 @@ export function HeaderSection({
       description={t("alerts.header.description")}
       actions={
         <>
-          <SearchToggle
-            placeholder={t("alerts.header.searchPlaceholder")}
-            value={search}
-            onChange={onSearch}
-          />
+          {/* Kept while it still hides some */}
+          {(!empty || search !== "") && (
+            <SearchToggle
+              placeholder={t("alerts.header.searchPlaceholder")}
+              value={search}
+              onChange={onSearch}
+            />
+          )}
           <Btn onClick={() => navigate({ to: "/alerts/library" })}>
             <LuLibrary size={18} />
             {t("alerts.library.title")}

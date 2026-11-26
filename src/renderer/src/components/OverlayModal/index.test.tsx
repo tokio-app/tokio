@@ -52,9 +52,12 @@ const title = () => screen.getByPlaceholderText("Type a title");
 const size = () => screen.getByRole("slider");
 const show = () => screen.getByRole("checkbox", { name: "Show count" });
 
-// The field's own reset button, beside its name
+// The field's own reset button, beside its name (a slider's has its value)
 const resetOf = (name: string) =>
-  within(screen.getByText(name).parentElement!).getByRole("button", {
+  within(
+    screen.getByText((text) => text === name || text.startsWith(`${name} (`))
+      .parentElement!,
+  ).getByRole("button", {
     name: "Reset to default",
   });
 
@@ -225,6 +228,36 @@ describe("OverlayModal", () => {
 
     expect(onRequestClose).toHaveBeenCalledTimes(2);
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "Cancel",
+      (user: ReturnType<typeof userEvent.setup>) =>
+        user.click(button("Cancel")),
+    ],
+    [
+      "the close button",
+      (user: ReturnType<typeof userEvent.setup>) => user.click(button("Close")),
+    ],
+    [
+      "Escape",
+      (user: ReturnType<typeof userEvent.setup>) => user.keyboard("{Escape}"),
+    ],
+  ])("asks before %s throws changes away", async (_, close) => {
+    const { user, onRequestClose } = setup();
+    await user.type(title(), "!");
+
+    await close(user);
+    const ask = screen.getByRole("dialog", { name: "Discard your changes?" });
+    expect(ask).toHaveTextContent("The settings you changed won't be saved.");
+    await user.click(within(ask).getByRole("button", { name: "Keep editing" }));
+    expect(onRequestClose).not.toHaveBeenCalled();
+    expect(title()).toHaveValue("Goal!");
+
+    await close(user);
+    await user.click(button("Discard"));
+    expect(onRequestClose).toHaveBeenCalledOnce();
   });
 
   it("shows the overlay in its own preview", () => {
@@ -400,9 +433,12 @@ describe("OverlayModal", () => {
       expect(screen.queryByRole("table")).not.toBeInTheDocument();
       expect(add()).toHaveFocus();
 
-      // The dialog still sees Escape
+      // The dialog still sees Escape, and asks first: the rows changed
       await user.keyboard("{Escape}");
-      expect(onRequestClose).toHaveBeenCalledOnce();
+      expect(
+        screen.getByRole("dialog", { name: "Discard your changes?" }),
+      ).toBeInTheDocument();
+      expect(onRequestClose).not.toHaveBeenCalled();
     });
   });
 });

@@ -22,8 +22,8 @@ type Tab = "sounds" | "media";
 // Newest first, the ones named by the search
 function shown<T extends { name: string }>(list: T[], search: string) {
   const needle = search.trim().toLowerCase();
-  return [...list]
-    .reverse()
+  return list
+    .toReversed()
     .filter((item) => item.name.toLowerCase().includes(needle));
 }
 

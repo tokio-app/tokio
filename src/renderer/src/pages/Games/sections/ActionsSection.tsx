@@ -26,6 +26,7 @@ import { usePlatforms } from "@/context/platforms";
 import {
   Btn,
   Check,
+  DeleteActionModal,
   EmoteOption,
   EmptyState,
   Input,
@@ -36,6 +37,7 @@ import {
   Toggle,
   TriggerFilter,
   TriggerSelect,
+  useFocusAfterDelete,
   VariableList,
 } from "@/components";
 import {
@@ -58,6 +60,7 @@ import {
 } from "react-icons/fi";
 import styles from "../games.module.css";
 import {
+  actionName,
   EDITIONS,
   enchantmentsText,
   GAME_TRIGGERS,
@@ -95,7 +98,22 @@ export function ActionsSection({
   update,
 }: Props) {
   const t = useT();
+  const language = useLanguage();
   const platforms = usePlatforms();
+  // The action waiting for the user to confirm it's deleted, by its place
+  // in the tab's list
+  const [deleting, setDeleting] = useState<{
+    id: string;
+    name: string;
+    at: number;
+  } | null>(null);
+  const list = useRef<HTMLUListElement>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
+  const deleted = useFocusAfterDelete(
+    actions.map((action) => action.id),
+    list,
+    addRef,
+  );
   // Asked once here, not by each action
   const translation = useTranslationLanguage();
   // Collapsed, the overlay below gets the room. Only while on the page.
@@ -139,8 +157,8 @@ export function ActionsSection({
         {shown.length === 0 ? (
           <EmptyState>{t("games.actions.empty")}</EmptyState>
         ) : (
-          <ul className={styles.actions}>
-            {shown.map((action) => (
+          <ul ref={list} className={styles.actions}>
+            {shown.map((action, at) => (
               <ActionItem
                 key={action.id}
                 action={action}
@@ -170,8 +188,10 @@ export function ActionsSection({
                   })
                 }
                 onRemove={() =>
-                  update((s) => {
-                    s.actions = s.actions.filter((a) => a.id !== action.id);
+                  setDeleting({
+                    id: action.id,
+                    name: actionName(action, gifts, language),
+                    at,
                   })
                 }
               />
@@ -179,6 +199,7 @@ export function ActionsSection({
           </ul>
         )}
         <Btn
+          ref={addRef}
           className={styles.add}
           onClick={() =>
             update((s) => {
@@ -190,6 +211,19 @@ export function ActionsSection({
           {t("games.actions.add")}
         </Btn>
       </div>
+      {deleting && (
+        <DeleteActionModal
+          item={deleting}
+          onClose={() => setDeleting(null)}
+          onDelete={() => {
+            const { id } = deleting;
+            deleted(id, deleting.at);
+            update((s) => {
+              s.actions = s.actions.filter((a) => a.id !== id);
+            });
+          }}
+        />
+      )}
     </Section>
   );
 }
@@ -266,6 +300,7 @@ function ActionItem({
     setResult({ results: res.results, error: res.error?.message });
   });
 
+  const name = actionName(action, gifts, language);
   const setSteps = (next: GameStep[]) => onChange({ ...action, steps: next });
   const setStep = (index: number, step: GameStep) =>
     setSteps(steps.map((s, i) => (i === index ? step : s)));
@@ -274,7 +309,7 @@ function ActionItem({
     <li className={styles.action}>
       <div className={styles.action_header}>
         <Toggle
-          aria-label={t("common.enabled")}
+          aria-label={t("games.actions.enable", { name })}
           checked={action.enabled}
           onChange={(e) => onChange({ ...action, enabled: e.target.checked })}
         />
@@ -350,6 +385,7 @@ function ActionItem({
           <Btn
             variant="icon"
             title={t("games.actions.remove")}
+            aria-label={t("games.actions.removeNamed", { name })}
             onClick={onRemove}
           >
             <FiTrash2 size={20} />

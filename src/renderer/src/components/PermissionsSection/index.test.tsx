@@ -71,18 +71,21 @@ describe("PermissionsSection", () => {
     });
 
     expect(box("Allow everyone")).not.toBeChecked();
-    expect(box("Followers only")).not.toBeChecked();
-    expect(box("Super Fans only")).not.toBeChecked();
-    expect(box("Moderators only")).toBeChecked();
+    expect(box("Followers")).not.toBeChecked();
+    expect(box("Super Fans")).not.toBeChecked();
+    expect(box("Moderators")).toBeChecked();
   });
 
   it.each([
     ["Allow everyone", "all"],
-    ["Followers only", "followers"],
-    ["Super Fans only", "superfans"],
-    ["Moderators only", "moderators"],
+    ["Followers", "followers"],
+    ["Super Fans", "superfans"],
+    ["Moderators", "moderators"],
   ] as const)("toggles %s", async (label, key) => {
-    const user = setup();
+    // Allow everyone turns the roles off
+    const user = setup((p) => {
+      if (key !== "all") p.all = false;
+    });
     const before = current()[key];
 
     await user.click(box(label));
@@ -93,8 +96,46 @@ describe("PermissionsSection", () => {
     expect(current()[key]).toBe(before);
   });
 
+  it("turns the roles off while Allow everyone is on, and says how they combine", async () => {
+    const user = setup((p) => {
+      p.all = true;
+      p.level.enabled = true;
+    });
+    for (const name of [
+      "Followers",
+      "Super Fans",
+      "Moderators",
+      "Minimum fan level",
+    ]) {
+      expect(box(name)).toBeDisabled();
+    }
+    expect(level()).toBeDisabled();
+    expect(
+      screen.getByText(
+        "Anyone who is one of these, or has the fan level, can use TTS. With none checked, everyone can.",
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(box("Allow everyone"));
+
+    expect(box("Followers")).toBeEnabled();
+    expect(level()).toBeEnabled();
+  });
+
+  it("says the allow list's names are the only ones who can use the feature", async () => {
+    setup((p) => {
+      p.list.enabled = true;
+    });
+
+    expect(
+      screen.getByText("When it has names, only they can use TTS."),
+    ).toBeInTheDocument();
+  });
+
   it("edits the fan level once Minimum fan level is on", async () => {
-    const user = setup();
+    const user = setup((p) => {
+      p.all = false;
+    });
     expect(level()).toBeDisabled();
 
     await user.click(box("Minimum fan level"));
@@ -111,7 +152,9 @@ describe("PermissionsSection", () => {
   });
 
   it("keeps the fan level from the keyboard and screen readers while it's hidden", async () => {
-    const user = setup();
+    const user = setup((p) => {
+      p.all = false;
+    });
     expect(level()).toHaveAttribute("aria-hidden", "true");
     expect(level()).toHaveAttribute("tabindex", "-1");
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
@@ -179,7 +222,7 @@ describe("PermissionsSection with other platforms", () => {
         .map((t) => t.textContent),
     ).toEqual(["TikTok", "YouTube", "Kick"]);
     expect(tab("TikTok")).toHaveAttribute("aria-selected", "true");
-    expect(box("Followers only")).toBeInTheDocument();
+    expect(box("Followers")).toBeInTheDocument();
     expect(box("Minimum fan level")).toBeInTheDocument();
     expect(screen.getByText(lists)).toBeInTheDocument();
   });
@@ -195,20 +238,14 @@ describe("PermissionsSection with other platforms", () => {
     withPlatforms(["twitch"]);
 
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
-    expect(box("Subscribers only")).toBeInTheDocument();
+    expect(box("Subscribers")).toBeInTheDocument();
     expect(screen.queryByText(lists)).not.toBeInTheDocument();
   });
 
   it.each([
-    [
-      "Twitch",
-      ["Allow everyone", "Subscribers only", "Moderators only", "VIPs only"],
-    ],
-    ["YouTube", ["Allow everyone", "Members only", "Moderators only"]],
-    [
-      "Kick",
-      ["Allow everyone", "Subscribers only", "Moderators only", "VIPs only"],
-    ],
+    ["Twitch", ["Allow everyone", "Subscribers", "Moderators", "VIPs"]],
+    ["YouTube", ["Allow everyone", "Members", "Moderators"]],
+    ["Kick", ["Allow everyone", "Subscribers", "Moderators", "VIPs"]],
   ])("offers on %s's tab what its chat says", async (name, labels) => {
     const { user } = withPlatforms(["tiktok", "twitch", "youtube", "kick"]);
 
@@ -229,7 +266,7 @@ describe("PermissionsSection with other platforms", () => {
     await user.click(tab("Twitch"));
 
     expect(box("Allow everyone")).toBeChecked();
-    expect(box("Subscribers only")).not.toBeChecked();
+    expect(box("Subscribers")).not.toBeChecked();
   });
 
   it("saves a platform's rules apart from TikTok's", async () => {
@@ -237,7 +274,7 @@ describe("PermissionsSection with other platforms", () => {
 
     await user.click(tab("Twitch"));
     await user.click(box("Allow everyone"));
-    await user.click(box("Subscribers only"));
+    await user.click(box("Subscribers"));
 
     expect(current().platforms).toEqual({
       twitch: { all: false, superfans: true, moderators: false, vips: false },
@@ -247,7 +284,20 @@ describe("PermissionsSection with other platforms", () => {
 
     await user.click(tab("TikTok"));
     expect(box("Allow everyone")).toBeChecked();
-    expect(box("Super Fans only")).not.toBeChecked();
+    expect(box("Super Fans")).not.toBeChecked();
+  });
+
+  it("says on another platform's tab how its roles combine", async () => {
+    const { user } = withPlatforms(["tiktok", "twitch"]);
+
+    await user.click(tab("Twitch"));
+
+    expect(box("VIPs")).toBeDisabled();
+    expect(
+      screen.getByText(
+        "Anyone who is one of these can use TTS. With none checked, everyone can.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("shows a platform's saved rules", async () => {
@@ -263,9 +313,9 @@ describe("PermissionsSection with other platforms", () => {
     await user.click(tab("Kick"));
 
     expect(box("Allow everyone")).not.toBeChecked();
-    expect(box("Subscribers only")).not.toBeChecked();
-    expect(box("Moderators only")).toBeChecked();
-    expect(box("VIPs only")).toBeChecked();
+    expect(box("Subscribers")).not.toBeChecked();
+    expect(box("Moderators")).toBeChecked();
+    expect(box("VIPs")).toBeChecked();
   });
 
   it("keeps the shared lists under every tab", async () => {
@@ -293,7 +343,7 @@ describe("PermissionsSection with other platforms", () => {
       </PlatformsContext>,
     );
 
-    expect(box("Followers only")).toBeInTheDocument();
-    expect(screen.queryByRole("checkbox", { name: "VIPs only" })).toBeNull();
+    expect(box("Followers")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "VIPs" })).toBeNull();
   });
 });

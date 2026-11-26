@@ -16,6 +16,7 @@ const loaded = profileReply((p) => {
     one_per_viewer: false,
     limit_controls: true,
   };
+  p.music.permissions.all = false;
   p.music.permissions.followers = true;
 });
 
@@ -80,12 +81,14 @@ describe("Music", () => {
     expect(screen.getByPlaceholderText("!play")).toHaveValue("!song");
     expect(screen.getByPlaceholderText("!play")).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: "Next" })).toBeChecked();
+    // Each command's field is named by its control
+    expect(screen.getByRole("textbox", { name: "Previous" })).toHaveValue(
+      "!last",
+    );
     expect(screen.getByPlaceholderText("!next")).toHaveValue("!next");
     expect(screen.getByPlaceholderText("!next")).toBeEnabled();
 
-    expect(
-      screen.getByRole("checkbox", { name: "Followers only" }),
-    ).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Followers" })).toBeChecked();
     expect(field("Cooldown").getByRole("spinbutton")).toHaveValue(4);
     expect(field("Max queue length").getByRole("spinbutton")).toHaveValue(15);
   });
@@ -293,8 +296,12 @@ describe("Music", () => {
 
   it("changes who may request songs and the limits", async () => {
     const { user } = await setup();
+    expect(screen.getByText("Who can use song requests.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Limits that keep chat from flooding song requests."),
+    ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("checkbox", { name: "Super Fans only" }));
+    await user.click(screen.getByRole("checkbox", { name: "Super Fans" }));
     fireEvent.change(field("Cooldown").getByRole("spinbutton"), {
       target: { value: "10" },
     });
@@ -321,6 +328,11 @@ describe("Music", () => {
       name: "One request per viewer",
     });
     expect(check).not.toBeChecked();
+    // Its rule shows under it, not only on hover
+    expect(check).toHaveAccessibleDescription(
+      "A viewer waits for their song to play before asking for another. A song already playing or waiting isn't added again.",
+    );
+    expect(check).not.toHaveAttribute("title");
 
     await user.click(check);
 
@@ -328,12 +340,15 @@ describe("Music", () => {
     expect((await saved()).protection.one_per_viewer).toBe(true);
   });
 
-  it("saves the limit on Next, Last and Revoke", async () => {
+  it("saves the limit on Next, Previous and Revoke", async () => {
     const { user } = await setup();
     const check = screen.getByRole("checkbox", {
-      name: "Limit Next, Last and Revoke",
+      name: "Limit Next, Previous and Revoke",
     });
     expect(check).toBeChecked();
+    expect(check).toHaveAccessibleDescription(
+      "Only you and your moderators can use Next and Previous, or revoke any song. Viewers can still skip their own song while it plays and revoke their own requests.",
+    );
 
     await user.click(check);
 
@@ -344,7 +359,7 @@ describe("Music", () => {
   it("saves a change 300ms later", async () => {
     const { user } = await setup();
 
-    await user.click(screen.getByRole("checkbox", { name: "Last" }));
+    await user.click(screen.getByRole("checkbox", { name: "Previous" }));
     await wait(299);
     expect(sent(APP_EVENTS.UPDATE_MUSIC_SETTINGS)).toEqual([]);
 

@@ -5,11 +5,13 @@ import {
   Btn,
   CopyField,
   EmptyState,
+  Field,
   Input,
   Section,
+  useFocusAfterDelete,
 } from "@/components";
 import { useT } from "@/ui/i18n";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
 import { LuPlus } from "react-icons/lu";
 import { PiShootingStarThin } from "react-icons/pi";
@@ -20,7 +22,8 @@ interface Props {
   overlays: TestOverlay[];
   statuses: Record<string, TestStatus>;
   onCreate: (name: string) => void;
-  onRemove: (id: string) => void;
+  // Asks first
+  onRemove: (overlay: TestOverlay) => void;
   onTest: (id: string) => void;
 }
 
@@ -33,6 +36,13 @@ export function TestOverlaysSection({
 }: Props) {
   const t = useT();
   const [name, setName] = useState("");
+  const list = useRef<HTMLDivElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const deleted = useFocusAfterDelete(
+    overlays.map((overlay) => overlay.id),
+    list,
+    nameRef,
+  );
 
   return (
     <Section
@@ -40,32 +50,35 @@ export function TestOverlaysSection({
       title={t("tools.test.title")}
       description={t("tools.test.description")}
     >
-      <form
-        className={styles.row}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!name.trim()) return;
-          onCreate(name);
-          setName("");
-        }}
-      >
-        <Input
-          placeholder={t("tools.test.name")}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <Btn
-          type="submit"
-          disabled={!name.trim()}
-          title={t("tools.test.create")}
+      <Field label={t("tools.test.name")}>
+        <form
+          className={styles.row}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!name.trim()) return;
+            onCreate(name);
+            setName("");
+          }}
         >
-          <LuPlus size={20} />
-        </Btn>
-      </form>
+          <Input
+            ref={nameRef}
+            aria-label={t("tools.test.name")}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <Btn
+            type="submit"
+            disabled={!name.trim()}
+            title={t("tools.test.create")}
+          >
+            <LuPlus size={20} />
+          </Btn>
+        </form>
+      </Field>
 
       {overlays.length > 0 ? (
-        <div className={styles.list}>
-          {overlays.map((overlay) => (
+        <div ref={list} className={styles.list}>
+          {overlays.map((overlay, at) => (
             <div key={overlay.id} className={styles.item}>
               <div className={styles.item_header}>
                 <h3 className={styles.item_name}>{overlay.name}</h3>
@@ -76,7 +89,10 @@ export function TestOverlaysSection({
                   </Btn>
                   <Btn
                     title={t("common.delete")}
-                    onClick={() => onRemove(overlay.id)}
+                    onClick={() => {
+                      deleted(overlay.id, at);
+                      onRemove(overlay);
+                    }}
                   >
                     <FiTrash2 size={18} />
                   </Btn>
@@ -84,11 +100,15 @@ export function TestOverlaysSection({
               </div>
 
               {/* One a line: side by side they can't shrink and overflow */}
-              <CopyField value={overlay.id} title={t("tools.test.copyId")} />
-              <CopyField
-                value={getOverlaySocketURL(overlay.id)}
-                title={t("tools.test.copyUrl")}
-              />
+              <Field label={t("tools.test.id")}>
+                <CopyField value={overlay.id} title={t("tools.test.copyId")} />
+              </Field>
+              <Field label={t("tools.test.url")}>
+                <CopyField
+                  value={getOverlaySocketURL(overlay.id)}
+                  title={t("tools.test.copyUrl")}
+                />
+              </Field>
 
               {statuses[overlay.id] && (
                 <p className={styles.test_status}>

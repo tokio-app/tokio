@@ -8,13 +8,17 @@ import {
   MinecraftEdition,
 } from "@/common/schemas";
 import {
+  ALERT_TRIGGER_LABELS,
   CommandResult,
+  CustomGift,
   GameStatus,
   MINECRAFT_CONNECT_COMMANDS,
   MINECRAFT_EDITION_NAMES,
   TOKIO_EVENTS,
 } from "@/common/types";
 import {
+  gameEventText,
+  gameStepsText,
   HAZARD_NAMES,
   HELP_NAMES,
   JAVA_ONLY_HAZARDS,
@@ -32,6 +36,23 @@ export const EDITIONS: SelectOption<MinecraftEdition>[] = [
   { value: "bedrock", label: "Bedrock" },
   { value: "java", label: "Java" },
 ];
+
+// An action as its row's buttons and its delete dialog name it, from what
+// it shows on the overlay: "Rose: Zombie ×5", or the event alone
+export function actionName(
+  action: GameAction,
+  gifts: CustomGift[],
+  language: string,
+) {
+  const event =
+    action.overlay.event.trim() ||
+    gameEventText(action, gifts, language) ||
+    translate(language, ALERT_TRIGGER_LABELS[action.trigger.type]);
+  const steps = action.overlay.name.trim() || gameStepsText(action, language);
+  return steps
+    ? translate(language, "games.actions.name", { event, steps })
+    : event;
+}
 
 // What each edition's chat takes to join Tokio, from this PC or another device
 export const connectCommand = (host: string, edition: MinecraftEdition) =>

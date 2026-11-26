@@ -36,11 +36,15 @@ export function SettingField({ field, gifts, onChange, onReset }: Props) {
   );
 
   // A label over its control
-  const stacked = (control: ReactNode, value?: ReactNode) => (
+  const stacked = (
+    control: ReactNode,
+    value?: ReactNode,
+    name: string = field.name,
+  ) => (
     <div className={styles.field} role="group" aria-labelledby={labelId}>
       <div className={styles.field_header}>
         <label id={labelId} className={styles.label}>
-          {field.name}
+          {name}
         </label>
         {value !== undefined && <span className={styles.value}>{value}</span>}
         {reset}
@@ -72,8 +76,16 @@ export function SettingField({ field, gifts, onChange, onReset }: Props) {
   );
 
   switch (field.type) {
+    // The value in the label, as TTS's sliders show theirs
     case "slider":
-      return stacked(control, field.attributes.value);
+      return stacked(
+        control,
+        undefined,
+        t("components.overlayModal.sliderValue", {
+          name: field.name,
+          value: String(field.attributes.value),
+        }),
+      );
 
     // The swatch first, so its picker opens toward the middle of the window
     case "color":

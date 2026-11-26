@@ -60,17 +60,14 @@ export function FormatSection({ format, update }: Props) {
           {
             value: "any",
             label: t("tts.format.any"),
-            description: t("tts.format.anyDescription"),
           },
           {
             value: "dot",
             label: t("tts.format.dot"),
-            description: t("tts.format.dotDescription"),
           },
           {
             value: "slash",
             label: t("tts.format.slash"),
-            description: t("tts.format.slashDescription"),
           },
           {
             value: "custom",

@@ -15,9 +15,27 @@
   transition: opacity var(--transition-fast);
 }
 
-.level:disabled {
+.level_off {
   opacity: 0;
   pointer-events: none;
+}
+
+/* A role Allow everyone overrides */
+.grid label:has(:disabled) {
+  color: var(--font-secondary);
+  cursor: default;
+}
+
+/* The roles, then how they combine */
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.rule {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
 }
 
 /* As close to the rules as LIVE history's and Fans' tabs */

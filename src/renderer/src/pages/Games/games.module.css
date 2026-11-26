@@ -619,6 +619,11 @@
   gap: var(--space-4);
 }
 
+/* Each swatch under the middle of its name */
+.color {
+  align-items: center;
+}
+
 .note {
   margin-top: calc(-1 * var(--space-2));
   color: var(--font-secondary);

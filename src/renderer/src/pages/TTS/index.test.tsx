@@ -41,7 +41,7 @@ const field = (label: string | RegExp) =>
 
 const testButton = () => screen.getByRole("button", { name: "Test voice" });
 const testMessage = () =>
-  screen.getByPlaceholderText("Type a message to test how the TTS sounds...");
+  screen.getByPlaceholderText("Type a message to hear it...");
 const customTrigger = () => screen.getByPlaceholderText("!tts");
 const template = () => field("Message template").getByRole("textbox");
 const mode = (label: RegExp) => screen.getByRole("radio", { name: label });
@@ -148,6 +148,11 @@ describe("TTS", () => {
   it("tests the voice only with a message", async () => {
     const { user } = await setup();
     expect(testButton()).toBeDisabled();
+    // The field comes first, then the button that reads it
+    expect(
+      testMessage().compareDocumentPosition(testButton()) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
     await user.type(testMessage(), "Hi");
     expect(testButton()).toBeEnabled();
@@ -377,7 +382,7 @@ describe("TTS", () => {
   it("sets the trigger of each format mode", async () => {
     const { user } = await setup();
 
-    await user.click(mode(/Read all messages/));
+    await user.click(mode(/All messages/));
     expect((await saved()).format.trigger).toEqual({
       mode: "any",
       value: "",
@@ -385,13 +390,13 @@ describe("TTS", () => {
     expect(customTrigger()).toBeDisabled();
     expect(customTrigger()).toHaveValue("");
 
-    await user.click(mode(/Dot prefix/));
+    await user.click(mode(/starting with a period/));
     expect((await saved()).format.trigger).toEqual({
       mode: "dot",
       value: ".",
     });
 
-    await user.click(mode(/Slash prefix/));
+    await user.click(mode(/starting with a slash/));
     expect((await saved()).format.trigger).toEqual({
       mode: "slash",
       value: "/",
@@ -604,8 +609,8 @@ describe("TTS", () => {
     expect(level).toBeDisabled();
 
     await user.click(screen.getByRole("checkbox", { name: "Allow everyone" }));
-    await user.click(screen.getByRole("checkbox", { name: "Followers only" }));
-    await user.click(screen.getByRole("checkbox", { name: "Moderators only" }));
+    await user.click(screen.getByRole("checkbox", { name: "Followers" }));
+    await user.click(screen.getByRole("checkbox", { name: "Moderators" }));
     await user.click(
       screen.getByRole("checkbox", { name: "Minimum fan level" }),
     );
