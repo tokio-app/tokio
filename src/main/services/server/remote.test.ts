@@ -337,7 +337,10 @@ describe("remote routes", () => {
             // The page passes paths
             const path = typeof input === "string" ? input : "";
             requests.push({ path, init });
-            return fetch(new URL(path, page), init);
+            // jsdom's AbortSignal isn't Node's: pass its abort on
+            const node = new AbortController();
+            init?.signal?.addEventListener("abort", () => node.abort());
+            return fetch(new URL(path, page), { ...init, signal: node.signal });
           };
         },
       });
@@ -402,6 +405,52 @@ describe("remote routes", () => {
       expect(byId("song-name").textContent).toBe("<i>Midnight Drive");
       expect(byId("song-artist").textContent).toBe("Luna Park");
       expect(byId("cover").getAttribute("src")).toBe(LIVE.song!.thumbnail);
+    });
+
+    it("shows a LIVE typed as a link as typed", async () => {
+      setup();
+      state = { ...LIVE, live: "https://www.twitch.tv/lucia" };
+
+      await ready();
+
+      expect(who()).toBe("https://www.twitch.tv/lucia");
+    });
+
+    it("asks for the state once at a time", async () => {
+      setup();
+      await ready();
+      const before = requests.length;
+      // A request that never answers
+      dom.window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+        requests.push({ path: typeof input === "string" ? input : "", init });
+        return new Promise<Response>(() => {});
+      };
+      const visible = () =>
+        doc().dispatchEvent(new dom.window.Event("visibilitychange"));
+
+      visible();
+      visible();
+
+      expect(requests.length - before).toBe(1);
+      expect(requests.at(-1)!.init!.signal).toBeDefined();
+    });
+
+    it("keeps a pressed key focusable while it waits", async () => {
+      setup();
+      await ready();
+      const skip = button("skip-song");
+      skip.focus();
+
+      skip.click();
+      skip.click();
+
+      expect(skip.disabled).toBe(false);
+      expect(skip.getAttribute("aria-disabled")).toBe("true");
+      expect(doc().activeElement).toBe(skip);
+      expect(requests.filter((r) => r.init?.method === "POST")).toHaveLength(1);
+      await vi.waitFor(() =>
+        expect(skip.hasAttribute("aria-disabled")).toBe(false),
+      );
     });
 
     it("loads a cover only from a web address", async () => {
@@ -487,7 +536,8 @@ describe("remote routes", () => {
 
       await vi.waitFor(() => expect(label()).toBe(labels.text.resume));
       expect(controlsService.isPaused()).toBe(true);
-      expect(pause.getAttribute("aria-pressed")).toBe("true");
+      // The label says it: "Resume", not "Resume, pressed"
+      expect(pause.hasAttribute("aria-pressed")).toBe(false);
       expect(doc().documentElement.classList.contains("paused")).toBe(true);
       expect(byId("paused").hidden).toBe(false);
       expect(theme()).not.toBe("#121212");
@@ -497,10 +547,11 @@ describe("remote routes", () => {
 
       // Paused elsewhere: the page follows the state it asks for
       controlsService.setPaused(false);
-      dom.window.document.dispatchEvent(
-        new dom.window.Event("visibilitychange"),
-      );
-      await vi.waitFor(() => expect(label()).toBe(labels.text.pause));
+      // Again until it asks: a state request still running skips it
+      await vi.waitFor(() => {
+        doc().dispatchEvent(new dom.window.Event("visibilitychange"));
+        expect(label()).toBe(labels.text.pause);
+      });
       expect(theme()).toBe("#121212");
     });
 
