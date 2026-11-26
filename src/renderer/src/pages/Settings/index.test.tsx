@@ -1,5 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { failure, profileReply, settingsReply } from "@test/fixtures";
+import { engine, failure, profileReply, settingsReply } from "@test/fixtures";
 import { send, sent, sentEvents } from "@test/ipc";
 import { inList, section } from "@test/queries";
 import { renderWithProviders } from "@test/render";
@@ -42,6 +42,38 @@ describe("Settings", () => {
   describe("Platforms", () => {
     const headings = () =>
       screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+
+    it("puts the sections in their order, platforms first", async () => {
+      await setup();
+      await send(
+        APP_EVENTS_RESPONSE.GET_PROFILE,
+        profileReply((p) => {
+          p.platforms = ["tiktok", "twitch"];
+        }),
+      );
+      await send(APP_EVENTS_RESPONSE.GET_VOICE_KEYS, {
+        success: true,
+        engines: [
+          { ...engine("Default", "TikTok", "voiceKeys.sessionId"), key: "" },
+        ],
+      });
+
+      expect(headings()).toEqual([
+        "TikTok LIVE",
+        "Twitch",
+        "Profiles",
+        "Voice engines",
+        "Overlay server",
+        "Remote control",
+        "AI assistants",
+        "Shortcuts",
+        "Chat translation",
+        "Language",
+        "Updates",
+        "Tray",
+        "Logs",
+      ]);
+    });
 
     it("shows TikTok's key and chat translation, not Twitch's sign-in, on a TikTok profile", async () => {
       await setup();
@@ -680,39 +712,17 @@ describe("Settings", () => {
       expect(toggle).toHaveFocus();
     });
 
-    it("shows the MCP address and each assistant's setup after Show", async () => {
-      const { user, container } = await setup(on);
-      await addresses(["192.168.1.20"]);
-      expect(remote().queryByTitle("Copy MCP address")).not.toBeInTheDocument();
-
+    it("keeps the AI assistants' setup out of Remote control", async () => {
+      const { user } = await setup(on);
       await user.click(
         remote().getByRole("button", { name: "Show QR code and key" }),
       );
 
-      expect(remote().getByTitle("Copy MCP address")).toHaveTextContent(
-        "http://127.0.0.1:37891/mcp",
-      );
+      expect(remote().queryByTitle("Copy MCP address")).not.toBeInTheDocument();
       expect(
-        remote().getByTitle("Copy the Claude Code setup"),
-      ).toHaveTextContent(
-        `claude mcp add --transport http tokio http://127.0.0.1:37891/mcp --header "Authorization: Bearer ${key}"`,
-      );
-      expect(remote().getByText("Run it in a terminal.")).toBeVisible();
-
-      await user.click(remote().getByText("Claude Code"));
-      await user.click(inList(container, "Cursor")!);
-
-      expect(remote().getByTitle("Copy the Cursor setup")).toHaveTextContent(
-        `"Authorization": "Bearer ${key}"`,
-      );
-      expect(remote().getByText("Add it to ~/.cursor/mcp.json.")).toBeVisible();
-      expect(
-        remote().getByText(
-          "AI assistants can connect from this computer only.",
-        ),
-      ).toBeVisible();
+        assistants().queryByTitle("Copy MCP address"),
+      ).not.toBeInTheDocument();
     });
-
     it("picks the address the link uses", async () => {
       const { user, container } = await setup(on);
       await addresses(["192.168.1.20", "10.0.0.5"]);
@@ -741,6 +751,77 @@ describe("Settings", () => {
       expect(remote().getByText(/No network address found/)).toBeVisible();
       expect(remote().queryByRole("img")).not.toBeInTheDocument();
       expect(remote().getByTitle("Copy key")).toHaveTextContent(key);
+    });
+
+    const assistants = () => section("AI assistants");
+
+    it("says AI assistants need remote control, and the server, while off", async () => {
+      await setup();
+      expect(
+        assistants().getByText(
+          "Remote control is off. Turn it on above, since AI assistants use its key.",
+        ),
+      ).toBeVisible();
+      expect(assistants().queryByRole("button")).not.toBeInTheDocument();
+
+      await send(
+        APP_EVENTS_RESPONSE.GET_SETTINGS,
+        settingsReply((s) => {
+          s.settings.remote = { enabled: true, key };
+        }),
+      );
+      expect(
+        assistants().getByText(
+          "The overlay server is off. Enable it above so AI assistants can connect.",
+        ),
+      ).toBeVisible();
+
+      await send(APP_EVENTS_RESPONSE.GET_SETTINGS, on);
+      expect(assistants().queryByText(/is off/)).not.toBeInTheDocument();
+    });
+
+    it("shows the MCP address and each assistant's setup after Show", async () => {
+      const { user, container } = await setup(on);
+      expect(
+        assistants().queryByTitle("Copy MCP address"),
+      ).not.toBeInTheDocument();
+      expect(document.body.textContent).not.toContain(key);
+
+      const toggle = assistants().getByRole("button", {
+        name: "Show setup and key",
+      });
+      await user.click(toggle);
+
+      expect(assistants().getByTitle("Copy MCP address")).toHaveTextContent(
+        "http://127.0.0.1:37891/mcp",
+      );
+      expect(
+        assistants().getByTitle("Copy the Claude Code setup"),
+      ).toHaveTextContent(
+        `claude mcp add --transport http tokio http://127.0.0.1:37891/mcp --header "Authorization: Bearer ${key}"`,
+      );
+      expect(assistants().getByText("Run it in a terminal.")).toBeVisible();
+
+      await user.click(assistants().getByText("Claude Code"));
+      await user.click(inList(container, "Cursor")!);
+
+      expect(
+        assistants().getByTitle("Copy the Cursor setup"),
+      ).toHaveTextContent(`"Authorization": "Bearer ${key}"`);
+      expect(
+        assistants().getByText("Add it to ~/.cursor/mcp.json."),
+      ).toBeVisible();
+      expect(
+        assistants().getByText(
+          "AI assistants can connect from this computer only.",
+        ),
+      ).toBeVisible();
+
+      // One button, so the focus stays on it
+      expect(toggle).toHaveTextContent("Hide");
+      await user.click(toggle);
+      expect(document.body.textContent).not.toContain(key);
+      expect(toggle).toHaveFocus();
     });
 
     const newKey = () =>

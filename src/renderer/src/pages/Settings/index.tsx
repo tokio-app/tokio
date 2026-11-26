@@ -15,6 +15,7 @@ import {
 } from "@/hooks";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
+import { AssistantsSection } from "./sections/AssistantsSection";
 import { LanguageSection } from "./sections/LanguageSection";
 import { LogsSection } from "./sections/LogsSection";
 import {
@@ -152,19 +153,43 @@ export function Settings() {
           <TwitchSection login={store.settings.accounts.twitch.login} />
         )}
 
+        <ProfileSection
+          profiles={store.profiles}
+          active={store.settings.activeProfile}
+          locked={connected}
+          onNew={() => setModal("newProfile")}
+          onClone={() => setModal("cloneProfile")}
+          onRename={() => setModal("renameProfile")}
+        />
+
+        <VoiceKeysSection />
+
         <ServerSection
           enabled={store.settings.server.enabled}
           onChange={server.toggle}
         />
 
-        <LanguageSection
-          language={store.settings.language}
-          onChange={(language) => {
+        <RemoteSection
+          remote={store.settings.remote}
+          serverEnabled={store.settings.server.enabled}
+          onChange={(enabled) => {
             updateStore((s) => {
-              s.settings.language = language;
+              s.settings.remote.enabled = enabled;
             });
-            window.api.emit(APP_EVENTS.SET_LANGUAGE, { language });
+            window.api.emit(APP_EVENTS.SET_REMOTE, { enabled });
           }}
+        />
+
+        {/* MCP shares remote control's switch and key */}
+        <AssistantsSection
+          remote={store.settings.remote}
+          serverEnabled={store.settings.server.enabled}
+        />
+
+        <ShortcutsSection
+          shortcuts={store.settings.shortcuts}
+          taken={taken}
+          onChange={setShortcut}
         />
 
         {/* Only TikTok says a message's language */}
@@ -179,6 +204,16 @@ export function Settings() {
             }}
           />
         )}
+
+        <LanguageSection
+          language={store.settings.language}
+          onChange={(language) => {
+            updateStore((s) => {
+              s.settings.language = language;
+            });
+            window.api.emit(APP_EVENTS.SET_LANGUAGE, { language });
+          }}
+        />
 
         <UpdatesSection
           enabled={store.settings.updates.auto}
@@ -205,34 +240,6 @@ export function Settings() {
             });
             window.api.emit(APP_EVENTS.SET_TRAY, { enabled });
           }}
-        />
-
-        <ShortcutsSection
-          shortcuts={store.settings.shortcuts}
-          taken={taken}
-          onChange={setShortcut}
-        />
-
-        <RemoteSection
-          remote={store.settings.remote}
-          serverEnabled={store.settings.server.enabled}
-          onChange={(enabled) => {
-            updateStore((s) => {
-              s.settings.remote.enabled = enabled;
-            });
-            window.api.emit(APP_EVENTS.SET_REMOTE, { enabled });
-          }}
-        />
-
-        <VoiceKeysSection />
-
-        <ProfileSection
-          profiles={store.profiles}
-          active={store.settings.activeProfile}
-          locked={connected}
-          onNew={() => setModal("newProfile")}
-          onClone={() => setModal("cloneProfile")}
-          onRename={() => setModal("renameProfile")}
         />
 
         <LogsSection

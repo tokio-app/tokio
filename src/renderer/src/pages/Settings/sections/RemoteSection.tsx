@@ -1,6 +1,6 @@
 import { RemoteSettings } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { getRemoteURL, MCP_URL } from "@/common/util";
+import { getRemoteURL } from "@/common/util";
 import {
   Btn,
   Check,
@@ -16,7 +16,6 @@ import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiRefreshCw } from "react-icons/fi";
 import { LuSmartphone } from "react-icons/lu";
-import { ASSISTANTS } from "../helper";
 import styles from "../settings.module.css";
 
 interface Props {
@@ -34,8 +33,6 @@ export function RemoteSection({ remote, serverEnabled, onChange }: Props) {
   const [shown, setShown] = useState(false);
   // A new key cuts off every phone, Stream Deck and assistant, so it asks
   const [asking, setAsking] = useState(false);
-  const [name, setName] = useState(ASSISTANTS[0].name);
-  const assistant = ASSISTANTS.find((a) => a.name === name) ?? ASSISTANTS[0];
 
   useIpcRequest(APP_EVENTS.GET_NETWORK_ADDRESSES);
   useIpcListener(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, (res) => {
@@ -45,69 +42,38 @@ export function RemoteSection({ remote, serverEnabled, onChange }: Props) {
   const host = addresses?.includes(picked) ? picked : addresses?.[0];
   const link = host ? getRemoteURL(host, remote.key) : "";
 
-  const details = shown ? (
-    <>
-      <div className={styles.remote}>
-        {link && <QRCode value={link} label={t("settings.remote.qr")} />}
-        <div className={styles.remote_fields}>
-          {addresses?.length === 0 && (
-            <p className={styles.note}>{t("settings.remote.noAddress")}</p>
-          )}
-          {link && <p className={styles.note}>{t("settings.remote.scan")}</p>}
-          {addresses && addresses.length > 1 && (
-            <Field label={t("settings.remote.address")}>
-              <Select
-                aria-label={t("settings.remote.address")}
-                options={addresses.map((ip) => ({ label: ip, value: ip }))}
-                value={host}
-                onChange={setPicked}
-              />
-            </Field>
-          )}
-          {link && (
-            <Field label={t("settings.remote.link")}>
-              <CopyField value={link} title={t("settings.remote.copyLink")} />
-            </Field>
-          )}
-          <Field
-            label={t("settings.remote.key")}
-            hint={t("settings.remote.keyHint")}
-          >
-            <CopyField
-              value={remote.key}
-              title={t("settings.remote.copyKey")}
+  const details = shown && (
+    <div className={styles.remote}>
+      {link && <QRCode value={link} label={t("settings.remote.qr")} />}
+      <div className={styles.remote_fields}>
+        {addresses?.length === 0 && (
+          <p className={styles.note}>{t("settings.remote.noAddress")}</p>
+        )}
+        {link && <p className={styles.note}>{t("settings.remote.scan")}</p>}
+        {addresses && addresses.length > 1 && (
+          <Field label={t("settings.remote.address")}>
+            <Select
+              aria-label={t("settings.remote.address")}
+              options={addresses.map((ip) => ({ label: ip, value: ip }))}
+              value={host}
+              onChange={setPicked}
             />
           </Field>
-        </div>
-      </div>
-      {/* Under the code, as wide as the section: configs run long */}
-      <div className={styles.remote_ai}>
+        )}
+        {link && (
+          <Field label={t("settings.remote.link")}>
+            <CopyField value={link} title={t("settings.remote.copyLink")} />
+          </Field>
+        )}
         <Field
-          label={t("settings.remote.mcp")}
-          hint={t("settings.remote.mcpHint")}
+          label={t("settings.remote.key")}
+          hint={t("settings.remote.keyHint")}
         >
-          <CopyField value={MCP_URL} title={t("settings.remote.copyMcp")} />
+          <CopyField value={remote.key} title={t("settings.remote.copyKey")} />
         </Field>
-        <Field label={t("settings.remote.assistant")}>
-          <Select
-            aria-label={t("settings.remote.assistant")}
-            options={ASSISTANTS.map((a) => ({ label: a.name, value: a.name }))}
-            value={assistant.name}
-            onChange={setName}
-          />
-          <CopyField
-            code
-            value={assistant.setup(remote.key)}
-            title={t("settings.remote.copySetup", { name: assistant.name })}
-          />
-          <p className={styles.note}>
-            {t(assistant.where, { file: assistant.file ?? "" })}
-          </p>
-        </Field>
-        <p className={styles.note}>{t("settings.remote.mcpNote")}</p>
       </div>
-    </>
-  ) : null;
+    </div>
+  );
 
   return (
     <Section
