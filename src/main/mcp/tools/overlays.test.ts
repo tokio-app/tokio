@@ -10,6 +10,7 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   OverlayApp,
+  type Platform,
   TOKIO_EVENTS,
 } from "@/common/types";
 import overlays from "@/events/pages/overlays";
@@ -363,7 +364,8 @@ describe("overlays MCP tools", () => {
       const store = {
         getStudio: () => held,
         getLiveStats: () => ({ likes: 0, viewers: 0, views: 0 }),
-        getProfileData: async () => null,
+        getProfileData: async (): Promise<{ platforms: Platform[] } | null> =>
+          null,
         addStudioOverlay: vi.fn(async (id: string, name: string) => {
           held.push(StudioOverlaySchema.parse({ id, name }));
           return true;
@@ -667,6 +669,24 @@ describe("overlays MCP tools", () => {
           id: ID,
           ops,
         });
+
+      it("starts new elements on the profile's platforms", async () => {
+        const { h, held, store } = seeded();
+        store.getProfileData = async () => ({ platforms: ["kick"] });
+
+        const res = await edit(h, [
+          { op: "add", item: { kind: "viewer", id: "v" } },
+          { op: "add", item: { kind: "list", id: "l" } },
+        ]);
+
+        expect(res.isError).toBe(false);
+        expect(held[0].items.find((i) => i.id === "v")).toMatchObject({
+          trigger: { type: TOKIO_EVENTS.SUBSCRIBE },
+        });
+        expect(held[0].items.find((i) => i.id === "l")).toMatchObject({
+          platform: "kick",
+        });
+      });
 
       it("adds items with their kind's defaults and new ids", async () => {
         const { h, held } = seeded();
