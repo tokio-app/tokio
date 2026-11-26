@@ -431,6 +431,20 @@ describe("ConnectorService", () => {
       ]);
     });
 
+    it("remembers the platform that ended the session, before telling it", () => {
+      const { service, tiktok, twitch, disconnected } = both();
+      const seen: unknown[] = [];
+      disconnected.mockImplementation(() => seen.push(service.endedBy()));
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+
+      tiktok.fire(TOKIO_EVENTS.DISCONNECTED, { reason: "lost" });
+      twitch.fire(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+
+      expect(seen).toEqual(["twitch"]);
+      expect(service.endedBy()).toBe("twitch");
+    });
+
     it("tells no platform's stop while a Disconnect stops them all", async () => {
       const { service, tiktok, twitch, disconnected, onPlatform } = both();
       tiktok.fire(TOKIO_EVENTS.CONNECTED);

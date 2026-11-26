@@ -261,6 +261,7 @@ function setup() {
     isConnected: vi.fn(() => false),
     isReconnecting: vi.fn(() => false),
     isWaiting: vi.fn(() => false),
+    endedBy: vi.fn((): ReturnType<ConnectorService["endedBy"]> => "tiktok"),
     fetchGifts: vi.fn(
       async (): Promise<{ success: boolean; data: Gift[] }> => ({
         success: true,
@@ -2682,6 +2683,39 @@ describe("init events", () => {
       ]);
     });
 
+    it("says the LIVE ended, not TikTok's look, when another platform ended it", async () => {
+      const s = await live();
+      // TikTok dropped earlier and looks for its LIVE
+      s.connectorService.isWaiting.mockReturnValue(true);
+      s.connectorService.endedBy.mockReturnValue("kick");
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          code: FEEDBACK_CODES.LIVE_ENDED,
+          message: "The LIVE has ended.",
+        }),
+      ]);
+    });
+
+    it("says to sign in again when Twitch signing Tokio out ended the LIVE", async () => {
+      const s = await live();
+      s.connectorService.isWaiting.mockReturnValue(true);
+      s.connectorService.endedBy.mockReturnValue("twitch");
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, { reason: "lost" });
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          code: FEEDBACK_CODES.CONNECTION_LOST,
+          message:
+            "Twitch signed Tokio out. Sign in with Twitch again in Settings.",
+        }),
+      ]);
+    });
+
     it("warns when it stopped looking for the LIVE, and shows it offline", async () => {
       const s = await live();
       const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
@@ -2815,7 +2849,7 @@ describe("init events", () => {
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toHaveLength(4);
     });
 
-    it("says when a platform ends, drops or stops while the LIVE goes on", async () => {
+    it("says when a platform ends, is signed out, drops or stops while the LIVE goes on", async () => {
       const s = await live();
       const [changed] = s.connectorService.onPlatform.mock.calls[0];
 
@@ -2834,10 +2868,12 @@ describe("init events", () => {
           code: FEEDBACK_CODES.LIVE_ENDED,
           message: "The LIVE on Twitch has ended.",
         }),
+        // Twitch's lost is always its sign-out
         expect.objectContaining({
           level: "warning",
           code: FEEDBACK_CODES.CONNECTION_LOST,
-          message: "Unable to reconnect to Twitch. Connect again from Home.",
+          message:
+            "Twitch signed Tokio out. Sign in with Twitch again in Settings.",
         }),
         expect.objectContaining({
           level: "info",
@@ -2869,6 +2905,7 @@ describe("init events", () => {
         account,
       );
       expect(s.h.notices).toEqual([]);
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT)).toEqual([]);
 
       s.storeManagerService.updateTwitchAccount.mockResolvedValue(false);
       expect(await save(account)).toBe(false);
@@ -2877,6 +2914,18 @@ describe("init events", () => {
           level: "warning",
           code: FEEDBACK_CODES.TWITCH_TOKEN_SAVE_FAILED,
         }),
+      ]);
+    });
+
+    it("shows the Twitch account signed out once Twitch forgot it", async () => {
+      const s = await live();
+      const [save] = s.connectorService.onTwitchAccount.mock.calls[0];
+
+      // Twitch revoked Tokio's access, or refused the refresh
+      await save({ id: "", login: "", key: "" });
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT)).toEqual([
+        { success: true, login: "" },
       ]);
     });
 

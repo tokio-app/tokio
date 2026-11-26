@@ -416,9 +416,18 @@ const registerConnectorEvents = ({
   };
 
   conn.on(TOKIO_EVENTS.DISCONNECTED, (d) => {
-    // After an abnormal stop the connector looks for the LIVE again
-    const waiting = conn.isWaiting();
-    if (d?.reason === "ended") {
+    // After an abnormal stop TikTok looks for its LIVE again, which says
+    // nothing about another platform's end
+    const by = conn.endedBy();
+    const waiting = by === "tiktok" && conn.isWaiting();
+    if (d?.reason === "lost" && by === "twitch") {
+      // Twitch's lost is always its sign-out
+      notifier.warn(
+        "connector",
+        FEEDBACK_CODES.CONNECTION_LOST,
+        t("main.home.connect.twitchBadKey", { settings: t("nav.settings") }),
+      );
+    } else if (d?.reason === "ended") {
       notifier.info(
         "connector",
         FEEDBACK_CODES.LIVE_ENDED,
@@ -520,9 +529,15 @@ const registerConnectorEvents = ({
       notifier.warn(
         "connector",
         FEEDBACK_CODES.CONNECTION_LOST,
-        waiting
-          ? t("main.init.platformLostLooking", params)
-          : t("main.init.connectionLostOn", { ...params, home: t("nav.home") }),
+        // Twitch's lost is always its sign-out
+        platform === "twitch"
+          ? t("main.home.connect.twitchBadKey", { settings: t("nav.settings") })
+          : waiting
+            ? t("main.init.platformLostLooking", params)
+            : t("main.init.connectionLostOn", {
+                ...params,
+                home: t("nav.home"),
+              }),
         options,
       );
     } else if (change === "stopped") {
@@ -546,6 +561,14 @@ const registerConnectorEvents = ({
         t("main.init.twitchTokenSaveFailed"),
         { key: "twitch-token", windowMs: REPEAT_NOTICE_MS },
       );
+    }
+    // Twitch revoked the access or refused the refresh: the window shows it
+    // signed out, as Settings' Sign out does
+    if (!account.key && !win.isDestroyed()) {
+      win.webContents.send(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT, {
+        success: true,
+        login: "",
+      });
     }
     return saved;
   });
