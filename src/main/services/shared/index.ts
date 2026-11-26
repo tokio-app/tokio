@@ -132,6 +132,22 @@ export abstract class BaseFileManagerService extends Service {
     return this._validate(schema, data, filePath, "loading");
   }
 
+  // The file's data, `empty` when it's missing, null when it's there but
+  // doesn't load
+  public async loadOr<T>(
+    filePath: string,
+    schema: z.ZodType<T>,
+    empty: T,
+  ): Promise<T | null> {
+    const data = await this.loadFile(filePath, schema);
+    if (data) return data;
+    // loadFile logged why a file it found doesn't load
+    return fs.access(filePath).then(
+      () => null,
+      (error: unknown) => (isMissing(error) ? empty : null),
+    );
+  }
+
   // Content read elsewhere, checked as loadFile checks what it reads
   public parseFile<T>(
     filePath: string,

@@ -30,7 +30,7 @@ import { parseAmount } from "@/helper/amount";
 import { isMissing, renameWithRetry } from "@/helper/fs";
 import { GiftStreaks } from "@/helper/streaks";
 import Logger from "@/logger";
-import { access, mkdir, readdir, rm } from "node:fs/promises";
+import { mkdir, readdir, rm } from "node:fs/promises";
 import { join, parse } from "node:path";
 import { z } from "zod";
 import type { JSONManagerService } from "../json";
@@ -126,7 +126,7 @@ type Index = z.infer<typeof IndexSchema>;
 
 type Json = Pick<
   JSONManagerService,
-  "loadFile" | "saveFile" | "saveArbitraryFile"
+  "loadFile" | "loadOr" | "saveFile" | "saveArbitraryFile"
 >;
 
 // What each event does to the LIVE in progress
@@ -1009,14 +1009,7 @@ export class HistoryService extends Service {
   private async _readIndex(dir: string): Promise<Index | null> {
     if (!this._json) return null;
     const path = join(dir, "index.json");
-    const data = await this._json.loadFile(path, IndexSchema);
-    if (data) return data;
-    // loadFile logged why a file it found doesn't load
-    return access(path).then(
-      () => null,
-      (error: unknown) =>
-        isMissing(error) ? { lives: [], gifters: [] } : null,
-    );
+    return this._json.loadOr(path, IndexSchema, { lives: [], gifters: [] });
   }
 
   private async _readLive(
