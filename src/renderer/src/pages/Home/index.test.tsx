@@ -144,6 +144,21 @@ describe("Home", () => {
     ).not.toHaveAttribute("aria-busy");
   });
 
+  it("connects on Enter in the username field, once while it loads", async () => {
+    const { user } = await renderApp();
+
+    await user.type(username(), "@streamer{Enter}");
+    await user.keyboard("{Enter}");
+
+    expect(sent(APP_EVENTS.CONNECT)).toEqual([
+      { username: "@streamer", channels: {} },
+    ]);
+    expect(page().getByRole("button", { name: "Loading" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+  });
+
   it("shows a connect still in progress when it opens", async () => {
     await renderApp();
 

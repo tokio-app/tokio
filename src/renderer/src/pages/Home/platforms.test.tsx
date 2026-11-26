@@ -57,7 +57,7 @@ const live = (platforms: Partial<Record<Platform, PlatformStatus>>) =>
   });
 
 describe("Home's platforms", () => {
-  it("adds a platform from its menu and removes it again", async () => {
+  it("adds a platform from its list and removes it again", async () => {
     const { user } = await renderApp();
     await usingPlatforms(["tiktok"]);
     // The only platform can't go
@@ -66,14 +66,19 @@ describe("Home's platforms", () => {
     ).not.toBeInTheDocument();
 
     const add = page().getByRole("button", { name: "Add a platform" });
+    expect(add).toHaveAttribute("aria-expanded", "false");
     await user.click(add);
-    const menu = within(page().getByRole("menu", { name: "Add a platform" }));
-    expect(menu.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+    // A disclosure: plain buttons, no menu that promises arrow keys
+    expect(add).toHaveAttribute("aria-expanded", "true");
+    expect(add).not.toHaveAttribute("aria-haspopup");
+    expect(page().queryByRole("menu")).toBeNull();
+    const list = within(page().getByRole("group", { name: "Add a platform" }));
+    expect(list.getAllByRole("button").map((i) => i.textContent)).toEqual([
       " Twitch",
       " YouTube",
       " Kick",
     ]);
-    await user.click(menu.getByRole("menuitem", { name: "Kick" }));
+    await user.click(list.getByRole("button", { name: "Kick" }));
 
     expect(sent(APP_EVENTS.SET_PLATFORMS)).toEqual([
       { platforms: ["tiktok", "kick"] },
@@ -95,7 +100,7 @@ describe("Home's platforms", () => {
     await usingPlatforms(["tiktok"]);
 
     await user.click(page().getByRole("button", { name: "Add a platform" }));
-    await user.click(page().getByRole("menuitem", { name: "Twitch" }));
+    await user.click(page().getByRole("button", { name: "Twitch" }));
     await send(APP_EVENTS_RESPONSE.SET_PLATFORMS, {
       success: false,
       platforms: ["tiktok"],
@@ -256,6 +261,25 @@ describe("Home's platforms", () => {
       "Type the channel first.",
     );
     expect(page().getByPlaceholderText("@channel or LIVE link")).toHaveFocus();
+  });
+
+  it("connects only the open tab's platform on Enter in its field", async () => {
+    const { user } = await renderApp();
+    await usingPlatforms(["tiktok", "youtube"]);
+
+    await user.click(tab("YouTube"));
+    await user.type(
+      page().getByPlaceholderText("@channel or LIVE link"),
+      "@tokio{Enter}",
+    );
+
+    expect(sent(APP_EVENTS.CONNECT)).toEqual([
+      {
+        username: "@streamer",
+        channels: { youtube: "@tokio" },
+        platforms: ["youtube"],
+      },
+    ]);
   });
 
   it("says how each platform is doing, and connects or disconnects one", async () => {

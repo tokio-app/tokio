@@ -91,7 +91,8 @@ const needs = (
   return typed(channels[platform]) ? null : "home.dashboard.needChannel";
 };
 
-// The platforms the profile doesn't use yet, in a menu under its button
+// The platforms the profile doesn't use yet, in a list under its button: a
+// disclosure, plain buttons with no menu's arrow keys
 function AddPlatform({
   platforms,
   onAdd,
@@ -112,21 +113,19 @@ function AddPlatform({
         variant="icon"
         title={add}
         aria-label={add}
-        aria-haspopup="menu"
         aria-expanded={menu.open}
         onClick={menu.toggle}
       >
         <FiPlus size={18} />
       </Btn>
       {menu.open && (
-        <div className={styles.menu} role="menu" aria-label={add}>
+        <div className={styles.menu} role="group" aria-label={add}>
           {addable.map((platform) => {
             const Icon = PLATFORM_ICONS[platform];
             return (
               <button
                 key={platform}
                 type="button"
-                role="menuitem"
                 className={styles.menu_item}
                 onClick={() => {
                   menu.toggle();
@@ -331,6 +330,15 @@ export function DashboardSection(props: Props) {
   // Connect all until anything is on
   const anyOn = busy || platforms.some(on);
 
+  // The open tab's button, which Enter in its field presses too
+  const press = (platform: Platform) => {
+    if (several) {
+      if (on(platform)) onDisconnect(platform);
+      else connect([platform]);
+    } else if (busy) onDisconnect();
+    else connect(platforms);
+  };
+
   return (
     <section className={styles.slate} ref={slate}>
       {/* The slate says what the page is. App, Layout, e2e and drive-app wait
@@ -450,33 +458,41 @@ export function DashboardSection(props: Props) {
           <AddPlatform platforms={platforms} onAdd={add} menu={menu} />
         </div>
 
+        {/* A form, so Enter in the field connects as the button does: a
+            loading button stops the submit as it stops a click */}
         {tab !== "all" && (
-          <div className={styles.line}>
+          <form
+            className={styles.line}
+            onSubmit={(e) => {
+              e.preventDefault();
+              press(tab);
+            }}
+          >
             <div className={styles.line_field}>
               {field(tab)}
               {state(tab)}
             </div>
             {several ? (
               <Btn
+                type="submit"
                 className={styles.line_btn}
                 loading={pending.includes(tab) && !status[tab]}
                 aria-label={`${t(on(tab) ? "common.disconnect" : "common.connect")} ${PLATFORM_LABELS[tab]}`}
-                onClick={() => (on(tab) ? onDisconnect(tab) : connect([tab]))}
               >
                 {t(on(tab) ? "common.disconnect" : "common.connect")}
               </Btn>
             ) : (
               // The only platform: Home's Connect, rose until it's on
               <Btn
+                type="submit"
                 variant={busy ? "default" : "accent"}
                 className={styles.line_btn}
                 loading={loading}
-                onClick={busy ? () => onDisconnect() : () => connect(platforms)}
               >
                 {t(busy ? "common.disconnect" : "common.connect")}
               </Btn>
             )}
-          </div>
+          </form>
         )}
       </div>
 
