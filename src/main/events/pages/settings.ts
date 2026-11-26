@@ -1,8 +1,9 @@
 import { APP_LANGUAGES } from "@/common/i18n";
-import { ProfileSchema } from "@/common/schemas";
+import { Profile, ProfileSchema } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
+  AppEventsResponseMap,
   FEEDBACK_CODES,
 } from "@/common/types";
 import { SERVER_PORT, TRANSLATION_LANGUAGES } from "@/common/util";
@@ -14,7 +15,7 @@ import { sendGamesOverlay } from "@/helper/games";
 import { refreshTikTokGifts, usesTikTok } from "@/helper/gifts";
 import { language, setLanguage, t } from "@/helper/i18n";
 import Logger, { localTime } from "@/logger";
-import { StoreManagerService } from "@/services/store";
+import { profileSlug, StoreManagerService } from "@/services/store";
 import { chatCommands } from "@/services/translation/commands";
 import { reasonKey, TranslationError } from "@/services/translation/common";
 import { TTSService } from "@/services/tts";
@@ -27,8 +28,11 @@ const MIN_NAME = ProfileSchema.shape.name.minLength ?? 1;
 // What the file dialogs call each kind of entity
 const ENTITY_NAMES = { profile: "main.settings.entity.profile" } as const;
 
-// A shorter name would make the profile fail to load.
-const assertNameLong = (name: string) => {
+// The name trimmed, for a new profile or the one in `own`'s file. A shorter
+// name would make the profile fail to load, and two profiles can't share one,
+// whatever its case and surrounding spaces.
+const checkName = (store: StoreManagerService, input: string, own?: string) => {
+  const name = input.trim();
   if (name.length < MIN_NAME) {
     throw new AppFailure(
       FEEDBACK_CODES.PROFILE_NAME_INVALID,
@@ -36,18 +40,18 @@ const assertNameLong = (name: string) => {
       { level: "warning" },
     );
   }
-};
-
-// Two profiles can't share a name, whatever its case and surrounding spaces.
-const assertNameFree = (store: StoreManagerService, name: string) => {
   const wanted = name.toLowerCase();
-  if (store.getProfiles().some((p) => p.name.trim().toLowerCase() === wanted)) {
+  const taken = store
+    .getProfiles()
+    .some((p) => p.file !== own && p.name.trim().toLowerCase() === wanted);
+  if (taken) {
     throw new AppFailure(
       FEEDBACK_CODES.PROFILE_EXISTS,
       t("main.settings.nameTaken", { name }),
       { level: "warning" },
     );
   }
+  return name;
 };
 
 // Changes to the settings also send the updated settings and profiles.
@@ -60,6 +64,18 @@ export const replySettings = (e: ReplyEvent, store: StoreManagerService) => {
     success: true,
   });
 };
+
+// GET_PROFILE's reply for the active profile, with its file: pages tell a
+// switch from a rename by it
+export const profileReply = (
+  store: StoreManagerService,
+  profile: Profile,
+): AppEventsResponseMap[APP_EVENTS_RESPONSE.GET_PROFILE] => ({
+  success: true,
+  profile,
+  profiles: store.getProfiles(),
+  file: store.getSettings().activeProfile.file,
+});
 
 events.push(
   APP_EVENTS.GET_SETTINGS,
@@ -103,9 +119,7 @@ const addProfile = async (
     name: string,
   ) => ReturnType<StoreManagerService["createNewProfile"]>,
 ) => {
-  const name = input.trim();
-  assertNameLong(name);
-  assertNameFree(store, name);
+  const name = checkName(store, input);
   const file = await store.profileFileFor(name);
   assertListed(
     e,
@@ -171,6 +185,53 @@ events.push(
   },
 );
 
+// Only the name users see: the file, and so its fans, history and timer, stay
+events.push(
+  APP_EVENTS.RENAME_PROFILE,
+  async (
+    { storeManagerService: store, notifier },
+    e,
+    { file, name: input },
+  ) => {
+    const name = checkName(store, input, file);
+    // Nothing to save or tell
+    const unchanged =
+      store
+        .getProfiles()
+        .find((p) => p.file === file)
+        ?.name.trim() === name;
+    if (!unchanged) {
+      const res = await store.renameProfile(file, name);
+      if (res === "unsaved") {
+        replySettings(e, store);
+        throw saveFailure();
+      }
+      if (!res) throw new Error(`Renaming the profile ${file} failed.`);
+    }
+
+    e.reply(APP_EVENTS_RESPONSE.RENAME_PROFILE, { success: true, file });
+    if (unchanged) return;
+    replySettings(e, store);
+    notifier.success(
+      "system",
+      FEEDBACK_CODES.PROFILE_RENAMED,
+      t("main.settings.profileRenamed", { name }),
+    );
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.PROFILE_RENAME_FAILED,
+      message: "main.failure.renameProfile",
+    },
+    onError: (e, error, { file }) =>
+      e.reply(APP_EVENTS_RESPONSE.RENAME_PROFILE, {
+        success: false,
+        file,
+        error,
+      }),
+  },
+);
+
 const assertDisconnected = (services: AppHandlerVariables) => {
   if (services.connectorService.isConnected()) {
     throw new AppFailure(
@@ -205,8 +266,7 @@ const switchProfile = async (
     );
   }
   const profile = await storeManagerService.getProfileData();
-  const profiles = storeManagerService.getProfiles();
-  if (!profile || !profiles) throw new Error(`Unable to load ${file}.`);
+  if (!profile) throw new Error(`Unable to load ${file}.`);
   timerService.load(profile.timer, file, profile.platforms);
   // Overlays get the new profile's fans once they load
   if (!(await services.fansService.load(file))) {
@@ -229,11 +289,10 @@ const switchProfile = async (
   // wait on each other, so this one doesn't wait for it.
   if (usesTikTok(profile.platforms)) void refreshTikTokGifts(services);
 
-  e.reply(APP_EVENTS_RESPONSE.GET_PROFILE, {
-    success: true,
-    profile,
-    profiles,
-  });
+  e.reply(
+    APP_EVENTS_RESPONSE.GET_PROFILE,
+    profileReply(storeManagerService, profile),
+  );
   replySettings(e, storeManagerService);
   notifier.success(
     "system",
@@ -274,9 +333,13 @@ events.push(
   APP_EVENTS.EXPORT_ENTITY,
   async ({ storeManagerService, win, notifier }, e, { type, file }) => {
     const name = t(ENTITY_NAMES[type]);
+    // A renamed profile keeps its file's name, so the dialog proposes its own
+    const listed = storeManagerService
+      .getProfiles()
+      .find((p) => p.file === file);
     const diagRes = await showSaveDialog(win, {
       title: t("main.dialog.export", { type: name }),
-      defaultPath: file,
+      defaultPath: listed ? `${profileSlug(listed.name)}.json` : file,
       filters: [
         {
           extensions: ["json"],
@@ -473,7 +536,10 @@ events.push(
       const removed = await storeManagerService.removeVoices(engine);
       const profile = await storeManagerService.getProfileData({ fresh: true });
       if (profile) {
-        e.reply(APP_EVENTS_RESPONSE.GET_PROFILE, { success: true, profile });
+        e.reply(
+          APP_EVENTS_RESPONSE.GET_PROFILE,
+          profileReply(storeManagerService, profile),
+        );
       }
       if (!removed) throw saveFailure();
     }

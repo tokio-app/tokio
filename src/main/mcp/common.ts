@@ -6,7 +6,7 @@ import {
   PLATFORMS,
 } from "@/common/types";
 import { PLATFORM_TRIGGERS } from "@/common/util";
-import { replySettings } from "@/events/pages/settings";
+import { profileReply, replySettings } from "@/events/pages/settings";
 import type { AppHandlerVariables } from "@/types";
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import { randomUUID } from "node:crypto";
@@ -136,13 +136,11 @@ export async function pushProfile({
   win,
 }: AppHandlerVariables) {
   const profile = await storeManagerService.getProfileData({ fresh: true });
-  const profiles = storeManagerService.getProfiles();
   if (!profile || win.isDestroyed()) return;
-  win.webContents.send(APP_EVENTS_RESPONSE.GET_PROFILE, {
-    success: true,
-    profile,
-    profiles,
-  });
+  win.webContents.send(
+    APP_EVENTS_RESPONSE.GET_PROFILE,
+    profileReply(storeManagerService, profile),
+  );
 }
 
 /** Sends the window the settings and profiles, as GET_SETTINGS answers. */

@@ -562,9 +562,6 @@ const emitLive = (
   data: unknown,
 ) => source.emit(event, data);
 
-// The store answers undefined before it's initialized
-const missing = (): any => undefined;
-
 describe("init events", () => {
   let logError: MockInstance<typeof Logger.error>;
   let logWarn: MockInstance<typeof Logger.warn>;
@@ -3533,13 +3530,13 @@ describe("init events", () => {
   });
 
   describe("GET_PROFILE", () => {
-    it("answers with the active profile and the list of profiles", async () => {
+    it("answers with the active profile, its file and the list of profiles", async () => {
       const s = setup();
 
       await s.h.invoke(init, APP_EVENTS.GET_PROFILE);
 
       expect(s.h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([
-        { success: true, profile, profiles },
+        { success: true, profile, profiles, file: profiles[0].file },
       ]);
       expect(s.h.notices).toEqual([]);
     });
@@ -3562,18 +3559,6 @@ describe("init events", () => {
     it("fails when the profile is missing", async () => {
       const s = setup();
       s.storeManagerService.getProfileData.mockResolvedValue(null);
-
-      await s.h.invoke(init, APP_EVENTS.GET_PROFILE);
-
-      expect(s.h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([
-        { success: false, error: failure },
-      ]);
-      expect(s.h.notices).toEqual([expect.objectContaining(failure)]);
-    });
-
-    it("fails when the list of profiles is missing", async () => {
-      const s = setup();
-      s.storeManagerService.getProfiles.mockReturnValue(missing());
 
       await s.h.invoke(init, APP_EVENTS.GET_PROFILE);
 

@@ -38,6 +38,7 @@ import {
 } from "@/common/util";
 import config from "@/config";
 import { globalShortcut, systemPreferences } from "electron";
+import { profileReply } from "@/events/pages/settings";
 import { connectionState, createStack, replyFailure } from "@/helper/events";
 import { AppFailure, REPEAT_NOTICE_MS, saveFailure } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
@@ -1165,15 +1166,12 @@ events.push(
   async ({ storeManagerService }, e) => {
     // Fresh, so a page reopened right after a save gets what it saved
     const profile = await storeManagerService.getProfileData({ fresh: true });
-    const profiles = storeManagerService.getProfiles();
-    if (!profile || !profiles)
-      throw new Error("The active profile is missing.");
+    if (!profile) throw new Error("The active profile is missing.");
 
-    e.reply(APP_EVENTS_RESPONSE.GET_PROFILE, {
-      success: true,
-      profile,
-      profiles,
-    });
+    e.reply(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply(storeManagerService, profile),
+    );
   },
   {
     failure: {

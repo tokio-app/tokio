@@ -431,6 +431,9 @@ describe("live MCP tools", () => {
             updateProfileData,
             getProfileData: async () => profile,
             getProfiles: () => [],
+            getSettings: () => ({
+              activeProfile: { name: "Main", file: "main.json" },
+            }),
             getLiveStats: () => ({ likes: 0, views: 0, viewers: 0 }),
             getTwitchAccount: () => ({ id: "", login: "", key: "" }),
           },
@@ -824,6 +827,10 @@ describe("live MCP tools", () => {
         }),
         removeVoices: vi.fn(async () => true),
         getProfileData: async () => defaultProfile,
+        getProfiles: () => [{ name: "Main", file: "main.json" }],
+        getSettings: () => ({
+          activeProfile: { name: "Main", file: "main.json" },
+        }),
       };
       const h = createHandler(
         {
