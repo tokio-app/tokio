@@ -36,14 +36,14 @@ const translated = (id: string, over = {}) =>
   });
 
 describe("TranslationSection", () => {
-  it("follows the language section", async () => {
+  it("comes right before the language section", async () => {
     await setup();
 
     const headings = screen
       .getAllByRole("heading", { level: 2 })
       .map((h) => h.textContent);
     expect(headings.indexOf("Chat translation")).toBe(
-      headings.indexOf("Language") + 1,
+      headings.indexOf("Language") - 1,
     );
   });
 

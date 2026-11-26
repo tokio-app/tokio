@@ -144,6 +144,21 @@ describe("Home", () => {
     ).not.toHaveAttribute("aria-busy");
   });
 
+  it("connects on Enter in the username field, once while it loads", async () => {
+    const { user } = await renderApp();
+
+    await user.type(username(), "@streamer{Enter}");
+    await user.keyboard("{Enter}");
+
+    expect(sent(APP_EVENTS.CONNECT)).toEqual([
+      { username: "@streamer", channels: {} },
+    ]);
+    expect(page().getByRole("button", { name: "Loading" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+  });
+
   it("shows a connect still in progress when it opens", async () => {
     await renderApp();
 
@@ -793,11 +808,11 @@ describe("Home", () => {
           .getByText(text)
           .className.includes("feature_warn");
 
-      expect(warned("YouTube · not connected")).toBe(true);
+      expect(warned("YouTube isn't connected")).toBe(true);
 
       await send(APP_EVENTS_RESPONSE.MUSIC_CONNECTED, { success: true });
 
-      expect(warned("YouTube · connected")).toBe(false);
+      expect(warned("Connected to YouTube")).toBe(false);
     });
 
     it("counts the alerts that are on", async () => {

@@ -43,9 +43,12 @@ export function AppSection({
           <h3 className={styles.app_name}>Tokio</h3>
           <p className={styles.muted}>
             {t("about.app.version", { version: __APP_VERSION__ })}
-            {versions &&
-              ` · Electron ${versions.electron} · Chromium ${versions.chrome} · Node ${versions.node}`}
           </p>
+          {versions && (
+            <p className={styles.muted}>
+              {`Electron ${versions.electron}, Chromium ${versions.chrome}, Node ${versions.node}`}
+            </p>
+          )}
           <p className={styles.muted}>{COPYRIGHT}</p>
         </div>
       </div>

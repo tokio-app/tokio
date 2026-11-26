@@ -25,7 +25,7 @@ describe("ServerSection", () => {
     await addresses("192.168.1.10", "172.20.0.1");
 
     expect(
-      screen.getByText("(for tokio-app.local on another computer)"),
+      screen.getByText("(for a streaming app on another computer)"),
     ).toBeVisible();
     const copies = field().getAllByTitle("Copy address");
     expect(copies.map((c) => c.textContent)).toEqual([

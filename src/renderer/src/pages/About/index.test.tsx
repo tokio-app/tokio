@@ -105,9 +105,10 @@ describe("About", () => {
     await about();
 
     expect(
-      screen.getByText(
-        `Version ${__APP_VERSION__} · Electron 39.2.0 · Chromium 142.0.7444.59 · Node 22.20.0`,
-      ),
+      screen.getByText(`Version ${__APP_VERSION__}`, { exact: true }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Electron 39.2.0, Chromium 142.0.7444.59, Node 22.20.0"),
     ).toBeInTheDocument();
   });
 

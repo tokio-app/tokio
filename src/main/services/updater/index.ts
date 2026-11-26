@@ -11,6 +11,7 @@ import { Service, type ServiceResult } from "../shared";
 
 // After startup, so the first check doesn't compete with loading the app.
 export const STARTUP_DELAY_MS = 15_000;
+// Settings → Updates quotes it ("every 6 hours", settings.updates.description)
 export const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 // Download progress is sent in steps of this many percent.
 const PROGRESS_STEP = 5;

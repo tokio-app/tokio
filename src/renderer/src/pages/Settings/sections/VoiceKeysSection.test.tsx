@@ -79,13 +79,18 @@ describe("VoiceKeysSection", () => {
 
     await user.click(addButton()!);
     expect(addButton()).toHaveAttribute("aria-expanded", "true");
+    // Plain buttons: the list has no menu's arrow keys
+    expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
+    // Only the engine not added yet
     expect(
-      screen.getAllByRole("menuitem").map((item) => item.textContent),
-    ).toEqual(["Fish Audio"]);
-    await user.click(screen.getByRole("menuitem", { name: "Fish Audio" }));
+      screen.queryByRole("button", { name: "ElevenLabs" }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Fish Audio" }));
 
     expect(field("Fish Audio API key...")).toHaveFocus();
-    expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Fish Audio" }),
+    ).not.toBeInTheDocument();
     // Nothing left to add
     expect(addButton()).not.toBeInTheDocument();
     expect(saves()).toEqual([]);

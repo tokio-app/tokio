@@ -12,7 +12,7 @@ const dialog = () =>
 const saveButton = () => dialog().getByRole("button", { name: "Save" });
 const field = (name: string) =>
   within(dialog().getByRole("group", { name })).getByRole("textbox");
-const platform = (name: string) => dialog().getByRole("tab", { name });
+const platform = (name: string) => dialog().getByRole("radio", { name });
 
 // Layout's reply, which names the profile and the connector
 const loaded = () =>
@@ -37,7 +37,10 @@ describe("Welcome", () => {
   it("starts on TikTok, with its username, the optional key and the profile's name", async () => {
     setup();
 
-    expect(platform("TikTok")).toHaveAttribute("aria-selected", "true");
+    expect(platform("TikTok")).toBeChecked();
+    expect(
+      dialog().getByRole("radiogroup", { name: "Platform" }),
+    ).toBeVisible();
     expect(dialog().getByPlaceholderText("@username")).toBeVisible();
     expect(
       dialog().getByRole("group", { name: /^Euler Stream API key/ }),
@@ -80,6 +83,34 @@ describe("Welcome", () => {
     expect(
       dialog().getByRole("button", { name: "Sign in with Twitch" }),
     ).toBeVisible();
+  });
+
+  it("picks the platform with the arrow keys, as one choice", async () => {
+    const { user } = setup();
+
+    await user.click(platform("TikTok"));
+    await user.keyboard("{ArrowRight}");
+
+    expect(platform("Twitch")).toBeChecked();
+    expect(platform("Twitch")).toHaveFocus();
+    expect(platform("TikTok")).not.toBeChecked();
+    expect(
+      dialog().getByRole("button", { name: "Sign in with Twitch" }),
+    ).toBeVisible();
+  });
+
+  it("saves on Enter in a field, and not while Save is off", async () => {
+    const { user, onClose } = setup();
+
+    await user.type(dialog().getByPlaceholderText("@username"), "@me{Enter}");
+    expect(requests()).toEqual([]);
+    expect(onClose).not.toHaveBeenCalled();
+
+    await loaded();
+    await user.type(dialog().getByPlaceholderText("@username"), "{Enter}");
+
+    expect(sent(APP_EVENTS.SET_CHANNELS)).toEqual([{ username: "@me" }]);
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it("can't save a profile name under three characters", async () => {
@@ -209,7 +240,7 @@ describe("Welcome", () => {
     expect(field("Profile name")).toHaveValue("Default 2");
   });
 
-  it.each([
+  const leaves = [
     [
       "Skip",
       async (user: ReturnType<typeof setup>["user"]) =>
@@ -225,19 +256,63 @@ describe("Welcome", () => {
       async (user: ReturnType<typeof setup>["user"]) =>
         user.keyboard("{Escape}"),
     ],
-  ])("sends nothing on %s", async (_, leave) => {
+  ] as const;
+
+  it.each(leaves)(
+    "closes at once on %s when nothing was typed",
+    async (_, leave) => {
+      const { user, onClose } = setup();
+      await loaded();
+      await user.click(platform("Kick"));
+
+      await leave(user);
+
+      expect(screen.queryByRole("dialog", { name: "Skip setup?" })).toBeNull();
+      expect(requests()).toEqual([]);
+      expect(onClose).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each(leaves)(
+    "asks before %s drops what was typed, and sends nothing",
+    async (_, leave) => {
+      const { user, onClose } = setup();
+      await loaded();
+      await user.click(platform("Kick"));
+      await user.type(
+        dialog().getByPlaceholderText("Channel or kick.com link"),
+        "westcol",
+      );
+
+      await leave(user);
+      const ask = () =>
+        within(screen.getByRole("dialog", { name: "Skip setup?" }));
+      expect(ask().getByText("What you typed won't be saved.")).toBeVisible();
+      expect(onClose).not.toHaveBeenCalled();
+
+      // Cancel keeps it all to finish
+      await user.click(ask().getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("dialog", { name: "Skip setup?" })).toBeNull();
+      expect(
+        dialog().getByPlaceholderText("Channel or kick.com link"),
+      ).toHaveValue("westcol");
+
+      await leave(user);
+      await user.click(ask().getByRole("button", { name: "Skip" }));
+
+      expect(requests()).toEqual([]);
+      expect(onClose).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("asks before dropping a new profile name", async () => {
     const { user, onClose } = setup();
     await loaded();
-    await user.click(platform("Kick"));
-    await user.type(
-      dialog().getByPlaceholderText("Channel or kick.com link"),
-      "westcol",
-    );
-    await user.click(dialog().getByPlaceholderText("Channel or kick.com link"));
 
-    await leave(user);
+    await user.type(field("Profile name"), " 2");
+    await user.click(dialog().getByRole("button", { name: "Skip" }));
 
-    expect(requests()).toEqual([]);
-    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.getByRole("dialog", { name: "Skip setup?" })).toBeVisible();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
