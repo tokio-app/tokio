@@ -14,7 +14,7 @@ import {
   PLATFORM_LABELS,
 } from "@/common/util";
 import { connectionState, createStack } from "@/helper/events";
-import { AppFailure, saveFailure } from "@/helper/feedback";
+import { AppFailure, logsPlace, saveFailure } from "@/helper/feedback";
 import { refreshTikTokGifts, usesTikTok } from "@/helper/gifts";
 import { t } from "@/helper/i18n";
 import { ConnectorFailure } from "@/services/connector/common";
@@ -157,7 +157,7 @@ events.push(
       notifier.warn(
         "connector",
         FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
-        t("main.home.usernameSaveFailed"),
+        t("main.home.usernameSaveFailed", logsPlace()),
       );
     }
     // A LIVE link shows as typed, not as "@https://…"

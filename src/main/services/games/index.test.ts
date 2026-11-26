@@ -212,7 +212,8 @@ describe("GamesService", () => {
       expect(minecraft.send).not.toHaveBeenCalled();
       expect(onError).toHaveBeenCalledWith(action(), {
         offline: true,
-        message: "Turn on Minecraft and connect the game first.",
+        message:
+          "Turn on Listen for Minecraft on Games, then paste the command it shows in Minecraft's chat.",
       });
     });
 
@@ -657,7 +658,8 @@ describe("GamesService", () => {
             every,
             {
               offline: true,
-              message: "Turn on Minecraft and connect the game first.",
+              message:
+                "Turn on Listen for Minecraft on Games, then paste the command it shows in Minecraft's chat.",
             },
           ],
         ]);
@@ -1068,7 +1070,8 @@ describe("GamesService", () => {
         }),
       ).toEqual({
         success: false,
-        error: "Turn on Minecraft and connect the game first.",
+        error:
+          "Turn on Listen for Minecraft on Games, then paste the command it shows in Minecraft's chat.",
       });
       expect(minecraft.send).not.toHaveBeenCalled();
     });

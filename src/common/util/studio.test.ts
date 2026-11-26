@@ -74,7 +74,7 @@ describe("fillStudioText", () => {
     );
     // Spanish spaces its unit with a no-break space
     expect(fill("{likes} me gusta", null, "es-419")).toMatch(
-      /^12\.8\sk me gusta$/,
+      /^12\.8\sK me gusta$/,
     );
   });
 

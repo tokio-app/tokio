@@ -292,7 +292,7 @@ describe("tts events", () => {
         const failure = {
           code: FEEDBACK_CODES.TTS_TEST_BLOCKED,
           message:
-            "This message wouldn't be read aloud: it has a banned word or nothing left to read.",
+            "This message isn't read aloud: it's empty or has a banned word.",
         };
         expect(generateBuffer).not.toHaveBeenCalled();
         expect(h.replies(APP_EVENTS_RESPONSE.GET_TTS_TEST)).toEqual([

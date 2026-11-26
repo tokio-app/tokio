@@ -304,7 +304,7 @@ describe("lives events", () => {
           level: "error",
           code: FEEDBACK_CODES.HISTORY_SAVE_FAILED,
           message:
-            "Tokio couldn't save the LIVE history. Check the logs folder for details.",
+            "Tokio couldn't save the LIVE history. To report it, export the logs in Settings → Logs.",
         }),
       ]);
     });

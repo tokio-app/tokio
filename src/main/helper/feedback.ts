@@ -66,11 +66,22 @@ export class AppFailure extends Error {
   }
 }
 
+/**
+ * Where a save failure sends the user to export the logs, for the texts'
+ * {settings} and {section}: the section's own title, so they can't drift.
+ */
+export const logsPlace = () => ({
+  settings: t("nav.settings"),
+  section: t("settings.logs.title"),
+});
+
 // A store write that failed. JSONManagerService logged why.
 export const saveFailure = () =>
-  new AppFailure(FEEDBACK_CODES.SETTINGS_SAVE_FAILED, t("main.saveFailed"), {
-    logged: true,
-  });
+  new AppFailure(
+    FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+    t("main.saveFailed", logsPlace()),
+    { logged: true },
+  );
 
 /**
  * A failure a service already logged with its details, such as the error of

@@ -183,7 +183,7 @@ describe("games events", () => {
       const error = {
         code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
         message:
-          "Tokio couldn't save the change. Check the logs folder for details.",
+          "Tokio couldn't save the change. To report it, export the logs in Settings → Logs.",
       };
       expect(h.replies(APP_EVENTS_RESPONSE.GAMES)).toEqual([
         { success: true, data: { settings: on, status: waiting } },
@@ -321,7 +321,8 @@ describe("games events", () => {
         gamesService: {
           test: async () => ({
             success: false,
-            error: "Turn on Minecraft and connect the game first.",
+            error:
+              "Turn on Listen for Minecraft on Games, then paste the command it shows in Minecraft's chat.",
           }),
         },
       });
@@ -335,7 +336,8 @@ describe("games events", () => {
           results: [],
           error: {
             code: FEEDBACK_CODES.GAME_TEST_FAILED,
-            message: "Turn on Minecraft and connect the game first.",
+            message:
+              "Turn on Listen for Minecraft on Games, then paste the command it shows in Minecraft's chat.",
           },
         },
       ]);

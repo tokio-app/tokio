@@ -909,7 +909,7 @@ describe("settings events", () => {
           level: "error",
           code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
           message:
-            "Tokio couldn't save the change. Check the logs folder for details.",
+            "Tokio couldn't save the change. To report it, export the logs in Settings → Logs.",
         }),
       ]);
     });
@@ -1709,7 +1709,7 @@ describe("settings events", () => {
         const failure = {
           code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
           message:
-            "Tokio couldn't save the change. Check the logs folder for details.",
+            "Tokio couldn't save the change. To report it, export the logs in Settings → Logs.",
         };
         expect(h.replies(APP_EVENTS_RESPONSE.SET_AUTO_UPDATES)).toEqual([
           { success: false, error: failure },
@@ -1816,7 +1816,7 @@ describe("settings events", () => {
       const failure = {
         code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
         message:
-          "Tokio couldn't save the change. Check the logs folder for details.",
+          "Tokio couldn't save the change. To report it, export the logs in Settings → Logs.",
       };
       // It runs as saved in memory until the next start
       expect(setAutoUpdate).toHaveBeenCalledWith(false);

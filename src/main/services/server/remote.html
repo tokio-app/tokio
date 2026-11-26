@@ -34,6 +34,9 @@
         --muted: #71717a;
         --rose: #f43f5e;
         --rose-light: #fb7185;
+        /* Darker, behind Paper text, so it stays readable */
+        --rose-button: #e11d48;
+        --rose-button-hover: #be123c;
         --gutter: 20px;
       }
 
@@ -318,8 +321,8 @@
           transform 0.1s ease-out;
       }
 
-      .key:active:not(:disabled),
-      .bar:active:not(:disabled) {
+      .key:active:not(:disabled):not([aria-disabled="true"]),
+      .bar:active:not(:disabled):not([aria-disabled="true"]) {
         background: var(--iron);
         transform: scale(0.985);
       }
@@ -331,7 +334,9 @@
       }
 
       .key:disabled,
-      .bar:disabled {
+      .key[aria-disabled="true"],
+      .bar:disabled,
+      .bar[aria-disabled="true"] {
         color: var(--muted);
         cursor: default;
       }
@@ -427,11 +432,13 @@
         font-stretch: 118%;
       }
 
-      .bar:disabled {
+      .bar:disabled,
+      .bar[aria-disabled="true"] {
         border-color: var(--border);
       }
 
-      .bar:disabled .glyph {
+      .bar:disabled .glyph,
+      .bar[aria-disabled="true"] .glyph {
         color: var(--muted);
       }
 
@@ -445,28 +452,29 @@
       }
 
       html.paused .bar {
-        background: var(--rose);
+        border-color: var(--rose-button);
+        background: var(--rose-button);
       }
 
       html.paused .bar .glyph {
         color: var(--paper);
       }
 
-      html.paused .bar:active:not(:disabled) {
-        background: var(--rose-light);
+      html.paused .bar:active:not(:disabled):not([aria-disabled="true"]) {
+        background: var(--rose-button-hover);
       }
 
       @media (hover: hover) {
-        .key:hover:not(:disabled) {
+        .key:hover:not(:disabled):not([aria-disabled="true"]) {
           border-color: var(--iron);
         }
 
-        .bar:hover:not(:disabled) {
+        .bar:hover:not(:disabled):not([aria-disabled="true"]) {
           background: var(--iron);
         }
 
-        html.paused .bar:hover:not(:disabled) {
-          background: var(--rose-light);
+        html.paused .bar:hover:not(:disabled):not([aria-disabled="true"]) {
+          background: var(--rose-button-hover);
         }
       }
 
@@ -578,8 +586,8 @@
           transition: none;
         }
 
-        .key:active:not(:disabled),
-        .bar:active:not(:disabled) {
+        .key:active:not(:disabled):not([aria-disabled="true"]),
+        .bar:active:not(:disabled):not([aria-disabled="true"]) {
           transform: none;
         }
 
@@ -691,7 +699,6 @@
           class="bar"
           id="pause"
           data-action="pause"
-          aria-pressed="false"
           disabled
         >
           <span class="glyph" aria-hidden="true">
@@ -743,6 +750,8 @@
         var key = new URLSearchParams(location.hash.slice(1)).get("key") || "";
         var paused = false;
         var timers = {};
+        var CALL_MS = 5000;
+        var refreshing = false;
 
         document.title = text.title;
         document.querySelectorAll("[data-label]").forEach(function (el) {
@@ -753,9 +762,10 @@
           cover.hidden = true;
         });
 
-        // A key pressed a moment ago stays off until its answer comes
+        // A key pressed a moment ago stays busy until its answer comes, with
+        // aria-disabled rather than disabled, so it keeps the focus
         function enable(button, on) {
-          button.disabled = !on || button.getAttribute("aria-busy") === "true";
+          button.disabled = !on;
         }
 
         function note(button, message) {
@@ -767,7 +777,6 @@
           root.classList.toggle("paused", paused);
           pausedNote.hidden = !paused;
           pauseLabel.textContent = paused ? text.resume : text.pause;
-          pauseButton.setAttribute("aria-pressed", String(paused));
           theme.setAttribute("content", paused ? "#1c1215" : "#121212");
         }
 
@@ -808,7 +817,13 @@
           root.classList.toggle("live", Boolean(state.live));
           onAir.hidden = !state.live;
           who.className = state.live ? "who" : "who quiet";
-          who.textContent = state.live ? "@" + state.live : text.notLive;
+          // A LIVE link shows as typed, not as "@https://…", as on Home
+          var live = state.live || "";
+          who.textContent = !live
+            ? text.notLive
+            : live.indexOf("/") === -1
+              ? "@" + live
+              : live;
           showSong(state.music ? state.song : null);
           // A key that can't do anything says why
           enable(skip, state.music);
@@ -839,29 +854,47 @@
             init.headers["Content-Type"] = "application/json";
             init.body = JSON.stringify(body);
           }
-          return fetch("/remote/api/" + path, init).then(function (res) {
-            return res
-              .json()
-              .catch(function () {
-                return null;
-              })
-              .then(function (json) {
-                return { res: res, json: json };
-              });
-          });
+          // No answer in 5 s counts as unreachable. Not AbortSignal.timeout:
+          // older iPhones lack it
+          var controller = new AbortController();
+          init.signal = controller.signal;
+          var timer = setTimeout(function () {
+            controller.abort();
+          }, CALL_MS);
+          return fetch("/remote/api/" + path, init)
+            .then(function (res) {
+              return res
+                .json()
+                .catch(function () {
+                  return null;
+                })
+                .then(function (json) {
+                  return { res: res, json: json };
+                });
+            })
+            .finally(function () {
+              clearTimeout(timer);
+            });
         }
 
+        // One state request at a time, so slow answers can't pile up
         function refresh() {
-          call("GET", "state").then(
-            function (answer) {
-              var message = failure(answer.res, answer.json);
-              if (message) return block(message);
-              render(answer.json);
-            },
-            function () {
-              block(text.unreachable);
-            },
-          );
+          if (refreshing) return;
+          refreshing = true;
+          call("GET", "state")
+            .then(
+              function (answer) {
+                var message = failure(answer.res, answer.json);
+                if (message) return block(message);
+                render(answer.json);
+              },
+              function () {
+                block(text.unreachable);
+              },
+            )
+            .then(function () {
+              refreshing = false;
+            });
         }
 
         // A short buzz on phones that have one, as a key would click
@@ -886,7 +919,7 @@
           var action = button.getAttribute("data-action");
           failureLine.textContent = "";
           button.setAttribute("aria-busy", "true");
-          button.disabled = true;
+          button.setAttribute("aria-disabled", "true");
           var body = action === "pause" ? { paused: !paused } : null;
           call("POST", action, body)
             .then(
@@ -912,14 +945,21 @@
             )
             .then(function () {
               button.removeAttribute("aria-busy");
+              button.removeAttribute("aria-disabled");
               refresh();
             });
         }
 
         buttons.forEach(function (b) {
           b.addEventListener("click", function () {
+            if (b.getAttribute("aria-busy") === "true") return;
             press(b);
           });
+        });
+
+        // iOS shows :active on touch only once a touchstart listener exists
+        document.addEventListener("touchstart", function () {}, {
+          passive: true,
         });
 
         if (!key) {

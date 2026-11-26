@@ -287,7 +287,11 @@ export class GamesService extends Service {
   // Why the edition's commands can't run: no game, or the other edition's
   private _unreachable(edition: MinecraftEdition): string | undefined {
     const status = this._minecraft.status;
-    if (status.state !== "connected") return t("main.games.notConnected");
+    if (status.state !== "connected")
+      return t("main.games.notConnected", {
+        listen: t("games.minecraft.listen"),
+        games: t("nav.games"),
+      });
     if (status.edition !== edition) {
       return t("main.games.connectEdition", {
         edition: MINECRAFT_EDITION_NAMES[edition],
