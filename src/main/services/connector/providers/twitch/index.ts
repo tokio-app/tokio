@@ -274,16 +274,27 @@ export class TwitchConnector
           broadcaster_user_id: userId,
         };
         if (as) condition[as] = userId;
-        const res = await this._auth.request(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type,
-            version,
-            condition,
-            transport: { method: "websocket", session_id: session },
-          }),
-        });
+        let res: Response;
+        try {
+          res = await this._auth.request(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type,
+              version,
+              condition,
+              transport: { method: "websocket", session_id: session },
+            }),
+          });
+        } catch (err) {
+          // A 429 skips the event like a 403; the network fails the try
+          if (type === CHAT || kindOf(err) !== "rateLimited") throw err;
+          this._logOnce(
+            `subscribe:${type}`,
+            `Skipped ${type} -- ${formatError(err)}`,
+          );
+          return;
+        }
         if (res.ok) return;
         const failure = await failureOf(res, `subscription to ${type}`);
         if (type === CHAT) throw failure;

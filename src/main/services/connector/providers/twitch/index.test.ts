@@ -276,6 +276,18 @@ describe("TwitchConnector", () => {
       expect(connector.isConnected()).toBe(false);
     });
 
+    it("skips an event Twitch rate limits, but not chat", async () => {
+      twitch.subStatus["channel.follow"] = 429;
+      expect(await connector.connect("")).toEqual({ success: true });
+      await connector.disconnect();
+
+      twitch.subStatus["channel.chat.message"] = 429;
+      const res = await connector.connect("");
+
+      expect(res.error?.kind).toBe("rateLimited");
+      expect(connector.isConnected()).toBe(false);
+    });
+
     it("tells a rate limit", async () => {
       twitch.override = (url) =>
         url === config.TOKEN_URL ? json(429, {}) : undefined;

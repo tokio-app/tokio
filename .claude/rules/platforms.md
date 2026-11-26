@@ -71,7 +71,7 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - The refresh token works once and rotates. Refreshes are single-flight (`TwitchAuth.refresh`) and a quit waits for one (`track`), and the new token is saved through `onAccount` before the access token is used: two refreshes at once, or a lost save, sign the user out. The store encrypts it (`.claude/rules/store.md`).
 - Twitch wants the token validated at connect and hourly (`VALIDATE_MS`). A refused refresh or a revocation signs the account out and stops the connection with `lost`.
 - EventSub: `session_reconnect` opens the new socket and keeps the subscriptions, and creating them again is a 409. A fresh socket (a drop, a keepalive timeout) subscribes again. Messages are deduped by `metadata.message_id`.
-- Only the chat subscription failing fails a connect. A 403 for Bits or points on a channel that isn't affiliate is logged and skipped.
+- Only the chat subscription failing fails a connect. A 403 for Bits or points on a channel that isn't affiliate, or a 429 on any other, is logged and skipped; the network still fails the try.
 - `stream.offline` ends the connection only when it was seen live (at connect or since): a channel connected to while offline stays connected, so chat works before going live.
 - Bits come only from `channel.bits.use`, which also carries Power-ups. Chat's `cheer` field would count them twice, so it's never read, and the cheermotes are taken out of `content` so TTS doesn't read "Cheer100".
 - Messages from other channels in a Shared Chat (`source_broadcaster_user_id`) are dropped, with the `shared_chat_*` notices.
