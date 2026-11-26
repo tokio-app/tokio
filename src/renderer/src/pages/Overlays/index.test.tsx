@@ -572,6 +572,23 @@ describe("Overlays", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("puts the focus on the next card once the removed one leaves", async () => {
+    const { user } = await renderApp("/overlays");
+    await overlays(GIFT_JAR, MY_GOAL);
+
+    await user.click(card("Gift Jar").getByRole("button", { name: "Remove" }));
+    await user.click(dialog().getByRole("button", { name: "Remove" }));
+    await overlays(MY_GOAL);
+    expect(card("My Goal").getByRole("button", { name: "Test" })).toHaveFocus();
+
+    await user.click(card("My Goal").getByRole("button", { name: "Remove" }));
+    await user.click(dialog().getByRole("button", { name: "Remove" }));
+    await overlays();
+    expect(
+      page().getByRole("button", { name: "Import overlay" }),
+    ).toHaveFocus();
+  });
+
   // Failed imports and removals send the current list
   it("shows the list a failed reply brings", async () => {
     await renderApp("/overlays");

@@ -7,11 +7,12 @@ import {
   OverlayView,
   SearchToggle,
   Section,
+  useFocusAfterDelete,
 } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useLanguage, useT } from "@/ui/i18n";
 import { useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { FiPlus } from "react-icons/fi";
 import { LuPackageSearch } from "react-icons/lu";
 import { updatesHint } from "../helper";
@@ -21,6 +22,7 @@ interface Props {
   overlays: OverlayApp[];
   onTest: (id: string) => void;
   onCustomize: (id: string) => void;
+  // Asks first
   onRemove: (overlay: OverlayApp) => void;
 }
 
@@ -37,6 +39,13 @@ export function GallerySection({
     const needle = search.trim().toLowerCase();
     return overlays.filter((o) => o.name.toLowerCase().includes(needle));
   }, [overlays, search]);
+  const gallery = useRef<HTMLDivElement>(null);
+  const importRef = useRef<HTMLButtonElement>(null);
+  const removed = useFocusAfterDelete(
+    overlays.map((overlay) => overlay.id),
+    gallery,
+    importRef,
+  );
 
   return (
     <Section
@@ -52,6 +61,7 @@ export function GallerySection({
           />
           <OfficialButton overlays={overlays} />
           <Btn
+            ref={importRef}
             title={t("overlays.gallery.import")}
             onClick={() => window.api.emit(APP_EVENTS.IMPORT_OVERLAY)}
           >
@@ -61,15 +71,18 @@ export function GallerySection({
       }
     >
       {shown.length > 0 ? (
-        <div className={styles.gallery}>
-          {shown.map((overlay) => (
+        <div ref={gallery} className={styles.gallery}>
+          {shown.map((overlay, at) => (
             <OverlayView
               // An update reloads the preview
               key={`${overlay.id}@${overlay.version}`}
               overlay={overlay}
               onTest={onTest}
               onCustomize={onCustomize}
-              onRemove={onRemove}
+              onRemove={(removing) => {
+                removed(removing.id, at);
+                onRemove(removing);
+              }}
             />
           ))}
         </div>
