@@ -81,7 +81,6 @@ export function VoiceKeysSection() {
               <button
                 key={engine.id}
                 type="button"
-                role="menuitem"
                 className={styles.menu_item}
                 onClick={() => {
                   menu.close();
