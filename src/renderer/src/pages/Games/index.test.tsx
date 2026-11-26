@@ -1080,17 +1080,21 @@ describe("Games overlay", () => {
   const testButton = () =>
     screen.getByRole("button", { name: "Light up the next action" });
 
-  it("says when there are no actions, and has nothing to test", async () => {
+  it("says when there are no actions, and has nothing to test or style", async () => {
     await load([]);
 
     expect(
       section("Overlay").getByText("Add an action to put it on the overlay."),
     ).toBeInTheDocument();
+    // Only the URL until there's an action to show
+    expect(screen.getByTitle("Copy the overlay's URL")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Layout" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Font" })).toBeNull();
     expect(
-      section("Overlay").getByText(
+      section("Overlay").queryByText(
         "Pick a picture or name an action to show it here.",
       ),
-    ).toBeInTheDocument();
+    ).toBeNull();
     expect(testButton()).toBeDisabled();
   });
 
