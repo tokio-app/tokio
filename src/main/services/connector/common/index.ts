@@ -1,4 +1,10 @@
-import { ChatEvent, Gift, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
+import {
+  ChatEvent,
+  Gift,
+  TOKIO_EVENTS,
+  TokioEventMap,
+  UserData,
+} from "@/common/types";
 import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import { TokioEmitter } from "../../shared/emitter";
@@ -35,6 +41,19 @@ export type ReconnectState = "reconnecting" | "reconnected" | "stopped";
 // Takes a chat before listeners get it: null sends it on at once, a promise
 // once it settles. The promise never rejects.
 export type ChatStage = (chat: ChatEvent) => Promise<ChatEvent> | null;
+
+// A chatter's roles from their badges' names, and the months their
+// subscriber or founder badge says (NaN or 0 when it says none)
+export const rolesOf = (
+  badges: Set<string>,
+  months: number,
+): Pick<UserData, "moderator" | "superfan" | "vip" | "subMonths"> => ({
+  // Music's host check reads it
+  moderator: badges.has("broadcaster") || badges.has("moderator"),
+  superfan: badges.has("subscriber") || badges.has("founder"),
+  vip: badges.has("vip"),
+  ...(months > 0 && { subMonths: months }),
+});
 
 // The account a platform signs in with (Twitch's): key is the refresh token,
 // which the store keeps encrypted and nothing logs

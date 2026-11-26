@@ -7,6 +7,7 @@ import {
   TokioEventMap,
   UserData,
 } from "@/common/types";
+import { rolesOf } from "../../../common";
 
 type Fragment = {
   type: "text" | "cheermote" | "emote" | "mention";
@@ -166,11 +167,7 @@ export function toChat(
         e.chatter_user_login,
         e.chatter_user_name,
       ),
-      // Music's host check reads it
-      moderator: badges.has("broadcaster") || badges.has("moderator"),
-      superfan: badges.has("subscriber") || badges.has("founder"),
-      vip: badges.has("vip"),
-      ...(months > 0 && { subMonths: months }),
+      ...rolesOf(badges, months),
     },
     comment: { content, emotes, lang: "" },
   };

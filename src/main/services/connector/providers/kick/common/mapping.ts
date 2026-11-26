@@ -7,6 +7,7 @@ import {
   TokioEventMap,
   UserData,
 } from "@/common/types";
+import { rolesOf } from "../../../common";
 import { slugOf } from "./api";
 
 type Sender = {
@@ -127,11 +128,7 @@ function toChat(e: ChatMessage): ChatEvent {
       follower: false,
       userId: `kick:${e.sender.id}`,
       platform: "kick",
-      // Music's host check reads it
-      moderator: badges.has("broadcaster") || badges.has("moderator"),
-      superfan: badges.has("subscriber") || badges.has("founder"),
-      vip: badges.has("vip"),
-      ...(months > 0 && { subMonths: months }),
+      ...rolesOf(badges, months),
     },
     comment: { content, emotes, lang: "" },
   };
