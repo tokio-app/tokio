@@ -552,10 +552,17 @@ describe("TimerService", () => {
       await vi.advanceTimersByTimeAsync(SAVE_INTERVAL_MS);
       expect(load).not.toHaveBeenCalled();
 
-      getProfileData.mockResolvedValue({ ...defaultProfile, timer: saved });
+      getProfileData.mockResolvedValue({
+        ...defaultProfile,
+        timer: saved,
+        platforms: ["kick"],
+      });
       await vi.advanceTimersByTimeAsync(SAVE_INTERVAL_MS);
       await vi.advanceTimersByTimeAsync(SAVE_INTERVAL_MS);
-      expect(load).toHaveBeenCalledExactlyOnceWith(saved, "stream.json");
+      // With its platforms, as a switch's load gets them
+      expect(load).toHaveBeenCalledExactlyOnceWith(saved, "stream.json", [
+        "kick",
+      ]);
       expect(left()).toBe(25 * MIN);
       // Saved into that file from then on
       timer.control("start");
