@@ -18,8 +18,9 @@ const kick = {
   // The client id of each realtime request
   clients: [] as string[],
   urls: [] as string[],
-  // Answers a request instead, until it gives undefined
-  override: undefined as ((url: string) => Response | undefined) | undefined,
+  // Answers a request instead, until it gives undefined; a promise holds it
+  override: undefined as
+    ((url: string) => Response | Promise<Response> | undefined) | undefined,
 };
 
 const socket = () => kick.sockets[kick.sockets.length - 1];
@@ -249,7 +250,7 @@ describe("KickConnector", () => {
         if (!url.endsWith("/channels/streamer") || held.release) {
           return undefined;
         }
-        return new Promise((resolve) => {
+        return new Promise<Response>((resolve) => {
           held.release = () =>
             resolve(
               json(200, {
