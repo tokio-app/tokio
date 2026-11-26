@@ -84,6 +84,17 @@ describe("Layout", () => {
     expect(nav).not.toHaveAttribute("data-names");
   });
 
+  it("skips to the page's content, first in the Tab order", async () => {
+    const { user } = await renderApp();
+
+    await user.tab();
+    const skip = screen.getByRole("link", { name: "Skip to content" });
+    expect(skip).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByRole("main")).toHaveFocus();
+  });
+
   it("moves between pages", async () => {
     const { user, router } = await renderApp();
     expect(

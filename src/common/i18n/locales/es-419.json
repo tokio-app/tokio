@@ -257,6 +257,7 @@
   "layout.error.show": "Mostrar error",
   "layout.error.hide": "Ocultar error",
   "layout.notFound": "Página no encontrada",
+  "layout.skipToContent": "Ir al contenido",
   "components.fonts.title": "Elige una fuente",
   "components.fonts.description": "Fuentes instaladas en esta computadora.",
   "components.fonts.searchPlaceholder": "Buscar fuentes...",

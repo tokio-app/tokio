@@ -257,6 +257,7 @@
   "layout.error.show": "Show error",
   "layout.error.hide": "Hide error",
   "layout.notFound": "Page not found",
+  "layout.skipToContent": "Skip to content",
   "components.fonts.title": "Select a font",
   "components.fonts.description": "Fonts installed on this computer.",
   "components.fonts.searchPlaceholder": "Search fonts...",
