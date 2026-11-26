@@ -90,12 +90,31 @@ test("shows the splash, then the app, with its data in the home folder", async (
   expect(existsSync(data("settings", "tokio.json"))).toBe(true);
   expect(existsSync(data("profiles", "default.json"))).toBe(true);
 
-  // A new store opens the tour, which would cover the window for the tests
-  // after this one
+  // A new store asks for the platform, the username and the profile's name
+  const welcome = page.getByRole("dialog", { name: "Set up your stream" });
+  await expect(welcome).toBeVisible();
+  await welcome
+    .getByRole("textbox", { name: "TikTok username" })
+    .fill("@e2e.streamer");
+  const name = welcome.getByRole("textbox", { name: "Profile name" });
+  await expect(name).toHaveValue("Default");
+  await name.fill("My stream");
+  await welcome.getByRole("button", { name: "Save" }).click();
+
+  // Then the tour, which would cover the window for the tests after this one
   const tour = page.getByRole("dialog", { name: "Welcome to Tokio" });
   await expect(tour).toBeVisible();
   await tour.getByRole("button", { name: "Close" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  // Saved in the first profile, whose file keeps its name
+  const profile = async () =>
+    JSON.parse(await readFile(data("profiles", "default.json"), "utf8"));
+  await expect.poll(async () => (await profile()).name).toBe("My stream");
+  expect(await profile()).toMatchObject({
+    platforms: ["tiktok"],
+    connector: { username: "e2e.streamer" },
+  });
 });
 
 test("keeps Node out of the page", async () => {
