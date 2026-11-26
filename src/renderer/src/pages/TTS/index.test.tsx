@@ -377,7 +377,7 @@ describe("TTS", () => {
   it("sets the trigger of each format mode", async () => {
     const { user } = await setup();
 
-    await user.click(mode(/Read all messages/));
+    await user.click(mode(/All messages/));
     expect((await saved()).format.trigger).toEqual({
       mode: "any",
       value: "",
@@ -385,13 +385,13 @@ describe("TTS", () => {
     expect(customTrigger()).toBeDisabled();
     expect(customTrigger()).toHaveValue("");
 
-    await user.click(mode(/Dot prefix/));
+    await user.click(mode(/starting with a period/));
     expect((await saved()).format.trigger).toEqual({
       mode: "dot",
       value: ".",
     });
 
-    await user.click(mode(/Slash prefix/));
+    await user.click(mode(/starting with a slash/));
     expect((await saved()).format.trigger).toEqual({
       mode: "slash",
       value: "/",
