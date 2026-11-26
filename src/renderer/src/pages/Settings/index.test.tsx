@@ -475,6 +475,81 @@ describe("Settings", () => {
         { type: "profile", file: "horror.json" },
       ]);
     });
+
+    const rename = async () => {
+      const app = await setup();
+      await app.user.click(
+        section("Live profiles").getByRole("button", { name: "Rename" }),
+      );
+      const field = within(
+        dialog().getByRole("group", { name: "Profile name" }),
+      ).getByRole("textbox");
+      return { ...app, field };
+    };
+    const renameButton = () => dialog().getByRole("button", { name: "Rename" });
+
+    it("renames the open profile by its file, once until main answers", async () => {
+      const { user, field } = await rename();
+      expect(dialog().getByText("Rename the profile")).toBeInTheDocument();
+      expect(field).toHaveValue("Horror");
+
+      await user.clear(field);
+      await user.type(field, "Scary");
+      await user.click(renameButton());
+      await user.click(renameButton());
+
+      expect(sent(APP_EVENTS.RENAME_PROFILE)).toEqual([
+        { file: "horror.json", name: "Scary" },
+      ]);
+
+      // Another profile's answer isn't this one's
+      await send(APP_EVENTS_RESPONSE.RENAME_PROFILE, {
+        success: true,
+        file: "default.json",
+      });
+      expect(dialog().getByText("Rename the profile")).toBeInTheDocument();
+
+      await send(APP_EVENTS_RESPONSE.RENAME_PROFILE, {
+        success: true,
+        file: "horror.json",
+      });
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("keeps a refused name to fix", async () => {
+      const { user, field } = await rename();
+      await user.clear(field);
+      await user.type(field, "Default");
+      await user.click(renameButton());
+
+      await send(APP_EVENTS_RESPONSE.RENAME_PROFILE, {
+        ...failure(),
+        file: "horror.json",
+      });
+
+      expect(field).toHaveValue("Default");
+      await user.type(field, " 2");
+      await user.click(renameButton());
+      expect(sent(APP_EVENTS.RENAME_PROFILE)).toEqual([
+        { file: "horror.json", name: "Default" },
+        { file: "horror.json", name: "Default 2" },
+      ]);
+    });
+
+    it("sends nothing for an empty or unchanged name", async () => {
+      const { user, field } = await rename();
+      await user.clear(field);
+      await user.type(field, "  ");
+      await user.click(renameButton());
+      expect(dialog().getByText("Rename the profile")).toBeInTheDocument();
+
+      await user.clear(field);
+      await user.type(field, " Horror ");
+      await user.click(renameButton());
+
+      expect(sent(APP_EVENTS.RENAME_PROFILE)).toEqual([]);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
   });
 
   describe("Shortcuts", () => {

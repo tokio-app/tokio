@@ -6,13 +6,18 @@ import { useT } from "@/ui/i18n";
 import { useState } from "react";
 
 // Open until main answers: a refused name stays to fix, the notice says why.
+// With `file`, a reply about another profile's file isn't this modal's.
 function useAnswered(
   response:
-    APP_EVENTS_RESPONSE.CREATE_PROFILE | APP_EVENTS_RESPONSE.CLONE_PROFILE,
+    | APP_EVENTS_RESPONSE.CREATE_PROFILE
+    | APP_EVENTS_RESPONSE.CLONE_PROFILE
+    | APP_EVENTS_RESPONSE.RENAME_PROFILE,
   onClose: () => void,
+  file?: string,
 ) {
   const [waiting, setWaiting] = useState(false);
   useIpcListener(response, (res) => {
+    if (file && res && "file" in res && res.file !== file) return;
     setWaiting(false);
     if (res?.success) onClose();
   });
@@ -91,6 +96,49 @@ export function CloneProfileModal({ profiles, active, onClose }: CloneProps) {
           placeholder={t("settings.profiles.cloneNamePlaceholder")}
           value={name}
           onChange={(e) => setName(e.target.value)}
+        />
+      </Field>
+    </Modal>
+  );
+}
+
+type RenameProps = {
+  // The profile renamed, with the name it has now
+  profile: EntityMetadata;
+  onClose: () => void;
+};
+
+export function RenameProfileModal({ profile, onClose }: RenameProps) {
+  const t = useT();
+  const [name, setName] = useState(profile.name);
+  const [waiting, setWaiting] = useAnswered(
+    APP_EVENTS_RESPONSE.RENAME_PROFILE,
+    onClose,
+    profile.file,
+  );
+
+  return (
+    <Modal
+      title={t("settings.profiles.renameTitle")}
+      description={t("settings.profiles.renameDescription")}
+      confirmText={t("settings.profiles.rename")}
+      onClose={onClose}
+      onConfirm={() => {
+        if (!name.trim() || waiting) return;
+        // Nothing to change
+        if (name.trim() === profile.name) return onClose();
+        setWaiting(true);
+        window.api.emit(APP_EVENTS.RENAME_PROFILE, {
+          file: profile.file,
+          name,
+        });
+      }}
+    >
+      <Field label={t("settings.profiles.name")}>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus
         />
       </Field>
     </Modal>
