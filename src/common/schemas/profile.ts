@@ -168,8 +168,8 @@ export const TriggerSchema = z.object({
   platform: z.enum(PLATFORMS).optional().catch(undefined),
 });
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
  * A Kick row saved while Kicks were gifts, as a Kicks row: Kick sends no

@@ -1,3 +1,4 @@
+import { isRecord } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -162,9 +163,6 @@ const unwrap = (schema: z.core.$ZodType): z.core.$ZodType => {
   if (schema instanceof z.ZodPipe) return unwrap(schema.out);
   return schema;
 };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
  * The dotted paths in `changes` that `schema` has no field for. Zod drops

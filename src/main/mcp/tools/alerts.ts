@@ -2,6 +2,7 @@ import {
   type Alert,
   ALERT_TRIGGERS,
   AlertItemSchema,
+  isRecord,
   MEDIA_DURATION,
   type MediaFile,
   type Profile,
@@ -117,9 +118,6 @@ const alertRow = (alert: Alert) => ({
   message: alert.tts?.message ?? null,
   media: fileOf(alert.media),
 });
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
  * The alert `changes` make of `stored`. A sound or media file other than the

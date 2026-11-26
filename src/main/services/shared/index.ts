@@ -1,3 +1,4 @@
+import { isRecord } from "@/common/schemas";
 import { formatError } from "@/common/util";
 import { cleanText } from "@/helper/chat";
 import { isMissing, writeFileAtomic } from "@/helper/fs";
@@ -19,10 +20,8 @@ export interface ServiceResult<T = undefined> {
  */
 export function deepMerge(target: unknown, source: unknown): unknown {
   if (target === source) return target;
-  const isObject = (item: unknown): item is Record<string, unknown> =>
-    Boolean(item && typeof item === "object" && !Array.isArray(item));
 
-  if (!isObject(target) || !isObject(source)) {
+  if (!isRecord(target) || !isRecord(source)) {
     return source !== undefined ? source : target;
   }
 
@@ -36,7 +35,7 @@ export function deepMerge(target: unknown, source: unknown): unknown {
       continue;
     }
 
-    if (isObject(targetVal) && isObject(sourceVal)) {
+    if (isRecord(targetVal) && isRecord(sourceVal)) {
       output[key] = deepMerge(targetVal, sourceVal);
     } else {
       output[key] = sourceVal;

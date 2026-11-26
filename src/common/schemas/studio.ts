@@ -3,6 +3,7 @@ import { PLATFORMS, TOKIO_EVENTS } from "../types/connector";
 import {
   CUT,
   GAMES_OVERLAY_MAX_COLUMNS,
+  isRecord,
   kicksRow,
   MAX_TRIGGERS,
   TriggerSchema,
@@ -590,9 +591,6 @@ const StoredStudioItemSchema = z.discriminatedUnion("kind", [
   StoredStudioGroupSchema,
   StudioElementSchema,
 ]);
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
 // An overlay saved before groups held its elements in layers: each layer
 // is a group now, with its id, name, flags and elements. Layers that aren't

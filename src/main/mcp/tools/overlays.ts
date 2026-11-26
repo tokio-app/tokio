@@ -1,6 +1,7 @@
 import {
   ALERT_TRIGGERS,
   GOAL_TRIGGER,
+  isRecord,
   localizeOverlayConfig,
   OverlayConfigSchema,
   type StudioElement,
@@ -70,9 +71,6 @@ const findStudio = ({ storeManagerService }: Handler, id: string) =>
 
 const findTestOverlay = ({ overlayService }: Handler, id: string) =>
   overlayService.getTestOverlays().find((o) => o.id === id);
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
 // The schema of an element's own kind: the union's check passes a key only
 // another kind has, which the save then drops
