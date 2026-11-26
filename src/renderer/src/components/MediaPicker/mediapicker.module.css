@@ -86,7 +86,7 @@
   box-sizing: content-box;
   padding: 3px;
   border-radius: var(--radius-full);
-  background: var(--accent-primary);
+  background: var(--accent-strong);
   color: var(--font-primary);
 }
 

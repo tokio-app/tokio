@@ -49,6 +49,7 @@ The look follows the `frontend-design` skill. The palette's values and the logos
 - One Ink surface (`--background-primary`). Panels (`--background-tertiary`) only for grouped content such as lists and cards. Controls on Field (`--background-secondary`), with `--border` for hairlines and Iron (`--background-secondary-hover`) for hover.
 - Rose (`--accent-primary`) means LIVE or "do this": the tally, primary actions, selection and focus, never decoration.
 - Text on rose is Paper (`--font-primary`), and checkboxes and radios keep the browser's light look (the user's call: they rejected dark text and gray dark-mode boxes).
+- Rose behind text or an icon, like an accent button's, is the darker `--accent-strong`, which Paper reads on at 4.5:1, and `--accent-strong-hover` on hover, darker again (the user's call). `--accent-primary` stays for the LIVE dot, links, focus rings, toggles and lines.
 - Radii: `--radius-md` for controls, `--radius-lg` for panels, `--radius-xl` for dialogs.
 - No shadows on cards, pills, or uppercase labels.
 - Type is Archivo, at 400 for text, 500 for labels and controls, 600 for titles. Live numbers use the readout: `font-stretch: var(--stretch-readout)`, 700, `tabular-nums`.

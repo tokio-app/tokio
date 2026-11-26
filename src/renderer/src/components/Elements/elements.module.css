@@ -39,13 +39,14 @@
 
 .btn_accent {
   border-color: transparent;
-  background-color: var(--accent-primary);
+  background-color: var(--accent-strong);
   font-weight: 600;
 }
 
+/* Darker, not lighter, so its text stays readable */
 .btn_accent:hover:not(:disabled) {
   border-color: transparent;
-  background-color: var(--accent-primary-hover);
+  background-color: var(--accent-strong-hover);
 }
 
 /* Gray, not a faded rose: there's nothing to do yet */

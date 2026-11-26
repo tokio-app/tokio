@@ -73,14 +73,14 @@
 
 .day_selected,
 .day_selected:hover {
-  background-color: var(--accent-primary);
+  background-color: var(--accent-strong);
   box-shadow: none;
   color: var(--font-primary);
   font-weight: 600;
 }
 
 .day_selected:hover {
-  background-color: var(--accent-primary-hover);
+  background-color: var(--accent-strong-hover);
 }
 
 .time {
