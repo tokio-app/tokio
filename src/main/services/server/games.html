@@ -198,7 +198,6 @@
         });
       };
 
-      // A lit row holds its turn until it goes out
       // A row's turn lasts until each of its gifts has shown, from the
       // first, and at least TURN_MS
       const turnMs = () => {
@@ -206,6 +205,7 @@
           list.children[turn]?.querySelectorAll(".games-event img").length ?? 0;
         return Math.max(TURN_MS, gifts * ROTATE_MS);
       };
+      // A lit row holds its turn until it goes out
       const next = () => {
         const held = lit.has(rows[turn]?.id);
         if (carousel && rows.length > 1 && !held) {

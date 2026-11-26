@@ -68,7 +68,6 @@
         font-weight: 600;
         color: var(--title);
         text-align: center;
-        text-wrap: balance;
         overflow-wrap: anywhere;
       }
 
@@ -254,7 +253,9 @@
         const ms = left();
         const running = state.status === "running";
         const warnAt = state.look.warn_at * 60_000;
-        clock.textContent = clockText(ms);
+        // Four times a second: only a new text touches the page
+        const text = clockText(ms);
+        if (clock.textContent !== text) clock.textContent = text;
         clock.classList.toggle("warn", running && warnAt > 0 && ms <= warnAt);
       };
 
