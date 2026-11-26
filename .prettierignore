@@ -7,5 +7,7 @@ test/fixtures
 .claude/skills/frontend-design
 # Vendored from blader/humanizer v3.1.0, kept as published
 .claude/skills/humanizer
+# Vendored from GoogleChrome/modern-web-guidance v1.0.2; its SKILL.md reads the guides here, not the CLI
+.claude/skills/modern-web-guidance
 # Agents' git worktrees
 .claude/worktrees/
