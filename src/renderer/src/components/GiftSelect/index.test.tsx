@@ -129,7 +129,7 @@ describe("GiftMultiSelect", () => {
     ]);
     expect(within(row("Galaxy")).getByText("1,000 coins")).toBeVisible();
     expect(within(row("Rose")).getByText("1 coin")).toBeVisible();
-    expect(status()).toHaveTextContent("5 gifts · 0 selected");
+    expect(status()).toHaveTextContent("5 gifts, 0 selected");
   });
 
   it("lists the gifts picked when it opened first, and keeps them in place", async () => {
@@ -152,7 +152,7 @@ describe("GiftMultiSelect", () => {
 
     await user.type(search, "  RO ");
     expect(listed()).toEqual(["Rose"]);
-    expect(status()).toHaveTextContent("1 of 5 gifts · 0 selected");
+    expect(status()).toHaveTextContent("1 of 5 gifts, 0 selected");
 
     await user.clear(search);
     await user.type(search, "zzz");
@@ -227,7 +227,7 @@ describe("GiftMultiSelect", () => {
 
     expect(checkbox("Rose")).toBeChecked();
     expect(checkbox("Galaxy")).not.toBeChecked();
-    expect(status()).toHaveTextContent("5 gifts · 2 selected");
+    expect(status()).toHaveTextContent("5 gifts, 2 selected");
     expect(onChange).not.toHaveBeenCalled();
 
     await user.click(picker().getByRole("button", { name: "Done" }));
@@ -278,7 +278,7 @@ describe("GiftMultiSelect", () => {
 
     expect(checkbox("Galaxy")).toBeChecked();
     expect(checkbox("Lion")).toBeChecked();
-    expect(status()).toHaveTextContent("2 of 5 gifts · 3 selected");
+    expect(status()).toHaveTextContent("2 of 5 gifts, 3 selected");
     expect(selectAll()).toBeDisabled();
 
     await user.click(picker().getByRole("button", { name: "Done" }));

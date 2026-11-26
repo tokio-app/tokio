@@ -59,11 +59,7 @@ export function GiftPicker({
           ? t("components.gifts.titleMultiple")
           : t("components.gifts.title")
       }
-      description={
-        multiple
-          ? t("components.gifts.descriptionMultiple")
-          : t("components.gifts.description")
-      }
+      description={t("components.gifts.description")}
       maxWidth="640px"
       onClose={onClose}
       footer={

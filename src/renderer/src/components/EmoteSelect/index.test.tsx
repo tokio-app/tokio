@@ -107,7 +107,7 @@ describe("EmoteMultiSelect", () => {
     const { user } = await openPicker(["e4", "e2"]);
     const order = ["Emote 2", "Emote 4", "Emote 1", "Emote 3", "Emote 5"];
     expect(listed()).toEqual(order);
-    expect(status()).toHaveTextContent("5 emotes · 2 selected");
+    expect(status()).toHaveTextContent("5 emotes, 2 selected");
 
     // Rows don't move under the pointer.
     await user.click(row("Emote 5"));
@@ -127,7 +127,7 @@ describe("EmoteMultiSelect", () => {
     await user.click(checkbox("Emote 5"));
     await user.click(row("Emote 3"));
 
-    expect(status()).toHaveTextContent("5 emotes · 2 selected");
+    expect(status()).toHaveTextContent("5 emotes, 2 selected");
     expect(onChange).not.toHaveBeenCalled();
 
     await user.click(button("Done"));
@@ -166,7 +166,7 @@ describe("EmoteMultiSelect", () => {
 
     expect(checkbox("Emote 1")).toBeChecked();
     expect(checkbox("Emote 5")).toBeChecked();
-    expect(status()).toHaveTextContent("5 emotes · 5 selected");
+    expect(status()).toHaveTextContent("5 emotes, 5 selected");
     expect(button("Select all")).toBeDisabled();
 
     await user.click(button("Done"));
@@ -194,7 +194,7 @@ describe("EmoteMultiSelect", () => {
     await user.click(field);
 
     expect(picker().getByText("No emotes yet.")).toBeInTheDocument();
-    expect(status()).toHaveTextContent("0 emotes · 0 selected");
+    expect(status()).toHaveTextContent("0 emotes, 0 selected");
     expect(button("Select all")).toBeDisabled();
     expect(button("Clear")).toBeDisabled();
   });
