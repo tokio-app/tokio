@@ -206,6 +206,21 @@ export function unknownKeys(
   });
 }
 
+/**
+ * unknownKeys stops at arrays, so each of an item's also_triggers is checked
+ * here, against the trigger `schema`.
+ */
+export const unknownTriggerKeys = (
+  schema: z.core.$ZodType,
+  item: unknown,
+  prefix = "",
+): string[] =>
+  isRecord(item) && Array.isArray(item.also_triggers)
+    ? item.also_triggers.flatMap((trigger: unknown, i) =>
+        unknownKeys(schema, trigger, `${prefix}also_triggers.${i}.`),
+      )
+    : [];
+
 /** An error result naming the unknown keys, undefined when there are none. */
 export function refuseUnknown(
   schema: z.core.$ZodType,

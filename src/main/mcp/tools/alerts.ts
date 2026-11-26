@@ -38,7 +38,7 @@ import {
   invokeOk,
   ok,
   pushProfile,
-  unknownKeys,
+  unknownTriggerKeys,
   PLATFORM_NOTE,
 } from "../common";
 import {
@@ -188,14 +188,6 @@ function mergeAlert(
     : { error: invalid(parsed.error) };
 }
 
-// unknownKeys stops at arrays, so each of also_triggers is checked here
-const unknownTriggerKeys = (changes: Record<string, unknown>) =>
-  Array.isArray(changes.also_triggers)
-    ? changes.also_triggers.flatMap((trigger: unknown, i) =>
-        unknownKeys(TriggerSchema, trigger, `also_triggers.${i}.`),
-      )
-    : [];
-
 const VARIABLES = ALERT_TRIGGERS.map(
   (trigger) =>
     `${trigger}: ${ALERT_MESSAGE_VARIABLES[trigger].map((v) => `{${v}}`).join(" ") || "none"}`,
@@ -279,7 +271,7 @@ export const kinds: Kinds = {
       });
     },
     save: async (handler, id, changes) => {
-      const unknown = unknownTriggerKeys(changes);
+      const unknown = unknownTriggerKeys(TriggerSchema, changes);
       if (unknown.length > 0) {
         return fail(
           `Unknown settings: ${unknown.join(", ")}. Nothing was saved: see describe for the fields.`,
