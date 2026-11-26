@@ -6,6 +6,7 @@ export enum FEEDBACK_CODES {
   // SYSTEM
   PROFILE_CREATED = "profile_created",
   PROFILE_CLONED = "profile_cloned",
+  PROFILE_RENAMED = "profile_renamed",
   PROFILE_SWITCHED = "profile_switched",
   PROFILE_IMPORTED = "profile_imported",
   PROFILE_EXPORTED = "profile_exported",
@@ -16,6 +17,7 @@ export enum FEEDBACK_CODES {
   PROFILE_SAVE_FAILED = "profile_save_failed",
   PROFILE_CREATE_FAILED = "profile_create_failed",
   PROFILE_CLONE_FAILED = "profile_clone_failed",
+  PROFILE_RENAME_FAILED = "profile_rename_failed",
   PROFILE_LOCKED = "profile_locked",
   PROFILE_EXISTS = "profile_exists",
   PROFILE_NAME_INVALID = "profile_name_invalid",
