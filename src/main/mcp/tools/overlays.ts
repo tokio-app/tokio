@@ -1,6 +1,7 @@
 import {
   ALERT_TRIGGERS,
   GOAL_TRIGGER,
+  isRecord,
   localizeOverlayConfig,
   OverlayConfigSchema,
   type StudioElement,
@@ -40,6 +41,7 @@ import {
   invokeOk,
   ok,
   unknownKeys,
+  unknownTriggerKeys,
 } from "../common";
 import {
   defineKind,
@@ -71,26 +73,10 @@ const findStudio = ({ storeManagerService }: Handler, id: string) =>
 const findTestOverlay = ({ overlayService }: Handler, id: string) =>
   overlayService.getTestOverlays().find((o) => o.id === id);
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
 // The schema of an element's own kind: the union's check passes a key only
 // another kind has, which the save then drops
 const elementSchema = (kind: unknown) =>
   StudioElementSchema.options.find((o) => o.shape.kind.value === kind);
-
-// unknownKeys stops at arrays, so each of an item's also_triggers is
-// checked here
-const unknownTriggerKeys = (item: unknown, prefix: string): string[] =>
-  isRecord(item) && Array.isArray(item.also_triggers)
-    ? item.also_triggers.flatMap((trigger: unknown, i) =>
-        unknownKeys(
-          StudioTriggerSchema,
-          trigger,
-          `${prefix}also_triggers.${i}.`,
-        ),
-      )
-    : [];
 
 const unknownElementKeys = (element: unknown, prefix: string) => [
   ...unknownKeys(
@@ -99,12 +85,12 @@ const unknownElementKeys = (element: unknown, prefix: string) => [
     element,
     prefix,
   ),
-  ...unknownTriggerKeys(element, prefix),
+  ...unknownTriggerKeys(StudioTriggerSchema, element, prefix),
 ];
 
 const unknownGroupKeys = (group: unknown, prefix: string) => [
   ...unknownKeys(StudioGroupSchema, group, prefix),
-  ...unknownTriggerKeys(group, prefix),
+  ...unknownTriggerKeys(StudioTriggerSchema, group, prefix),
 ];
 
 // unknownKeys stops at arrays, and a studio overlay is mostly its items: a

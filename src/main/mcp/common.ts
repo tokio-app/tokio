@@ -1,3 +1,4 @@
+import { isRecord } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -41,15 +42,6 @@ export const ok = (value: unknown): CallToolResult => ({
 export const fail = (message: string): CallToolResult => ({
   content: [{ type: "text", text: message }],
   isError: true,
-});
-
-/** A provider or engine without its key: only whether it has one. */
-export const masked = <T extends { key: string }>({
-  key,
-  ...rest
-}: T): Omit<T, "key"> & { hasKey: boolean } => ({
-  ...rest,
-  hasKey: key !== "",
 });
 
 // FLUSH_SETTINGS ids the window hasn't answered, with what ends the wait
@@ -172,9 +164,6 @@ const unwrap = (schema: z.core.$ZodType): z.core.$ZodType => {
   return schema;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
 /**
  * The dotted paths in `changes` that `schema` has no field for. Zod drops
  * them without a word, so a typo would report success: refuse them, a
@@ -216,6 +205,21 @@ export function unknownKeys(
     return unknownKeys(field, value, `${prefix}${key}.`);
   });
 }
+
+/**
+ * unknownKeys stops at arrays, so each of an item's also_triggers is checked
+ * here, against the trigger `schema`.
+ */
+export const unknownTriggerKeys = (
+  schema: z.core.$ZodType,
+  item: unknown,
+  prefix = "",
+): string[] =>
+  isRecord(item) && Array.isArray(item.also_triggers)
+    ? item.also_triggers.flatMap((trigger: unknown, i) =>
+        unknownKeys(schema, trigger, `${prefix}also_triggers.${i}.`),
+      )
+    : [];
 
 /** An error result naming the unknown keys, undefined when there are none. */
 export function refuseUnknown(

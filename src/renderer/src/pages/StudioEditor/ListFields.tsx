@@ -1,19 +1,11 @@
 import {
   STUDIO_LIST_SOURCES,
-  STUDIO_MAX_FONT_SIZE,
   STUDIO_MAX_LIST_GAP,
   STUDIO_MAX_LIST_ROWS,
   StudioElementOf,
   StudioListSource,
 } from "@/common/schemas";
-import {
-  Check,
-  Color,
-  Field,
-  FontSelect,
-  NumberInput,
-  Select,
-} from "@/components";
+import { Check, Color, Field, NumberInput, Select } from "@/components";
 import {
   AlertTrigger,
   Platform,
@@ -23,6 +15,7 @@ import {
 import { PLATFORM_LABELS, triggersFor } from "@/common/util";
 import { usePlatforms } from "@/context/platforms";
 import { useT } from "@/ui/i18n";
+import { FontFields } from "./FontFields";
 import { listSourceName } from "./helper";
 import styles from "./studioeditor.module.css";
 
@@ -133,30 +126,7 @@ export function ListFields({ element, onChange }: Props) {
           />
         </Field>
       </div>
-      <Field label={t("studio.fields.font")}>
-        <FontSelect
-          value={element.font}
-          defaultLabel={t("common.defaultFont")}
-          onChange={(font) => onChange({ ...element, font })}
-        />
-      </Field>
-      <div className={styles.pair}>
-        <Field label={t("studio.fields.size")}>
-          <NumberInput
-            scrub
-            min={1}
-            max={STUDIO_MAX_FONT_SIZE}
-            value={element.size}
-            onChange={(size) => onChange({ ...element, size })}
-          />
-        </Field>
-        <Field label={t("studio.fields.color")}>
-          <Color
-            value={element.color}
-            onChange={(color) => onChange({ ...element, color })}
-          />
-        </Field>
-      </div>
+      <FontFields element={element} onChange={onChange} />
       {valued && (
         <Field label={t("studio.list.valueColor")}>
           <Color

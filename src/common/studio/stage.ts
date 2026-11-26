@@ -161,9 +161,14 @@ const restart = (node: HTMLElement, className: string) => {
 
 type Box = { x: number; y: number; width: number; height: number };
 
-// The smallest unturned box around a turned one: the editor's extent
-// (pages/StudioEditor/helper.ts), copied since this file imports only types
-const extent = ({ x, y, width, height, rotation }: StudioElementView): Box => {
+/** The smallest unturned box around a turned one. */
+export const extent = ({
+  x,
+  y,
+  width,
+  height,
+  rotation,
+}: Box & { rotation: number }): Box => {
   if (!rotation) return { x, y, width, height };
   const rad = (rotation * Math.PI) / 180;
   const cos = Math.abs(Math.cos(rad));
@@ -178,12 +183,12 @@ const extent = ({ x, y, width, height, rotation }: StudioElementView): Box => {
   };
 };
 
-// A group's box: the smallest box around its elements' extents, as they
-// show, which is the editor's groupFrame unturned. Empty, at the canvas's
-// corner, without any.
-const groupBox = (elements: StudioElementView[]): Box => {
-  if (elements.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
-  const boxes = elements.map(extent);
+/**
+ * The smallest box around unturned ones, null for none: several selected
+ * items' extents, which move, stick and line up as one.
+ */
+export const unionBox = (boxes: Box[]): Box | null => {
+  if (boxes.length === 0) return null;
   const x = Math.min(...boxes.map((b) => b.x));
   const y = Math.min(...boxes.map((b) => b.y));
   return {
@@ -193,6 +198,12 @@ const groupBox = (elements: StudioElementView[]): Box => {
     height: Math.max(...boxes.map((b) => b.y + b.height)) - y,
   };
 };
+
+// A group's box: the smallest box around its elements' extents, as they
+// show, which is the editor's groupFrame unturned. Empty, at the canvas's
+// corner, without any.
+const groupBox = (elements: StudioElementView[]): Box =>
+  unionBox(elements.map(extent)) ?? { x: 0, y: 0, width: 0, height: 0 };
 
 /**
  * The seconds of a media element's video that play: cutPart's rule

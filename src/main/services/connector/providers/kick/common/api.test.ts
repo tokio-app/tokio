@@ -45,7 +45,6 @@ describe("Kick's API", () => {
 
     expect(await lookup(config, "streamer")).toEqual({
       slug: "streamer",
-      name: "Streamer",
       channelId: 10,
       chatroomId: 20,
       viewers: 1234,

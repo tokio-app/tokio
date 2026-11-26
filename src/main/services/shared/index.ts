@@ -1,3 +1,4 @@
+import { isRecord } from "@/common/schemas";
 import { formatError } from "@/common/util";
 import { cleanText } from "@/helper/chat";
 import { isMissing, writeFileAtomic } from "@/helper/fs";
@@ -19,10 +20,8 @@ export interface ServiceResult<T = undefined> {
  */
 export function deepMerge(target: unknown, source: unknown): unknown {
   if (target === source) return target;
-  const isObject = (item: unknown): item is Record<string, unknown> =>
-    Boolean(item && typeof item === "object" && !Array.isArray(item));
 
-  if (!isObject(target) || !isObject(source)) {
+  if (!isRecord(target) || !isRecord(source)) {
     return source !== undefined ? source : target;
   }
 
@@ -36,7 +35,7 @@ export function deepMerge(target: unknown, source: unknown): unknown {
       continue;
     }
 
-    if (isObject(targetVal) && isObject(sourceVal)) {
+    if (isRecord(targetVal) && isRecord(sourceVal)) {
       output[key] = deepMerge(targetVal, sourceVal);
     } else {
       output[key] = sourceVal;
@@ -131,6 +130,22 @@ export abstract class BaseFileManagerService extends Service {
     const data = await this.loadArbitraryFile(filePath);
     if (data === null) return null;
     return this._validate(schema, data, filePath, "loading");
+  }
+
+  // The file's data, `empty` when it's missing, null when it's there but
+  // doesn't load
+  public async loadOr<T>(
+    filePath: string,
+    schema: z.ZodType<T>,
+    empty: T,
+  ): Promise<T | null> {
+    const data = await this.loadFile(filePath, schema);
+    if (data) return data;
+    // loadFile logged why a file it found doesn't load
+    return fs.access(filePath).then(
+      () => null,
+      (error: unknown) => (isMissing(error) ? empty : null),
+    );
   }
 
   // Content read elsewhere, checked as loadFile checks what it reads

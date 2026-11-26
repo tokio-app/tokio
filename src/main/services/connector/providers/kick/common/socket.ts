@@ -68,11 +68,6 @@ export class KickSocket {
     private _handlers: KickSocketHandlers,
   ) {}
 
-  // Connected and subscribed, and not dropped since
-  public get connected(): boolean {
-    return this._socket !== null && this._opening === null;
-  }
-
   // A fresh socket: resolves once the server took the token and answered
   // every subscribe. Rejects with a failure that says whether it's terminal.
   public open(url: string, token: string, feeds: string[]): Promise<void> {
@@ -100,6 +95,13 @@ export class KickSocket {
   }
 
   public close() {
+    this._teardown()?.reject(
+      connectFailure("network", "The chat socket was closed."),
+    );
+  }
+
+  // Drops the socket and its timers, and hands back the open still waiting
+  private _teardown() {
     clearTimeout(this._watchdog);
     clearTimeout(this._refresh);
     discard(this._socket);
@@ -107,7 +109,7 @@ export class KickSocket {
     this._commands.clear();
     const opening = this._opening;
     this._opening = null;
-    opening?.reject(connectFailure("network", "The chat socket was closed."));
+    return opening;
   }
 
   private _send(socket: WebSocket, what: string, command: object): number {
@@ -289,13 +291,7 @@ export class KickSocket {
     cause?: Error,
     kind: ConnectorFailure["kind"] = "network",
   ) {
-    clearTimeout(this._watchdog);
-    clearTimeout(this._refresh);
-    discard(this._socket);
-    this._socket = null;
-    this._commands.clear();
-    const opening = this._opening;
-    this._opening = null;
+    const opening = this._teardown();
     if (opening) {
       const failure: SocketFailure = Object.assign(
         connectFailure(kind, `The chat socket ${why}`, { cause }),

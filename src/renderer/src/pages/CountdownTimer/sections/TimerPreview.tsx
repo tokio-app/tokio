@@ -2,6 +2,7 @@ import { TimerSettings } from "@/common/schemas";
 import { formatAdded, timerTriggers } from "@/common/util";
 import { cx, fontFamily, formatDuration } from "@/helper";
 import { usePlatforms } from "@/context/platforms";
+import { useNow } from "@/hooks";
 import { useLanguage } from "@/ui/i18n";
 import { useEffect, useState } from "react";
 import styles from "../countdowntimer.module.css";
@@ -29,7 +30,7 @@ export function TimerPreview({ timer, settings, bare }: Props) {
   const { state, added } = timer.data;
   const { look } = settings;
   const running = state.status === "running";
-  const [now, setNow] = useState(timer.at);
+  const now = useNow(running, timer.at);
   // The time added or removed while it shows, summed like the overlay's
   const [slot, setSlot] = useState<{ ms: number; key: number } | null>(null);
   const [prevTimer, setPrevTimer] = useState(timer);
@@ -40,12 +41,6 @@ export function TimerPreview({ timer, settings, bare }: Props) {
       setSlot((s) => ({ ms: (s?.ms ?? 0) + added, key: (s?.key ?? 0) + 1 }));
     }
   }
-
-  useEffect(() => {
-    if (!running) return undefined;
-    const tick = setInterval(() => setNow(performance.now()), 250);
-    return () => clearInterval(tick);
-  }, [running]);
 
   // Each change shows it again for the whole animation
   useEffect(() => {

@@ -2,6 +2,7 @@ import {
   type Alert,
   ALERT_TRIGGERS,
   AlertItemSchema,
+  isRecord,
   MEDIA_DURATION,
   type MediaFile,
   type Profile,
@@ -37,7 +38,7 @@ import {
   invokeOk,
   ok,
   pushProfile,
-  unknownKeys,
+  unknownTriggerKeys,
   PLATFORM_NOTE,
 } from "../common";
 import {
@@ -118,9 +119,6 @@ const alertRow = (alert: Alert) => ({
   media: fileOf(alert.media),
 });
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
 /**
  * The alert `changes` make of `stored`. A sound or media file other than the
  * stored one starts over, as a pick in the editor does: the old cut,
@@ -189,14 +187,6 @@ function mergeAlert(
     ? { alert: parsed.data }
     : { error: invalid(parsed.error) };
 }
-
-// unknownKeys stops at arrays, so each of also_triggers is checked here
-const unknownTriggerKeys = (changes: Record<string, unknown>) =>
-  Array.isArray(changes.also_triggers)
-    ? changes.also_triggers.flatMap((trigger: unknown, i) =>
-        unknownKeys(TriggerSchema, trigger, `also_triggers.${i}.`),
-      )
-    : [];
 
 const VARIABLES = ALERT_TRIGGERS.map(
   (trigger) =>
@@ -281,7 +271,7 @@ export const kinds: Kinds = {
       });
     },
     save: async (handler, id, changes) => {
-      const unknown = unknownTriggerKeys(changes);
+      const unknown = unknownTriggerKeys(TriggerSchema, changes);
       if (unknown.length > 0) {
         return fail(
           `Unknown settings: ${unknown.join(", ")}. Nothing was saved: see describe for the fields.`,

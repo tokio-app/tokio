@@ -110,12 +110,17 @@ export interface RemoteDeps {
   labels: () => RemoteLabels;
 }
 
-const authorized = (header: string | undefined, key: string) => {
-  if (!key || !header?.startsWith("Bearer ")) return false;
-  const given = Buffer.from(header.slice("Bearer ".length));
-  const wanted = Buffer.from(key);
-  return given.length === wanted.length && timingSafeEqual(given, wanted);
+/** Whether `given` is `key`, in constant time. An empty key matches nothing. */
+export const sameKey = (given: string, key: string) => {
+  if (!key) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(key);
+  return a.length === b.length && timingSafeEqual(a, b);
 };
+
+const authorized = (header: string | undefined, key: string) =>
+  header?.startsWith("Bearer ") === true &&
+  sameKey(header.slice("Bearer ".length), key);
 
 /**
  * Remote control on (403 otherwise) and its key (401), before anything reads

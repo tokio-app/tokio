@@ -1,7 +1,6 @@
 import { MessageKey } from "@/common/i18n";
 import {
   STUDIO_MAX_BORDER,
-  STUDIO_MAX_FONT_SIZE,
   STUDIO_MAX_OUTLINE,
   STUDIO_NAME_MAX_LENGTH,
   STUDIO_TEXT_MAX_LENGTH,
@@ -27,7 +26,6 @@ import {
   Color,
   EmoteOption,
   Field,
-  FontSelect,
   GiftSelect,
   Input,
   NumberInput,
@@ -44,6 +42,7 @@ import { BarFields } from "./BarFields";
 import { BoxFields } from "./BoxFields";
 import { CameraFields } from "./CameraFields";
 import { EffectsFields } from "./EffectsFields";
+import { FontFields } from "./FontFields";
 import { GradientFields } from "./GradientFields";
 import {
   alignTo,
@@ -225,30 +224,7 @@ export function ElementSettings({
               />
             )}
           </Field>
-          <Field label={t("studio.fields.font")}>
-            <FontSelect
-              value={element.font}
-              defaultLabel={t("common.defaultFont")}
-              onChange={(font) => onChange({ ...element, font })}
-            />
-          </Field>
-          <div className={styles.pair}>
-            <Field label={t("studio.fields.size")}>
-              <NumberInput
-                scrub
-                min={1}
-                max={STUDIO_MAX_FONT_SIZE}
-                value={element.size}
-                onChange={(size) => onChange({ ...element, size })}
-              />
-            </Field>
-            <Field label={t("studio.fields.color")}>
-              <Color
-                value={element.color}
-                onChange={(color) => onChange({ ...element, color })}
-              />
-            </Field>
-          </div>
+          <FontFields element={element} onChange={onChange} />
           {/* Each on or off, its color beside it, as a shape's paint */}
           <div className={styles.paint}>
             <GradientFields value={element} onChange={onChange} />

@@ -22,7 +22,9 @@ import {
   GIFT_CURRENCY,
   inRange,
   idPlatform,
+  placer,
   platformOf,
+  topOfEach,
   platformParts,
   viewerMatcher,
 } from "@/common/util";
@@ -30,7 +32,7 @@ import { parseAmount } from "@/helper/amount";
 import { isMissing, renameWithRetry } from "@/helper/fs";
 import { GiftStreaks } from "@/helper/streaks";
 import Logger from "@/logger";
-import { access, mkdir, readdir, rm } from "node:fs/promises";
+import { mkdir, readdir, rm } from "node:fs/promises";
 import { join, parse } from "node:path";
 import { z } from "zod";
 import type { JSONManagerService } from "../json";
@@ -126,7 +128,7 @@ type Index = z.infer<typeof IndexSchema>;
 
 type Json = Pick<
   JSONManagerService,
-  "loadFile" | "saveFile" | "saveArbitraryFile"
+  "loadFile" | "loadOr" | "saveFile" | "saveArbitraryFile"
 >;
 
 // What each event does to the LIVE in progress
@@ -152,6 +154,18 @@ const byCoins = (a: Gifter, b: Gifter) =>
 const overlaid = (gifter: Gifter) =>
   gifter.coins > 0 && GIFT_CURRENCY[platformOf(gifter)] !== null;
 
+// Adds a gifter's totals to the map's entry for them, keeping a picture
+const addGifter = (map: Map<string, Gifter>, gifter: Gifter) => {
+  const past = map.get(gifter.userId);
+  map.set(gifter.userId, {
+    ...gifter,
+    picture: gifter.picture || (past?.picture ?? ""),
+    coins: (past?.coins ?? 0) + gifter.coins,
+    gifts: (past?.gifts ?? 0) + gifter.gifts,
+    giftSubs: (past?.giftSubs ?? 0) + gifter.giftSubs,
+  });
+};
+
 const noPart = (): HistoryTotals => ({ amount: 0, gifts: 0, giftSubs: 0 });
 
 const addPart = (
@@ -163,23 +177,6 @@ const addPart = (
   part.amount += amount;
   part.gifts += gifts;
   part.giftSubs += giftSubs;
-};
-
-// Counts each platform's gifters as it's called, giving the one's place
-const placer = () => {
-  const places = new Map<Platform, number>();
-  return (gifter: Gifter) => {
-    const platform = platformOf(gifter);
-    const place = (places.get(platform) ?? 0) + 1;
-    places.set(platform, place);
-    return place;
-  };
-};
-
-// The sorted gifters within their platform's first `count`, in their order
-const topOfEach = (sorted: Gifter[], count: number) => {
-  const place = placer();
-  return sorted.filter((gifter) => place(gifter) <= count);
 };
 
 // The two rankings LIVE history shows: who sent an amount, in byAmount
@@ -629,16 +626,7 @@ export class HistoryService extends Service {
         const sent = allInRange(record, range)
           ? record.gifters
           : giftersIn(record, range);
-        for (const gifter of sent) {
-          const past = gifters.get(gifter.userId);
-          gifters.set(gifter.userId, {
-            ...gifter,
-            picture: gifter.picture || (past?.picture ?? ""),
-            coins: (past?.coins ?? 0) + gifter.coins,
-            gifts: (past?.gifts ?? 0) + gifter.gifts,
-            giftSubs: (past?.giftSubs ?? 0) + gifter.giftSubs,
-          });
-        }
+        for (const gifter of sent) addGifter(gifters, gifter);
       }
       sorted = [...gifters.values()].sort(byAmount);
     }
@@ -880,16 +868,7 @@ export class HistoryService extends Service {
   private _finish({ gifters, minutes: _minutes, ...summary }: LiveRecord) {
     this._lives.push(summary);
     this._newest = Math.max(this._newest, summary.startedAt);
-    for (const gifter of gifters) {
-      const past = this._gifters.get(gifter.userId);
-      this._gifters.set(gifter.userId, {
-        ...gifter,
-        picture: gifter.picture || (past?.picture ?? ""),
-        coins: (past?.coins ?? 0) + gifter.coins,
-        gifts: (past?.gifts ?? 0) + gifter.gifts,
-        giftSubs: (past?.giftSubs ?? 0) + gifter.giftSubs,
-      });
-    }
+    for (const gifter of gifters) addGifter(this._gifters, gifter);
   }
 
   /**
@@ -1009,14 +988,7 @@ export class HistoryService extends Service {
   private async _readIndex(dir: string): Promise<Index | null> {
     if (!this._json) return null;
     const path = join(dir, "index.json");
-    const data = await this._json.loadFile(path, IndexSchema);
-    if (data) return data;
-    // loadFile logged why a file it found doesn't load
-    return access(path).then(
-      () => null,
-      (error: unknown) =>
-        isMissing(error) ? { lives: [], gifters: [] } : null,
-    );
+    return this._json.loadOr(path, IndexSchema, { lives: [], gifters: [] });
   }
 
   private async _readLive(

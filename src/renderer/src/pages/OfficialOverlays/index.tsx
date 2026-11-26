@@ -1,7 +1,6 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, OverlayApp } from "@/common/types";
-import { defaultProfile } from "@/common/util";
 import { Page } from "@/components";
-import { useIpcListener, useIpcRequest } from "@/hooks";
+import { useIpcListener, useIpcRequest, useProfilePlatforms } from "@/hooks";
 import { useState } from "react";
 import { CatalogSection } from "./sections/CatalogSection";
 
@@ -12,13 +11,9 @@ import { CatalogSection } from "./sections/CatalogSection";
 export function OfficialOverlays() {
   const [overlays, setOverlays] = useState<OverlayApp[]>([]);
   // The catalog shows the overlays that work on them
-  const [platforms, setPlatforms] = useState(defaultProfile.platforms);
+  const platforms = useProfilePlatforms();
 
   useIpcRequest(APP_EVENTS.GET_OVERLAYS);
-  useIpcRequest(APP_EVENTS.GET_PROFILE);
-  useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
-    if (res?.success && res.profile) setPlatforms(res.profile.platforms);
-  });
 
   // Also sent after installing or removing one
   useIpcListener(APP_EVENTS_RESPONSE.GET_OVERLAYS, (res) => {

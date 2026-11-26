@@ -5,8 +5,6 @@ import type { FetchInit, KickConfig } from "../config";
 
 export type Channel = {
   slug: string;
-  // The streamer's name as they write it
-  name: string;
   // The channel.<id> and channel_<id> feeds'
   channelId: number;
   // The chat's feeds', another id than the channel's
@@ -102,7 +100,6 @@ export async function lookup(
   const viewers = json.livestream?.viewer_count;
   return {
     slug: json.slug ?? slug,
-    name: json.user?.username ?? slug,
     channelId,
     chatroomId,
     viewers: json.livestream ? Number(viewers) || 0 : null,

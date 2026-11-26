@@ -5,10 +5,8 @@ import {
   TOKIO_EVENTS,
   UserData,
 } from "@/common/types";
-import { platformOf } from "@/common/util";
-import { isMissing } from "@/helper/fs";
+import { platformOf, topOfEach } from "@/common/util";
 import Logger from "@/logger";
-import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import type { JSONManagerService } from "../json";
@@ -70,22 +68,13 @@ const order = (a: Fan, b: Fan) =>
   b.seenAt - a.seenAt;
 
 // The last MAX_FANS of each platform, in the order they came
-function capped(fans: Fan[]): Fan[] {
-  const counts = new Map<Platform, number>();
-  return fans
-    .toReversed()
-    .filter((fan) => {
-      const count = (counts.get(platformOf(fan)) ?? 0) + 1;
-      counts.set(platformOf(fan), count);
-      return count <= MAX_FANS;
-    })
-    .toReversed();
-}
+const capped = (fans: Fan[]) =>
+  topOfEach(fans.toReversed(), MAX_FANS).toReversed();
 
 // Least recently seen first
 const FansFileSchema = z.object({ fans: z.array(FanSchema) });
 
-type Json = Pick<JSONManagerService, "loadFile" | "saveFile">;
+type Json = Pick<JSONManagerService, "loadOr" | "saveFile">;
 
 /**
  * The fans the active profile has seen in its LIVEs, by user id: TikTok's fan
@@ -251,13 +240,8 @@ export class FansService extends Service {
   // The file's fans, [] without one, null when it's there but doesn't load
   private async _read(path: string): Promise<Fan[] | null> {
     if (!this._json) return null;
-    const data = await this._json.loadFile(path, FansFileSchema);
-    if (data) return data.fans;
-    // loadFile logged why a file it found doesn't load
-    return access(path).then(
-      () => null,
-      (error: unknown) => (isMissing(error) ? [] : null),
-    );
+    const data = await this._json.loadOr(path, FansFileSchema, { fans: [] });
+    return data && data.fans;
   }
 
   private _emit() {

@@ -1,4 +1,4 @@
-import { EntityMetadata } from "@/common/schemas";
+import { EntityMetadata, ProfileSchema } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -21,7 +21,7 @@ import styles from "./welcome.module.css";
 type Loaded = { profile: EntityMetadata; provider: string };
 
 // Shortest name main takes for a profile
-const MIN_NAME = 3;
+const MIN_NAME = ProfileSchema.shape.name.minLength ?? 1;
 
 // The field each platform asks for. Twitch's is the account.
 const FIELDS = {
