@@ -927,9 +927,9 @@ describe("alerts events", () => {
       list: APP_EVENTS_RESPONSE.GET_MEDIA,
       removed: FEEDBACK_CODES.MEDIA_REMOVED,
       failed: FEEDBACK_CODES.MEDIA_REMOVE_FAILED,
-      notice: "Media deleted.",
+      notice: "File deleted.",
       warning:
-        "Media removed from the library, but its file couldn't be deleted.",
+        "File removed from the library, but it couldn't be deleted from disk.",
     },
   ] as const)("$event", (c) => {
     const setup = (
@@ -1178,7 +1178,7 @@ describe("alerts events", () => {
         expect.objectContaining({
           level: "success",
           code: FEEDBACK_CODES.MEDIA_ADDED,
-          message: 'Media "party" added.',
+          message: 'File "party" added.',
         }),
       ]);
     });

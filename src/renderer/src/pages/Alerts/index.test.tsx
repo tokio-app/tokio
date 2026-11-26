@@ -101,7 +101,7 @@ const top = () => within(screen.getAllByRole("dialog").at(-1)!);
 const dialogs = () => screen.queryAllByRole("dialog");
 
 // Opens the editor of the alert in the row, on one of its tabs
-async function edit(user: UserEvent, row: number, tab?: "Sound" | "Media") {
+async function edit(user: UserEvent, row: number, tab?: "Sound" | "Image or video") {
   await user.click(summary(row));
   if (tab) await user.click(editor().getByRole("tab", { name: tab }));
   return editor();
@@ -992,9 +992,9 @@ describe("Alerts", () => {
     // Opens the media picker of the alert in the row over its editor, with
     // the library listed
     async function openMedia(user: UserEvent, row: number) {
-      const opened = await edit(user, row, "Media");
+      const opened = await edit(user, row, "Image or video");
       await user.click(
-        opened.getByRole("button", { name: /^(Change|Choose media)\.\.\.$/ }),
+        opened.getByRole("button", { name: /^(Change|Choose a file)\.\.\.$/ }),
       );
       await send(APP_EVENTS_RESPONSE.GET_MEDIA, {
         success: true,
@@ -1059,7 +1059,7 @@ describe("Alerts", () => {
 
       expect(dialogs()).toHaveLength(1);
       expect(summary(0)).toHaveTextContent("Party");
-      expect(summary(1)).toHaveTextContent("No media");
+      expect(summary(1)).toHaveTextContent("No image or video");
     });
 
     it("takes a deleted file off the alerts it shows", async () => {
@@ -1078,7 +1078,7 @@ describe("Alerts", () => {
       });
 
       expect(summary(0)).toHaveTextContent("No sound");
-      expect(summary(0)).toHaveTextContent("No media");
+      expect(summary(0)).toHaveTextContent("No image or video");
       await wait(300);
       expect(saves().at(-1)?.items).toEqual([
         alert("alert-1", { sound: null }),
@@ -1120,7 +1120,7 @@ describe("Alerts", () => {
       const { user } = await load([
         alert("alert-1", { media: alertMedia(clip) }),
       ]);
-      await edit(user, 0, "Media");
+      await edit(user, 0, "Image or video");
       const video = screen.getByRole("dialog").querySelector("video")!;
       Object.defineProperty(video, "duration", { value: 7.4 });
       fireEvent.loadedMetadata(video);
@@ -1196,7 +1196,7 @@ describe("Alerts", () => {
         media: party,
       });
 
-      expect(summary(0)).toHaveTextContent("No media");
+      expect(summary(0)).toHaveTextContent("No image or video");
       await wait(300);
       expect(saves()).toEqual([]);
     });

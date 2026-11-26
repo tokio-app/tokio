@@ -280,7 +280,7 @@ describe("AlertItem", () => {
   it("names its sound and how long it plays, or says it has none", () => {
     const { unmount } = setup(alert());
     expect(summary()).toHaveTextContent("No sound");
-    expect(summary()).toHaveTextContent("No media");
+    expect(summary()).toHaveTextContent("No image or video");
     unmount();
 
     const cut = setup(

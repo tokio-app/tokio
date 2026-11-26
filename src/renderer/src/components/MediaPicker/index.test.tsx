@@ -42,13 +42,13 @@ describe("MediaPicker", () => {
   it("shows the media library, searched from the title's row", async () => {
     const { user } = setup();
     expect(sent(APP_EVENTS.GET_MEDIA)).toHaveLength(1);
-    expect(screen.getByText(/No media yet/)).toBeInTheDocument();
+    expect(screen.getByText(/No images or videos yet/)).toBeInTheDocument();
 
     await library();
     expect(screen.getByRole("button", { name: "Party" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Search" }));
-    const search = screen.getByPlaceholderText("Search your media...");
+    const search = screen.getByPlaceholderText("Search images and videos...");
     expect(search).toHaveFocus();
     await user.type(search, "conf");
     expect(screen.queryByRole("button", { name: "Party" })).toBeNull();
@@ -57,7 +57,7 @@ describe("MediaPicker", () => {
     ).toBeInTheDocument();
 
     await user.type(search, "x");
-    expect(screen.getByText("No media matches.")).toBeInTheDocument();
+    expect(screen.getByText("No images or videos match.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Close search" }));
     expect(screen.getByRole("button", { name: "Party" })).toBeInTheDocument();
@@ -138,7 +138,7 @@ describe("MediaPicker", () => {
     await library();
 
     await user.click(tile("Confetti").getByRole("button", { name: "Delete" }));
-    const confirm = screen.getByRole("dialog", { name: "Delete media?" });
+    const confirm = screen.getByRole("dialog", { name: "Delete file?" });
     expect(confirm).toHaveTextContent(
       '"Confetti" will be deleted from your computer and from every alert and Overlay Studio element that shows it, in all your profiles.',
     );
@@ -157,7 +157,7 @@ describe("MediaPicker", () => {
 
     await user.click(tile("Party").getByRole("button", { name: "Delete" }));
     await user.click(
-      within(screen.getByRole("dialog", { name: "Delete media?" })).getByRole(
+      within(screen.getByRole("dialog", { name: "Delete file?" })).getByRole(
         "button",
         { name: "Cancel" },
       ),
@@ -194,7 +194,7 @@ describe("MediaPicker", () => {
       request: 1,
     });
     expect(
-      screen.getByText("Couldn't save or load the media."),
+      screen.getByText("Couldn't save or load the file."),
     ).toBeInTheDocument();
   });
 
@@ -217,7 +217,7 @@ describe("MediaPicker", () => {
       request: 2,
     });
     expect(
-      screen.getByText("Couldn't save or load the media."),
+      screen.getByText("Couldn't save or load the file."),
     ).toBeInTheDocument();
   });
 

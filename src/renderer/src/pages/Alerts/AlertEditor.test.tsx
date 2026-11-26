@@ -32,7 +32,7 @@ async function setup(item: Alert) {
     onClose: vi.fn(),
   };
   const view = renderWithProviders(<AlertEditor alert={item} {...props} />);
-  await view.user.click(screen.getByRole("tab", { name: "Media" }));
+  await view.user.click(screen.getByRole("tab", { name: "Image or video" }));
   const rerender = (changed: Alert) =>
     view.rerender(<AlertEditor alert={changed} {...props} />);
   return { ...view, ...props, rerender };
@@ -59,7 +59,7 @@ describe("AlertEditor's media", () => {
     const { user, onPickMedia } = await setup(alert());
 
     expect(screen.queryByRole("spinbutton")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Choose media..." }));
+    await user.click(screen.getByRole("button", { name: "Choose a file..." }));
     expect(onPickMedia).toHaveBeenCalledOnce();
 
     await user.click(screen.getByRole("button", { name: OVERLAY_URL }));
