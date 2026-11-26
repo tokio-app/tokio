@@ -78,18 +78,14 @@ describe("VoiceKeysSection", () => {
     await keys(tiktok(), eleven("saved-key"), fish());
 
     await user.click(addButton()!);
-    const menu = screen.getByRole("menu", { name: "Add a voice engine" });
+    expect(addButton()).toHaveAttribute("aria-expanded", "true");
     expect(
-      within(menu)
-        .getAllByRole("menuitem")
-        .map((item) => item.textContent),
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
     ).toEqual(["Fish Audio"]);
-    await user.click(
-      within(menu).getByRole("menuitem", { name: "Fish Audio" }),
-    );
+    await user.click(screen.getByRole("menuitem", { name: "Fish Audio" }));
 
     expect(field("Fish Audio API key...")).toHaveFocus();
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
     // Nothing left to add
     expect(addButton()).not.toBeInTheDocument();
     expect(saves()).toEqual([]);

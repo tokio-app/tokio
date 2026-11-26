@@ -15,7 +15,11 @@ interface Props {
   children: ReactNode;
 }
 
-/** A `+` icon button that opens a menu under it, on a section's title row. */
+/**
+ * A `+` icon button that opens a menu under it, on a section's title row. A
+ * disclosure, like the bell's: its items are buttons Tab reaches, with no
+ * arrow keys, so it says neither `menu` nor `menuitem`.
+ */
 export function AddMenuButton({
   label,
   menu,
@@ -31,19 +35,13 @@ export function AddMenuButton({
         variant="icon"
         title={label}
         aria-label={label}
-        aria-haspopup="menu"
         aria-expanded={menu.open}
         onClick={menu.toggle}
       >
         <FiPlus size={20} />
       </Btn>
       {menu.open && (
-        <div
-          ref={menuRef}
-          className={menuClassName}
-          role="menu"
-          aria-label={label}
-        >
+        <div ref={menuRef} className={menuClassName}>
           {children}
         </div>
       )}

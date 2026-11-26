@@ -6,6 +6,7 @@ import styles from "./elements.module.css";
 declare module "react" {
   interface CSSProperties {
     "--tab-accent"?: string;
+    "--tab-anchor"?: string;
   }
 }
 
@@ -29,9 +30,23 @@ type Props<T extends string> = {
   disabled?: boolean;
   // Names the list for screen readers
   label?: string;
+  // The id of the role="tabpanel" the tabs show
+  panelId?: string;
   className?: string;
 };
 
+// Where the arrow keys go from the tab at `at` of `count`, wrapping around
+const MOVES: Record<string, (at: number, count: number) => number> = {
+  ArrowRight: (at, count) => (at + 1) % count,
+  ArrowLeft: (at, count) => (at - 1 + count) % count,
+  Home: () => 0,
+  End: (_, count) => count - 1,
+};
+
+/**
+ * Tabs with one stop in the Tab order, the selected tab's, and the arrow
+ * keys, Home and End moving the selection.
+ */
 export function Tabs<T extends string>({
   tabs,
   value,
@@ -39,57 +54,95 @@ export function Tabs<T extends string>({
   variant = "underline",
   disabled,
   label,
+  panelId,
   className,
 }: Props<T>) {
-  return (
+  // With none selected, the first is the one Tab reaches
+  const stop = tabs.some((tab) => tab.value === value) ? value : tabs[0]?.value;
+
+  const row = cx(
+    styles.tabs,
+    variant === "underline" ? styles.tabs_underline : styles.tabs_pill,
+    disabled && styles.tabs_disabled,
+    className,
+  );
+  const closable = tabs.some((tab) => tab.onClose);
+
+  const list = (
     <div
       role="tablist"
       aria-label={label}
-      className={cx(
-        styles.tabs,
-        variant === "underline" ? styles.tabs_underline : styles.tabs_pill,
-        disabled && styles.tabs_disabled,
-        className,
-      )}
+      // With a ×, the row holds the list and the ×s
+      className={closable ? styles.tablist : row}
+      onKeyDown={(e) => {
+        const move = MOVES[e.key];
+        const buttons = [
+          ...e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]'),
+        ];
+        const at = buttons.findIndex((button) => button === e.target);
+        if (!move || at === -1) return;
+        e.preventDefault();
+        const to = move(at, buttons.length);
+        buttons[to].focus();
+        onChange(tabs[to].value);
+      }}
     >
-      {tabs.map((tab) => {
+      {tabs.map((tab, i) => {
         const active = tab.value === value;
-        const button = (
+        return (
           <button
             key={tab.value}
             type="button"
             role="tab"
             aria-selected={active}
+            aria-controls={panelId}
+            tabIndex={tab.value === stop ? 0 : -1}
             disabled={disabled}
-            className={cx(styles.tab, active && styles.tab_active)}
-            style={{ "--tab-accent": tab.accent }}
+            className={cx(
+              styles.tab,
+              active && styles.tab_active,
+              tab.onClose && styles.tab_closable,
+            )}
+            style={{
+              "--tab-accent": tab.accent,
+              "--tab-anchor": tab.onClose ? `--tab-${i}` : undefined,
+            }}
             onClick={() => onChange(tab.value)}
           >
             {tab.icon}
             {tab.label}
           </button>
         );
-        if (!tab.onClose) return button;
-        return (
-          <div key={tab.value} className={styles.tab_closable}>
-            {button}
-            {/* Like a browser tab's. The open tab's is the one in the Tab
-                order, so Tab doesn't stop twice on every tab. */}
+      })}
+    </div>
+  );
+  if (!closable) return list;
+
+  return (
+    <div className={row}>
+      {list}
+      {/* Only tabs belong in the list, so each × is out of it, placed over
+          its tab's right padding like a browser tab's. The open tab's is
+          the one in the Tab order, so Tab doesn't stop on every tab's. */}
+      {tabs.map(
+        (tab, i) =>
+          tab.onClose && (
             <button
+              key={tab.value}
               type="button"
               className={styles.tab_close}
+              style={{ "--tab-anchor": `--tab-${i}` }}
               title={tab.closeLabel}
               aria-label={tab.closeLabel}
-              aria-hidden={active ? undefined : true}
-              tabIndex={active ? undefined : -1}
+              aria-hidden={tab.value === value ? undefined : true}
+              tabIndex={tab.value === value ? undefined : -1}
               disabled={disabled}
               onClick={tab.onClose}
             >
               <FiX size={14} aria-hidden />
             </button>
-          </div>
-        );
-      })}
+          ),
+      )}
     </div>
   );
 }
