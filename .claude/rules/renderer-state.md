@@ -20,7 +20,7 @@ paths:
 - `useEditableSettings(section, onLoad?)` loads a profile section and saves it `SAVE_DELAY` after the last change, so quick changes go in one save.
 - A change still waiting is sent on `pagehide` (not `beforeunload`, which can keep the window open), and dropped when another profile loads. A failed save reloads the profile.
 - Nothing is saved before a profile has loaded, so the defaults it starts from never reach one.
-- `onLoad(profile, switched)` runs on every load. `switched` is true for another profile than the last one (by name), not a resync, so a page can drop what it waits for from the last profile.
+- `onLoad(profile, switched)` runs on every load. `switched` is true for another profile than the last one (by `GET_PROFILE`'s `file`, so a rename isn't one), not a resync, so a page can drop what it waits for from the last profile.
 - Main saves to whichever profile is active, so call `flushSettings()` before switching profiles: it sends the changes still waiting to the profile they were made on, and the `useAutosave` fields still waiting.
 
 ## Saving one field
