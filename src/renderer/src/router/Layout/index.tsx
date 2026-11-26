@@ -145,7 +145,8 @@ export function Layout() {
           ))}
         </nav>
 
-        <main className={styles.content}>
+        {/* Focusable for a dialog that closes after its opener left */}
+        <main className={styles.content} tabIndex={-1}>
           <Outlet />
         </main>
       </div>

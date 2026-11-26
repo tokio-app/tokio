@@ -70,7 +70,8 @@ export function TitleBar({ target, logo, compact, live, children }: Props) {
       </div>
       <div className={styles.items}>
         {children}
-        <div className={styles.controls}>
+        {/* Over dialogs, which don't make them inert (components/Modal) */}
+        <div className={styles.controls} data-over-dialogs>
           <button
             className={styles.control}
             title={t("titlebar.minimize")}

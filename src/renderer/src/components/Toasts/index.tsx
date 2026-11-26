@@ -114,6 +114,8 @@ export function Toasts({ toasts, onExpire, onClose }: Props) {
       role="region"
       aria-label={t("components.notifications.title")}
       className={styles.viewport}
+      // Live over dialogs, which don't make it inert (components/Modal)
+      data-over-dialogs
     >
       {toasts.map((n) => (
         <Toast

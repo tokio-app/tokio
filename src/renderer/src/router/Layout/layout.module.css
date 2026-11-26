@@ -23,6 +23,11 @@
   background-color: var(--background-primary);
 }
 
+/* Where the focus lands, not a control: no ring around the page */
+.content:focus-visible {
+  outline: none;
+}
+
 .sidebar {
   position: relative;
   z-index: var(--z-sidebar);
