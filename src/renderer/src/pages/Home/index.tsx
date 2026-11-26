@@ -13,6 +13,7 @@ import {
   useIpcRequest,
   useServerSwitch,
 } from "@/hooks";
+import { Profile } from "@/common/schemas";
 import { useT } from "@/ui/i18n";
 import { useRef, useState } from "react";
 import styles from "./home.module.css";
@@ -89,23 +90,28 @@ export function Home() {
     if (res) setPaused(res.paused);
   });
 
-  useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
-    if (!res?.success) return;
-    setProfile(res.profile!);
-    setPlatforms(res.profile!.platforms);
-    // A profile pushed while the streamer types a username keeps what they typed
-    if (document.activeElement !== usernameField.current) {
-      setUsername(res.profile!.connector.username);
-    }
-    // The same for a channel being typed
+  // Names pushed while the streamer types one keep what they typed
+  const takeNames = (name: string, saved: Profile["channels"]) => {
+    if (document.activeElement !== usernameField.current) setUsername(name);
     const focused = document.activeElement;
     const typing =
       focused instanceof HTMLElement ? focused.dataset.channel : undefined;
     setChannels((now) =>
-      isPlatform(typing)
-        ? { ...res.profile!.channels, [typing]: now[typing] ?? "" }
-        : res.profile!.channels,
+      isPlatform(typing) ? { ...saved, [typing]: now[typing] ?? "" } : saved,
     );
+  };
+
+  useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
+    if (!res?.success) return;
+    setProfile(res.profile!);
+    setPlatforms(res.profile!.platforms);
+    takeNames(res.profile!.connector.username, res.profile!.channels);
+  });
+
+  // Names saved without connecting, as the first-start dialog saves them:
+  // what main holds, also when it refused them
+  useIpcListener(APP_EVENTS_RESPONSE.SET_CHANNELS, (res) => {
+    if (res) takeNames(res.username, res.channels);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {
