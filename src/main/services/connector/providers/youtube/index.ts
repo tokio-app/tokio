@@ -66,9 +66,15 @@ export class YouTubeConnector extends ConnectorProvider {
   public setKey() {}
 
   public connect(channel: string): Promise<ConnectorResponse> {
-    return (this._connecting ??= this._connect(channel).finally(() => {
-      this._connecting = null;
-    }));
+    // A connect a Disconnect stopped can still be finishing its requests: a
+    // new Connect starts over instead of getting its "canceled"
+    if (this._conn === null) this._connecting = null;
+    const connecting = (this._connecting ??= this._connect(channel).finally(
+      () => {
+        if (this._connecting === connecting) this._connecting = null;
+      },
+    ));
+    return connecting;
   }
 
   public async disconnect(): Promise<void> {

@@ -240,6 +240,41 @@ describe("KickConnector", () => {
         kick.urls.filter((u) => u.endsWith("/channels/streamer")),
       ).toHaveLength(1);
     });
+
+    it("starts over on a Connect right after a Disconnect, while the stopped one finishes", async () => {
+      const onConnected = capture(TOKIO_EVENTS.CONNECTED);
+      // The first lookup waits until after the tab's Disconnect and Connect
+      const held: { release?: () => void } = {};
+      kick.override = (url) => {
+        if (!url.endsWith("/channels/streamer") || held.release) {
+          return undefined;
+        }
+        return new Promise((resolve) => {
+          held.release = () =>
+            resolve(
+              json(200, {
+                id: 10,
+                slug: "streamer",
+                chatroom: { id: 20 },
+                livestream: null,
+                user: { username: "Streamer" },
+              }),
+            );
+        });
+      };
+
+      const first = connector.connect("streamer");
+      await vi.waitFor(() => expect(held.release).toBeDefined());
+      await connector.disconnect();
+      const again = connector.connect("streamer");
+      held.release!();
+
+      expect((await first).error?.kind).toBe("canceled");
+      expect(await again).toEqual({ success: true });
+      expect(onConnected).toHaveBeenCalledTimes(1);
+      expect(kick.sockets).toHaveLength(1);
+      expect(connector.isConnected()).toBe(true);
+    });
   });
 
   describe("events", () => {

@@ -180,6 +180,16 @@ describe("YouTubeConnector", () => {
       expect((await connector.connect("madeup")).error?.kind).toBe("canceled");
       expect(youtube.state.urls).toHaveLength(1);
     });
+
+    it("starts over on a Connect right after a Disconnect, while the stopped one finishes", async () => {
+      const first = connector.connect("madeup");
+      await connector.disconnect();
+      const again = connector.connect("madeup");
+
+      expect((await first).error?.kind).toBe("canceled");
+      expect(await again).toEqual({ success: true });
+      expect(connector.isConnected()).toBe(true);
+    });
   });
 
   describe("the chat", () => {

@@ -128,9 +128,13 @@ export class TwitchConnector
 
   // The channel is the account's own, whatever the profile names
   public connect(_channel?: string): Promise<ConnectorResponse> {
-    return (this._connecting ??= this._connect().finally(() => {
-      this._connecting = null;
+    // A connect a Disconnect stopped can still be finishing its requests: a
+    // new Connect starts over instead of getting its "canceled"
+    if (this._conn === null) this._connecting = null;
+    const connecting = (this._connecting ??= this._connect().finally(() => {
+      if (this._connecting === connecting) this._connecting = null;
     }));
+    return connecting;
   }
 
   public async disconnect(): Promise<void> {

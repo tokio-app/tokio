@@ -341,6 +341,20 @@ describe("TwitchConnector", () => {
         expect(connector.isConnected()).toBe(false);
       });
 
+      it("then a Connect starts over instead of getting its result", async () => {
+        const released = hold();
+        const first = connector.connect("");
+        await vi.waitFor(() => expect(released()).toBeDefined());
+        await connector.disconnect();
+        const again = connector.connect("");
+        released()!();
+
+        expect((await first).error?.kind).toBe("canceled");
+        expect(await again).toEqual({ success: true });
+        expect(twitch.sockets).toHaveLength(1);
+        expect(connector.isConnected()).toBe(true);
+      });
+
       it("during the welcome wait", async () => {
         twitch.welcome = false;
         const connecting = connector.connect("");
