@@ -15,7 +15,8 @@ paths:
 - `createNewProfile`, `cloneProfile` and `importProfile` return `"unsaved"` when only the store save failed, after deleting the profile file they wrote, and `null` for other failures.
 - A profile switch or a new listing (`addProfile`) that can't be saved is undone. The store is then saved once more so the file matches memory: an earlier queued save may have written it. An undone switch reads the active profile from its file again, since an update to it may have landed during the save.
 - Profile files, an import's too (after the picked file's name), are named by `profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file. An export into the profiles folder is refused: the save dialog starts in the last folder used, which an import can make that one.
-- Creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`).
+- Creating, cloning or renaming a profile to a name another one has is refused (`PROFILE_EXISTS`); a rename leaves its own file out, so a change of case is fine.
+- A rename (`renameProfile`) changes only the name users see, in three copies: the profile file's `name`, its `profiles[]` entry and `activeProfile` (a separate object after startup). The file keeps its own name, so fans, LIVE history and the timer, all keyed by the file, stay where they are (the user's call). A failed store save puts the old name back in memory and in the file, then saves again.
 - A clone or an export waits for the updates queued on the profile's file (`whenWritten`) before reading it: any profile can have some, like the timer's or a sweep's, not only the active one.
 - An import is listed under the name saved in it, trimmed, and numbered ("Name 2") when another profile has that name in any case. One whose trimmed name is too short is listed as "Imported profile".
 
@@ -32,7 +33,7 @@ paths:
 - The store file is read once, at startup.
 - One that doesn't parse or validate is backed up from the bytes read to `tokio.corrupted-<time>.json` next to it and replaced by the defaults. `startApp` warns naming the backup (`corruptedBackup()`, `SETTINGS_LOAD_FAILED`), and LOAD_APP's `newStore` (the tour) is only for a store file that wasn't there.
 - One that can't be read (locked, no access) or backed up stops startup ("Tokio couldn't start") and is left as it is.
-- A rebuilt store keeps a valid `default.json`. An invalid one is backed up as `default.corrupted-<time>.json` before it's replaced, and one that can't be read stops startup too. So does another profile file it can't read, or a sounds, media or pictures folder that's there but can't be read. Profiles that don't load are left out.
+- A rebuilt store keeps a valid `default.json`. An invalid one is backed up as `default.corrupted-<time>.json` before it's replaced, and one that can't be read stops startup too. So does another profile file it can't read, or a sounds, media or pictures folder that's there but can't be read. Profiles that don't load are left out. Its `activeProfile` takes the found `default.json` entry, with the name saved in it, so a renamed first profile keeps its name.
 
 ## The Twitch account
 

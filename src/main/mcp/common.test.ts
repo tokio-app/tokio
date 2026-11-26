@@ -136,7 +136,7 @@ describe("pushes", () => {
       storeManagerService: {
         getProfileData,
         getProfiles: () => profiles,
-        getSettings: () => ({ language: "en" }),
+        getSettings: () => ({ language: "en", activeProfile: profiles[0] }),
       },
     });
 
@@ -145,10 +145,16 @@ describe("pushes", () => {
 
     expect(getProfileData).toHaveBeenCalledWith({ fresh: true });
     expect(h.pushed(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([
-      { success: true, profile, profiles },
+      { success: true, profile, profiles, file: "a.json" },
     ]);
     expect(h.pushed(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([
-      { success: true, data: { settings: { language: "en" }, profiles } },
+      {
+        success: true,
+        data: {
+          settings: { language: "en", activeProfile: profiles[0] },
+          profiles,
+        },
+      },
     ]);
   });
 });

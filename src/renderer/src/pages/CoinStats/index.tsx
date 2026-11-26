@@ -108,9 +108,9 @@ export function CoinStats() {
   const [ranked, setRanked] = useState<{ tab: StatsTab; by: Ranking }>();
   // The next LIVES is another profile's, which starts from its newest LIVE
   const switched = useRef(false);
-  // The profile the last GET_PROFILE named. It also comes as a resync (an MCP
-  // write), which isn't a switch. The first one counts, since a switch may
-  // have come before it.
+  // The profile file the last GET_PROFILE named. It also comes as a resync (an
+  // MCP write) or after a rename, which aren't switches. The first one counts,
+  // since a switch may have come before it.
   const profile = useRef<string | null>(null);
 
   const range = dateRange(filter, now);
@@ -190,8 +190,8 @@ export function CoinStats() {
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
-    if (!res?.success || res.profile?.name === profile.current) return;
-    profile.current = res.profile?.name ?? null;
+    if (!res?.success || (res.file ?? null) === profile.current) return;
+    profile.current = res.file ?? null;
     switched.current = true;
     // The last profile's, which the same dates or search would still match
     setDatesReply(undefined);

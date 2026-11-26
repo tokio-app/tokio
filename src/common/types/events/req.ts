@@ -63,6 +63,7 @@ export enum APP_EVENTS {
   GET_SETTINGS = "app:settings:get",
   CREATE_PROFILE = "app:settings:create:profile",
   CLONE_PROFILE = "app:settings:clone:profile",
+  RENAME_PROFILE = "app:settings:rename:profile",
   IMPORT_ENTITY = "app:settings:import:entity",
   EXPORT_ENTITY = "app:settings:export:entity",
   EXPORT_LOGS = "app:settings:export:logs",
@@ -280,6 +281,13 @@ export interface AppEventsMap {
   [APP_EVENTS.CLONE_PROFILE]: {
     name: string;
     ref: string;
+  };
+
+  // A new name for the profile in that file. The file keeps its own name, so
+  // its fans, LIVE history and timer stay where they are.
+  [APP_EVENTS.RENAME_PROFILE]: {
+    file: string;
+    name: string;
   };
 
   [APP_EVENTS.IMPORT_ENTITY]: {

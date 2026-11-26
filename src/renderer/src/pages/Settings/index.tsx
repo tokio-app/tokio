@@ -16,7 +16,11 @@ import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { LanguageSection } from "./sections/LanguageSection";
 import { LogsSection } from "./sections/LogsSection";
-import { CloneProfileModal, NewProfileModal } from "./sections/ProfileModals";
+import {
+  CloneProfileModal,
+  NewProfileModal,
+  RenameProfileModal,
+} from "./sections/ProfileModals";
 import { ProfileSection } from "./sections/ProfileSection";
 import { ProvidersSection } from "./sections/ProvidersSection";
 import { RemoteSection } from "./sections/RemoteSection";
@@ -28,7 +32,8 @@ import { TwitchSection } from "./sections/TwitchSection";
 import { UpdatesSection } from "./sections/UpdatesSection";
 import { VoiceKeysSection } from "./sections/VoiceKeysSection";
 
-type ModalType = "newProfile" | "cloneProfile" | "confirmDebug";
+type ModalType =
+  "newProfile" | "cloneProfile" | "renameProfile" | "confirmDebug";
 
 export function Settings() {
   const t = useT();
@@ -134,6 +139,13 @@ export function Settings() {
         />
       )}
 
+      {modal === "renameProfile" && (
+        <RenameProfileModal
+          profile={store.settings.activeProfile}
+          onClose={closeModal}
+        />
+      )}
+
       <Page width="wide" layout="aside">
         {/* First: connecting needs its key */}
         {platforms.includes("tiktok") && (
@@ -225,6 +237,7 @@ export function Settings() {
           locked={connected}
           onNew={() => setModal("newProfile")}
           onClone={() => setModal("cloneProfile")}
+          onRename={() => setModal("renameProfile")}
         />
 
         <LogsSection

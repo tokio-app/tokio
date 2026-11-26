@@ -790,6 +790,23 @@ describe("LIVE history", () => {
     expect(selected()).toMatch(/^All time/);
   });
 
+  it("keeps its LIVE history when the open profile is renamed", async () => {
+    const { user } = renderWithProviders(<CoinStats />);
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, profileReply());
+    await lives([saturday, friday]);
+    await user.click(option(/^All time/));
+
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.name = "Renamed";
+      }, "default.json"),
+    );
+
+    expect(sent(APP_EVENTS.GET_LIVES)).toEqual([undefined, undefined]);
+    expect(selected()).toMatch(/^All time/);
+  });
+
   it("drops the last profile's totals and gifters after a switch", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 31, 21));

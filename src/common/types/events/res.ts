@@ -80,6 +80,7 @@ export enum APP_EVENTS_RESPONSE {
   GET_SETTINGS = "app:settings:res",
   CREATE_PROFILE = "app:settings:res:create:profile",
   CLONE_PROFILE = "app:settings:res:clone:profile",
+  RENAME_PROFILE = "app:settings:res:rename:profile",
   IMPORT_ENTITY = "app:settings:res:import:entity",
   EXPORT_ENTITY = "app:settings:res:export:entity",
   SET_PROVIDER = "app:settings:res:set:provider",
@@ -214,9 +215,12 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.RESIZE_MUSIC_WINDOW]: WindowState;
 
   // PROFILE
+  // file: the active profile's, which a switch changes and a rename doesn't,
+  // so pages tell a switch by it, never by the name
   [APP_EVENTS_RESPONSE.GET_PROFILE]: Reply<{
     profile?: Profile;
     profiles?: { name: string; file: string }[];
+    file?: string;
   }>;
 
   //VOICES
@@ -261,6 +265,9 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.CREATE_PROFILE]: Reply;
 
   [APP_EVENTS_RESPONSE.CLONE_PROFILE]: Reply;
+
+  // The profile's file, failures included, so a modal ignores another's
+  [APP_EVENTS_RESPONSE.RENAME_PROFILE]: Reply<{ file: string }>;
 
   [APP_EVENTS_RESPONSE.IMPORT_ENTITY]: Reply<{
     type: "profile";

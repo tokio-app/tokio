@@ -77,6 +77,36 @@ describe("useEditableSettings", () => {
     ]);
   });
 
+  it("tells a switch by the profile's file, so a rename isn't one", async () => {
+    const onLoad = vi.fn();
+    setup(onLoad);
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, loaded);
+
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.name = "Renamed";
+      }, "default.json"),
+    );
+    expect(onLoad.mock.calls.map(([, switched]) => switched)).toEqual([
+      true,
+      false,
+    ]);
+
+    // Another file with the same name is another profile
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.name = "Renamed";
+      }, "horror.json"),
+    );
+    expect(onLoad.mock.calls.map(([, switched]) => switched)).toEqual([
+      true,
+      false,
+      true,
+    ]);
+  });
+
   it("ignores a failed profile reply", async () => {
     const onLoad = vi.fn();
     const { result } = setup(onLoad);

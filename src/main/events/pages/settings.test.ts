@@ -118,6 +118,12 @@ function profileStore({ fail }: { fail?: null | "unsaved" } = {}) {
     cloneProfile: vi.fn(async (_ref: string, file: string, name: string) =>
       add(file, name),
     ),
+    renameProfile: vi.fn(async (file: string, name: string) => {
+      if (fail !== undefined) return fail;
+      const index = profiles.findIndex((p) => p.file === file);
+      profiles[index] = { file, name };
+      return "renamed" as const;
+    }),
   };
 }
 
@@ -405,6 +411,165 @@ describe("settings events", () => {
     });
   });
 
+  describe("RENAME_PROFILE", () => {
+    // Stream isn't the active profile: the file sent is the one renamed
+    it("renames the profile in its file, then sends the settings and a notice", async () => {
+      const store = profileStore();
+      const h = createHandler({ storeManagerService: store });
+
+      const log = await run(h, APP_EVENTS.RENAME_PROFILE, {
+        file: "stream.json",
+        name: "  Night stream ",
+      });
+
+      expect(store.renameProfile).toHaveBeenCalledExactlyOnceWith(
+        "stream.json",
+        "Night stream",
+      );
+      expect(log).toEqual([
+        [
+          APP_EVENTS_RESPONSE.RENAME_PROFILE,
+          { success: true, file: "stream.json" },
+        ],
+        [
+          APP_EVENTS_RESPONSE.GET_SETTINGS,
+          {
+            success: true,
+            data: {
+              settings: appSettings,
+              profiles: [
+                defaultProfile,
+                { file: "stream.json", name: "Night stream" },
+              ],
+            },
+          },
+        ],
+        notice({
+          level: "success",
+          code: FEEDBACK_CODES.PROFILE_RENAMED,
+          message: 'Profile renamed to "Night stream".',
+        }),
+      ]);
+    });
+
+    it("takes its own name in another case", async () => {
+      const store = profileStore();
+      const h = createHandler({ storeManagerService: store });
+
+      await h.invoke(settings, APP_EVENTS.RENAME_PROFILE, {
+        file: "default.json",
+        name: "DEFAULT",
+      });
+
+      expect(store.renameProfile).toHaveBeenCalledWith(
+        "default.json",
+        "DEFAULT",
+      );
+      expect(h.replies(APP_EVENTS_RESPONSE.RENAME_PROFILE)).toEqual([
+        { success: true, file: "default.json" },
+      ]);
+    });
+
+    it("saves and tells nothing for the same name once trimmed", async () => {
+      const store = profileStore();
+      const h = createHandler({ storeManagerService: store });
+
+      const log = await run(h, APP_EVENTS.RENAME_PROFILE, {
+        file: "default.json",
+        name: " Default ",
+      });
+
+      expect(store.renameProfile).not.toHaveBeenCalled();
+      expect(log).toEqual([
+        [
+          APP_EVENTS_RESPONSE.RENAME_PROFILE,
+          { success: true, file: "default.json" },
+        ],
+      ]);
+    });
+
+    it.each([
+      ["stream", FEEDBACK_CODES.PROFILE_EXISTS, 'A profile named "stream"'],
+      ["  ab ", FEEDBACK_CODES.PROFILE_NAME_INVALID, "at least 3 characters"],
+    ])(
+      'refuses "%s", keeping the file in the reply',
+      async (name, code, text) => {
+        const store = profileStore();
+        const h = createHandler({ storeManagerService: store });
+
+        await h.invoke(settings, APP_EVENTS.RENAME_PROFILE, {
+          file: "default.json",
+          name,
+        });
+
+        expect(store.renameProfile).not.toHaveBeenCalled();
+        expect(h.replies(APP_EVENTS_RESPONSE.RENAME_PROFILE)).toEqual([
+          {
+            success: false,
+            file: "default.json",
+            error: { code, message: expect.stringContaining(text) },
+          },
+        ]);
+        expect(h.notices).toEqual([
+          expect.objectContaining({ level: "warning", code }),
+        ]);
+      },
+    );
+
+    it("replies and notifies when the store doesn't rename it", async () => {
+      const h = createHandler({
+        storeManagerService: profileStore({ fail: null }),
+      });
+
+      await h.invoke(settings, APP_EVENTS.RENAME_PROFILE, {
+        file: "stream.json",
+        name: "Night",
+      });
+
+      const failure = {
+        code: FEEDBACK_CODES.PROFILE_RENAME_FAILED,
+        message: "Unable to rename the profile.",
+      };
+      expect(h.replies(APP_EVENTS_RESPONSE.RENAME_PROFILE)).toEqual([
+        { success: false, file: "stream.json", error: failure },
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "error", ...failure }),
+      ]);
+    });
+
+    it("sends the profiles main holds when the store can't be saved", async () => {
+      const h = createHandler({
+        storeManagerService: profileStore({ fail: "unsaved" }),
+      });
+
+      await h.invoke(settings, APP_EVENTS.RENAME_PROFILE, {
+        file: "stream.json",
+        name: "Night",
+      });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([
+        {
+          success: true,
+          data: {
+            settings: appSettings,
+            profiles: [defaultProfile, streamProfile],
+          },
+        },
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.RENAME_PROFILE)).toEqual([
+        expect.objectContaining({ success: false, file: "stream.json" }),
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+        }),
+      ]);
+    });
+  });
+
   describe("SET_PROFILE", () => {
     const timer = TimerProfileSchema.parse({
       status: "paused",
@@ -617,6 +782,7 @@ describe("settings events", () => {
               ...gamesOf(streamProfile),
             },
             profiles: [defaultProfile, streamProfile],
+            file: "stream.json",
           },
         ],
         [
@@ -846,9 +1012,13 @@ describe("settings events", () => {
   describe("EXPORT_ENTITY", () => {
     const filePath = join(tmpdir(), "exports", "stream.json");
 
+    const getProfiles = () => [streamProfile];
+
     it("does nothing when the dialog is canceled", async () => {
       const exportProfile = vi.fn(async () => true);
-      const h = createHandler({ storeManagerService: { exportProfile } });
+      const h = createHandler({
+        storeManagerService: { exportProfile, getProfiles },
+      });
 
       await h.invoke(settings, APP_EVENTS.EXPORT_ENTITY, {
         type: "profile",
@@ -867,10 +1037,33 @@ describe("settings events", () => {
       expect(h.notices).toEqual([]);
     });
 
+    it("proposes a renamed profile's name, not its file's", async () => {
+      const h = createHandler({
+        storeManagerService: {
+          exportProfile: vi.fn(),
+          getProfiles: () => [{ file: "stream.json", name: "Café Night" }],
+        },
+      });
+
+      await h.invoke(settings, APP_EVENTS.EXPORT_ENTITY, {
+        type: "profile",
+        file: "stream.json",
+      });
+
+      expect(dialog.showSaveDialog).toHaveBeenCalledWith(
+        h.win,
+        expect.objectContaining({
+          defaultPath: expect.stringMatching(/(^|[\\/])cafe-night\.json$/),
+        }),
+      );
+    });
+
     it("exports the profile where the user chose and notifies", async () => {
       dialog.showSaveDialog.mockResolvedValue({ canceled: false, filePath });
       const exportProfile = vi.fn(async () => true);
-      const h = createHandler({ storeManagerService: { exportProfile } });
+      const h = createHandler({
+        storeManagerService: { exportProfile, getProfiles },
+      });
 
       await h.invoke(settings, APP_EVENTS.EXPORT_ENTITY, {
         type: "profile",
@@ -893,7 +1086,7 @@ describe("settings events", () => {
     it("replies the type with the failure", async () => {
       dialog.showSaveDialog.mockResolvedValue({ canceled: false, filePath });
       const h = createHandler({
-        storeManagerService: { exportProfile: async () => false },
+        storeManagerService: { exportProfile: async () => false, getProfiles },
       });
 
       await h.invoke(settings, APP_EVENTS.EXPORT_ENTITY, {
@@ -1227,6 +1420,8 @@ describe("settings events", () => {
           updateVoiceKey: vi.fn(async () => true),
           removeVoices: vi.fn(async () => removed),
           getProfileData: vi.fn(async () => profile),
+          getProfiles: () => [defaultProfile],
+          getSettings: () => appSettings,
         };
         const h = createHandler({
           storeManagerService,
@@ -1253,7 +1448,12 @@ describe("settings events", () => {
           fresh: true,
         });
         expect(h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([
-          { success: true, profile },
+          {
+            success: true,
+            profile,
+            profiles: [defaultProfile],
+            file: "default.json",
+          },
         ]);
         expect(h.notices).toEqual([]);
       });
@@ -1279,7 +1479,12 @@ describe("settings events", () => {
         });
 
         expect(h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([
-          { success: true, profile },
+          {
+            success: true,
+            profile,
+            profiles: [defaultProfile],
+            file: "default.json",
+          },
         ]);
         expect(h.notices).toEqual([
           expect.objectContaining({
