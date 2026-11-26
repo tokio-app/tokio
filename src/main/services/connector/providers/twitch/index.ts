@@ -198,6 +198,13 @@ export class TwitchConnector
       this._stop(conn);
       return { success: false, error: toFailure(err) };
     }
+    // A stop between _start's answer and this, like a sign-out from a picture
+    // lookup's refresh: going up would start timers nothing stops
+    if (this._conn !== conn) {
+      return this._auth.lost
+        ? fail("badKey", "Twitch signed the account out.")
+        : fail("canceled", "Disconnected while connecting.");
+    }
 
     conn.up = true;
     conn.validate = setInterval(
@@ -206,7 +213,7 @@ export class TwitchConnector
     );
     const live =
       viewers === undefined
-        ? ", live or not unknown"
+        ? ", live status unknown"
         : viewers !== null
           ? ", live"
           : ", not live";
