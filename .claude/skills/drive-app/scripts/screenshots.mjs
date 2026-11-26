@@ -881,6 +881,14 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     page.getByRole("group", { name: tr(name, key), exact: true });
   const studioNumber = (name, key) =>
     studioGroup(name, key).getByRole("spinbutton");
+  // Filling a field scrolls the settings to it, and a crop would then cut a
+  // heading in half
+  const panelsToTop = () =>
+    page.evaluate(() => {
+      for (const panel of document.querySelectorAll('main [class*="panel"]')) {
+        panel.scrollTop = 0;
+      }
+    });
   // Where the + menu puts it: into the selected group or the selected
   // element's group, else on its own
   const addStudio = async (item) => {
@@ -960,11 +968,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   // The editor with the star selected, its Shape picker showing. Its
   // settings start at the top: placing the logo scrolled them to the box.
   await studioRow(tr("Star")).click();
-  await page.evaluate(() => {
-    for (const panel of document.querySelectorAll('main [class*="panel"]')) {
-      panel.scrollTop = 0;
-    }
-  });
+  await panelsToTop();
   await page.waitForTimeout(500);
   await crop("studio-editor", page.getByRole("main"), { pad: 0 });
   await shoot("overlay-studio");
@@ -1061,6 +1065,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
       }),
     })
     .fill("50");
+  await panelsToTop();
   await crop(
     "studio-camera",
     [page.locator('[class*="stage_frame"]'), studioGroup("Quality")],
@@ -1241,7 +1246,11 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     const { key } = JSON.parse(
       readFileSync(join(home, ".tokio", "settings", "tokio.json"), "utf8"),
     ).settings.remote;
-    const browser = await chromium.launch({ channel: "msedge" });
+    // Grayscale text, as drive.mjs gives the app
+    const browser = await chromium.launch({
+      channel: "msedge",
+      args: ["--disable-lcd-text"],
+    });
     // A 390×844 phone's browser, under its address and tool bars
     const phone = await browser.newPage({
       viewport: { width: 390, height: 664 },

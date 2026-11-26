@@ -103,6 +103,9 @@ let app;
 let failed = false;
 try {
   const args = [
+    // Grayscale text: ClearType's colored edges fit only the screen they're
+    // drawn on, and turn into color noise in a screenshot seen anywhere else
+    "--disable-lcd-text",
     ...(values.scale ? [`--force-device-scale-factor=${values.scale}`] : []),
     ...(values["fake-camera"] ? ["--use-fake-device-for-media-stream"] : []),
   ];
