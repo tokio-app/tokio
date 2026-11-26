@@ -1,7 +1,7 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { Page, Section } from "@/components";
 import { cx, formatDuration, formatStat } from "@/helper";
-import { useIpcListener, useIpcRequest } from "@/hooks";
+import { useIpcListener, useIpcRequest, useNow } from "@/hooks";
 import {
   timeLeft,
   timerStatusText,
@@ -11,7 +11,7 @@ import {
 import homeStyles from "@/pages/Home/home.module.css";
 import { useLanguage, useT } from "@/ui/i18n";
 import { Link } from "@tanstack/react-router";
-import { ReactNode, useEffect, useId, useState } from "react";
+import { ReactNode, useId, useState } from "react";
 import styles from "./tools.module.css";
 
 /**
@@ -107,13 +107,7 @@ function CountdownRow({ timer }: { timer: TimerPush | null }) {
   const t = useT();
   const language = useLanguage();
   const running = timer?.data.state.status === "running";
-  const [now, setNow] = useState(() => performance.now());
-
-  useEffect(() => {
-    if (!running) return undefined;
-    const tick = setInterval(() => setNow(performance.now()), 250);
-    return () => clearInterval(tick);
-  }, [running]);
+  const now = useNow(running);
 
   const remaining = timer && timeLeft(timer, timer.data.settings.start, now);
 

@@ -7,6 +7,7 @@ export * from "./useEditableSettings";
 export * from "./useImmerState";
 export * from "./useMenu";
 export * from "./useNearView";
+export * from "./useNow";
 export * from "./useIpcListener";
 export * from "./useIpcRequest";
 export * from "./useNotifications";
