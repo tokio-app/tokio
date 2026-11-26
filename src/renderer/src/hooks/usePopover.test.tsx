@@ -98,15 +98,34 @@ describe("usePopover", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("closes when something else scrolls, since it doesn't follow its anchor", async () => {
+  it("closes when a scroll moves its anchor, since it doesn't follow it", async () => {
     const user = userEvent.setup();
     render(<Popover />);
+    const rect = vi
+      .spyOn(screen.getByTestId("anchor"), "getBoundingClientRect")
+      .mockReturnValue(new DOMRect(12, 20, 200, 20));
     await user.click(screen.getByRole("button", { name: "Open" }));
 
     fireEvent.scroll(screen.getByTestId("menu-list"));
     expect(screen.getByRole("menu")).toBeInTheDocument();
 
+    rect.mockReturnValue(new DOMRect(12, -80, 200, 20));
     fireEvent.scroll(screen.getByTestId("page"));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  // A late event from the scroll that brought the anchor into view, or the
+  // browser's scroll anchoring, closed a Select as it opened
+  it("stays open when a scroll leaves its anchor in place", async () => {
+    const user = userEvent.setup();
+    render(<Popover />);
+    vi.spyOn(
+      screen.getByTestId("anchor"),
+      "getBoundingClientRect",
+    ).mockReturnValue(new DOMRect(12, 20, 200, 20));
+    await user.click(screen.getByRole("button", { name: "Open" }));
+
+    fireEvent.scroll(screen.getByTestId("page"));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
   });
 });
