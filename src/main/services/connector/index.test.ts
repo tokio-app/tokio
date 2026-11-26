@@ -550,6 +550,18 @@ describe("ConnectorService", () => {
       expect(service.isWaiting()).toBe(false);
     });
 
+    it("says TikTok is connected once its look found the LIVE, while the look still runs", () => {
+      const { service, tiktok, connected } = both();
+      vi.spyOn(tiktok, "isWaiting").mockReturnValue(true);
+      const seen: unknown[] = [];
+      connected.mockImplementation(() => seen.push(service.status()));
+
+      // The library sends CONNECTED from inside the look's connect
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+
+      expect(seen).toEqual([{ tiktok: "connected", twitch: "connecting" }]);
+    });
+
     it("names the session after the platform that started it", async () => {
       const { service, tiktok, twitch } = both();
       let during = "";

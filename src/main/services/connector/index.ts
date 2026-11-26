@@ -213,13 +213,14 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
     const status: Partial<Record<Platform, PlatformStatus>> = {};
     for (const [platform, p] of this._sources()) {
       if (!p.isConnected()) continue;
-      status[platform] = p.isWaiting()
-        ? "waiting"
-        : p.isReconnecting()
+      // Up first: TikTok's look sends CONNECTED while it's still waiting
+      status[platform] = this._up.has(platform)
+        ? p.isReconnecting()
           ? "reconnecting"
-          : this._up.has(platform)
-            ? "connected"
-            : "connecting";
+          : "connected"
+        : p.isWaiting()
+          ? "waiting"
+          : "connecting";
     }
     return status;
   }
