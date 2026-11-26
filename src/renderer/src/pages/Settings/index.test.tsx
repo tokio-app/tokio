@@ -294,11 +294,11 @@ describe("Settings", () => {
     });
   });
 
-  describe("Live profiles", () => {
+  describe("Profiles", () => {
     it("switches to the profile picked", async () => {
       const { user, container } = await setup();
 
-      await user.click(section("Live profiles").getByText("Horror"));
+      await user.click(section("Profiles").getByText("Horror"));
       await user.click(inList(container, "Default")!);
 
       expect(sent(APP_EVENTS.SET_PROFILE)).toEqual([{ file: "default.json" }]);
@@ -313,7 +313,7 @@ describe("Settings", () => {
       await connected(true);
       expect(screen.getByText("(disconnect to switch)")).toBeInTheDocument();
 
-      await user.click(section("Live profiles").getByText("Horror"));
+      await user.click(section("Profiles").getByText("Horror"));
       expect(inList(container, "Default")).toBeNull();
 
       await connected(false);
@@ -326,7 +326,7 @@ describe("Settings", () => {
       const { user } = await setup();
 
       await user.click(
-        section("Live profiles").getByRole("button", { name: "New" }),
+        section("Profiles").getByRole("button", { name: "New" }),
       );
       expect(dialog().getByText("Create a profile")).toBeInTheDocument();
 
@@ -348,7 +348,7 @@ describe("Settings", () => {
     it("keeps the new profile's name to fix when main refuses it", async () => {
       const { user } = await setup();
       await user.click(
-        section("Live profiles").getByRole("button", { name: "New" }),
+        section("Profiles").getByRole("button", { name: "New" }),
       );
       const field = dialog().getByPlaceholderText("e.g. Chill Stream");
       await user.type(field, "Horror");
@@ -378,7 +378,7 @@ describe("Settings", () => {
     it("doesn't create a profile without a name", async () => {
       const { user } = await setup();
       await user.click(
-        section("Live profiles").getByRole("button", { name: "New" }),
+        section("Profiles").getByRole("button", { name: "New" }),
       );
 
       await user.type(dialog().getByPlaceholderText("e.g. Chill Stream"), "  ");
@@ -397,7 +397,7 @@ describe("Settings", () => {
       const { user } = await setup();
 
       await user.click(
-        section("Live profiles").getByRole("button", { name: "Clone" }),
+        section("Profiles").getByRole("button", { name: "Clone" }),
       );
       expect(dialog().getByText("Clone a profile")).toBeInTheDocument();
       expect(dialog().getByText("Horror")).toBeInTheDocument();
@@ -420,7 +420,7 @@ describe("Settings", () => {
     it("stays open when main refuses the clone", async () => {
       const { user } = await setup();
       await user.click(
-        section("Live profiles").getByRole("button", { name: "Clone" }),
+        section("Profiles").getByRole("button", { name: "Clone" }),
       );
       const field = dialog().getByPlaceholderText("e.g. Horror Stream Layout");
       await user.type(field, "Default");
@@ -435,7 +435,7 @@ describe("Settings", () => {
     it("clones the profile picked", async () => {
       const { user, container } = await setup();
       await user.click(
-        section("Live profiles").getByRole("button", { name: "Clone" }),
+        section("Profiles").getByRole("button", { name: "Clone" }),
       );
 
       await user.click(dialog().getByText("Horror"));
@@ -454,7 +454,7 @@ describe("Settings", () => {
     it("doesn't clone without a name", async () => {
       const { user } = await setup();
       await user.click(
-        section("Live profiles").getByRole("button", { name: "Clone" }),
+        section("Profiles").getByRole("button", { name: "Clone" }),
       );
 
       await user.click(dialog().getByRole("button", { name: "Clone profile" }));
@@ -465,7 +465,7 @@ describe("Settings", () => {
 
     it("imports a profile and exports the active one", async () => {
       const { user } = await setup();
-      const profilesSection = section("Live profiles");
+      const profilesSection = section("Profiles");
 
       await user.click(profilesSection.getByRole("button", { name: "Import" }));
       await user.click(profilesSection.getByRole("button", { name: "Export" }));
@@ -479,7 +479,7 @@ describe("Settings", () => {
     const rename = async () => {
       const app = await setup();
       await app.user.click(
-        section("Live profiles").getByRole("button", { name: "Rename" }),
+        section("Profiles").getByRole("button", { name: "Rename" }),
       );
       const field = within(
         dialog().getByRole("group", { name: "Profile name" }),

@@ -793,11 +793,11 @@ describe("Home", () => {
           .getByText(text)
           .className.includes("feature_warn");
 
-      expect(warned("YouTube · not connected")).toBe(true);
+      expect(warned("YouTube isn't connected")).toBe(true);
 
       await send(APP_EVENTS_RESPONSE.MUSIC_CONNECTED, { success: true });
 
-      expect(warned("YouTube · connected")).toBe(false);
+      expect(warned("Connected to YouTube")).toBe(false);
     });
 
     it("counts the alerts that are on", async () => {

@@ -159,7 +159,7 @@ test("opens every page from the sidebar", async () => {
     ["Games", "Actions"],
     ["Tools", "Tools"],
     ["About", "Online services"],
-    ["Settings", "Live profiles"],
+    ["Settings", "Profiles"],
     ["Home", "Dashboard"],
   ];
   const sidebar = page.getByRole("navigation");
