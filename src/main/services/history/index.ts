@@ -154,6 +154,18 @@ const byCoins = (a: Gifter, b: Gifter) =>
 const overlaid = (gifter: Gifter) =>
   gifter.coins > 0 && GIFT_CURRENCY[platformOf(gifter)] !== null;
 
+// Adds a gifter's totals to the map's entry for them, keeping a picture
+const addGifter = (map: Map<string, Gifter>, gifter: Gifter) => {
+  const past = map.get(gifter.userId);
+  map.set(gifter.userId, {
+    ...gifter,
+    picture: gifter.picture || (past?.picture ?? ""),
+    coins: (past?.coins ?? 0) + gifter.coins,
+    gifts: (past?.gifts ?? 0) + gifter.gifts,
+    giftSubs: (past?.giftSubs ?? 0) + gifter.giftSubs,
+  });
+};
+
 const noPart = (): HistoryTotals => ({ amount: 0, gifts: 0, giftSubs: 0 });
 
 const addPart = (
@@ -614,16 +626,7 @@ export class HistoryService extends Service {
         const sent = allInRange(record, range)
           ? record.gifters
           : giftersIn(record, range);
-        for (const gifter of sent) {
-          const past = gifters.get(gifter.userId);
-          gifters.set(gifter.userId, {
-            ...gifter,
-            picture: gifter.picture || (past?.picture ?? ""),
-            coins: (past?.coins ?? 0) + gifter.coins,
-            gifts: (past?.gifts ?? 0) + gifter.gifts,
-            giftSubs: (past?.giftSubs ?? 0) + gifter.giftSubs,
-          });
-        }
+        for (const gifter of sent) addGifter(gifters, gifter);
       }
       sorted = [...gifters.values()].sort(byAmount);
     }
@@ -865,16 +868,7 @@ export class HistoryService extends Service {
   private _finish({ gifters, minutes: _minutes, ...summary }: LiveRecord) {
     this._lives.push(summary);
     this._newest = Math.max(this._newest, summary.startedAt);
-    for (const gifter of gifters) {
-      const past = this._gifters.get(gifter.userId);
-      this._gifters.set(gifter.userId, {
-        ...gifter,
-        picture: gifter.picture || (past?.picture ?? ""),
-        coins: (past?.coins ?? 0) + gifter.coins,
-        gifts: (past?.gifts ?? 0) + gifter.gifts,
-        giftSubs: (past?.giftSubs ?? 0) + gifter.giftSubs,
-      });
-    }
+    for (const gifter of gifters) addGifter(this._gifters, gifter);
   }
 
   /**
