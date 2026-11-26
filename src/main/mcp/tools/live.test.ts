@@ -698,7 +698,7 @@ describe("live MCP tools", () => {
         }),
       ).toMatchObject({
         isError: true,
-        text: "The profile doesn't use YouTube, Twitch. Add them in settings section platforms first.",
+        text: "The profile doesn't use YouTube and Twitch. Add them to its platforms first (settings section platforms).",
       });
       expect(invoke).not.toHaveBeenCalled();
     });

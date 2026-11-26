@@ -468,9 +468,11 @@ export const tools: ToolDef<any>[] = [
       }
       const unused = platforms?.filter((p) => !used.includes(p)) ?? [];
       if (unused.length > 0) {
-        const names = unused.map((p) => PLATFORM_LABELS[p]).join(", ");
+        const names = new Intl.ListFormat("en").format(
+          unused.map((p) => PLATFORM_LABELS[p]),
+        );
         return fail(
-          `The profile doesn't use ${names}. Add them in settings section platforms first.`,
+          `The profile doesn't use ${names}. Add ${unused.length > 1 ? "them" : "it"} to its platforms first (settings section platforms).`,
         );
       }
       const joins = (p: Platform) =>
