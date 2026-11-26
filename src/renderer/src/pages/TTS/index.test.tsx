@@ -604,8 +604,8 @@ describe("TTS", () => {
     expect(level).toBeDisabled();
 
     await user.click(screen.getByRole("checkbox", { name: "Allow everyone" }));
-    await user.click(screen.getByRole("checkbox", { name: "Followers only" }));
-    await user.click(screen.getByRole("checkbox", { name: "Moderators only" }));
+    await user.click(screen.getByRole("checkbox", { name: "Followers" }));
+    await user.click(screen.getByRole("checkbox", { name: "Moderators" }));
     await user.click(
       screen.getByRole("checkbox", { name: "Minimum fan level" }),
     );

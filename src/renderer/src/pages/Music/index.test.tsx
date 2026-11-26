@@ -16,6 +16,7 @@ const loaded = profileReply((p) => {
     one_per_viewer: false,
     limit_controls: true,
   };
+  p.music.permissions.all = false;
   p.music.permissions.followers = true;
 });
 
@@ -83,9 +84,7 @@ describe("Music", () => {
     expect(screen.getByPlaceholderText("!next")).toHaveValue("!next");
     expect(screen.getByPlaceholderText("!next")).toBeEnabled();
 
-    expect(
-      screen.getByRole("checkbox", { name: "Followers only" }),
-    ).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Followers" })).toBeChecked();
     expect(field("Cooldown").getByRole("spinbutton")).toHaveValue(4);
     expect(field("Max queue length").getByRole("spinbutton")).toHaveValue(15);
   });
@@ -293,8 +292,12 @@ describe("Music", () => {
 
   it("changes who may request songs and the limits", async () => {
     const { user } = await setup();
+    expect(screen.getByText("Who can use song requests.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Limits that keep chat from flooding song requests."),
+    ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("checkbox", { name: "Super Fans only" }));
+    await user.click(screen.getByRole("checkbox", { name: "Super Fans" }));
     fireEvent.change(field("Cooldown").getByRole("spinbutton"), {
       target: { value: "10" },
     });
