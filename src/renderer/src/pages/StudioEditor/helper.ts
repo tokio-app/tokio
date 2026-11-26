@@ -15,7 +15,7 @@ import {
   StudioTrigger,
   StudioTriggerSchema,
 } from "@/common/schemas";
-import type { StageFit } from "@/common/studio/stage";
+import { extent, type StageFit, unionBox } from "@/common/studio/stage";
 import { CustomGift, Platform, StudioView } from "@/common/types";
 import {
   ALERT_MESSAGE_VARIABLES,
@@ -489,37 +489,7 @@ export function turnTo(center: Point, point: Point, snap = false): number {
   return (rounded > 180 ? rounded - 360 : rounded) || 0;
 }
 
-/** The smallest unturned box around a turned one. */
-export function extent({ x, y, width, height, rotation }: Turned): Box {
-  if (!rotation) return { x, y, width, height };
-  const rad = (rotation * Math.PI) / 180;
-  const cos = Math.abs(Math.cos(rad));
-  const sin = Math.abs(Math.sin(rad));
-  const w = width * cos + height * sin;
-  const h = width * sin + height * cos;
-  return {
-    x: x + (width - w) / 2,
-    y: y + (height - h) / 2,
-    width: w,
-    height: h,
-  };
-}
-
-/**
- * The smallest box around unturned ones, null for none: several selected
- * items' extents, which move, stick and line up as one.
- */
-export function unionBox(boxes: Box[]): Box | null {
-  if (boxes.length === 0) return null;
-  const x = Math.min(...boxes.map((b) => b.x));
-  const y = Math.min(...boxes.map((b) => b.y));
-  return {
-    x,
-    y,
-    width: Math.max(...boxes.map((b) => b.x + b.width)) - x,
-    height: Math.max(...boxes.map((b) => b.y + b.height)) - y,
-  };
-}
+export { extent, unionBox };
 
 // The canvas's edges and middles an element lines up with
 export type AlignTo = "left" | "center" | "right" | "top" | "middle" | "bottom";
