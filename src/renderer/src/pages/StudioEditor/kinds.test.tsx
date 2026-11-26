@@ -385,6 +385,24 @@ describe("StudioEditor", () => {
       expect(page().queryByRole("group", { name: "Points" })).toBeNull();
     });
 
+    it("draws a wide speech bubble's thumbnail tall enough to read", async () => {
+      await open(
+        holding(
+          elementOf("shape", {
+            shape: "bubble",
+            width: 900,
+            height: 100,
+            border: true,
+            border_width: 6,
+          }),
+        ),
+      );
+      const svg = row(/^Speech bubble/).querySelector("svg")!;
+
+      expect(svg).toHaveAttribute("width", "18");
+      expect(svg).toHaveAttribute("height", "10");
+    });
+
     it("moves through the shapes with the arrow keys, and names and draws one in the list", async () => {
       const { user } = await open(holding(elementOf("shape")));
       await user.click(row(/^Rectangle/));
