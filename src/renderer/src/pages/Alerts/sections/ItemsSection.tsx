@@ -65,15 +65,14 @@ export function ItemsSection({
 
   return (
     <>
-      <div ref={list} className={styles.items}>
-        {shown.length === 0 ? (
-          <EmptyState>
-            {t(
-              items.length > 0 ? "alerts.items.notFound" : "alerts.items.empty",
-            )}
-          </EmptyState>
-        ) : (
-          shown.map(({ alert, index }, place) => (
+      {/* On the page, as the other pages' empty lists */}
+      {shown.length === 0 ? (
+        <EmptyState>
+          {t(items.length > 0 ? "alerts.items.notFound" : "alerts.items.empty")}
+        </EmptyState>
+      ) : (
+        <div ref={list} className={styles.items}>
+          {shown.map(({ alert, index }, place) => (
             <AlertItem
               key={alert.id}
               alert={alert}
@@ -97,9 +96,9 @@ export function ItemsSection({
                 })
               }
             />
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
       {deleting && (
         <DeleteAlertModal
           item={deleting}

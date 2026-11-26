@@ -269,9 +269,7 @@ describe("Games", () => {
   it("says when there are no actions", async () => {
     await load([]);
 
-    expect(
-      screen.getByText("No actions yet. Use the add button to create one."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("No actions yet.")).toBeInTheDocument();
   });
 
   it("adds and removes actions, and saves them", async () => {

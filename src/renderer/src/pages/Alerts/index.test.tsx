@@ -134,7 +134,7 @@ async function download(user: UserEvent) {
     dialog.getByRole("button", { name: "Download and use this sound" }),
   );
 }
-const empty = "No alerts yet. Use the add button to create one.";
+const empty = "No alerts yet. Add one with the bell button at the top right.";
 
 beforeEach(() => {
   vi.useFakeTimers();
