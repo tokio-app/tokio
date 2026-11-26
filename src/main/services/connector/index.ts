@@ -340,7 +340,12 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
     this._channels[platform] = channel;
     Logger.debug(`<Connector> Connecting to: ${named}`, this._logFile);
     const res = await provider.connect(channel);
-    if (!res.success) {
+    if (res.error?.kind === "canceled") {
+      Logger.info(
+        `<Connector> Stopped connecting to ${named}: the user disconnected.`,
+        this._logFile,
+      );
+    } else if (!res.success) {
       Logger.error(
         `<Connector> Unable to connect to ${named} -- ${formatError(res.error)}`,
         this._logFile,

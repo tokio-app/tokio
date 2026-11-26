@@ -132,11 +132,16 @@ export class YouTubeConnector extends ConnectorProvider {
         }
       }
     } catch (err) {
+      // A Disconnect woke the pause or came during a request: not the network
+      if (this._conn !== conn) {
+        return fail("canceled", "Disconnected while connecting.");
+      }
       this._stop(conn);
       return { success: false, error: toFailure(err) };
     }
+    // Its requests went on after a Disconnect
     if (this._conn !== conn) {
-      return fail("unknown", "Disconnected while connecting.");
+      return fail("canceled", "Disconnected while connecting.");
     }
 
     conn.up = true;

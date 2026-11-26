@@ -3,6 +3,7 @@ import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import { randomUUID } from "node:crypto";
 import {
+  connectFailure,
   ConnectorProvider,
   ConnectorResponse,
   fail,
@@ -117,11 +118,16 @@ export class KickConnector extends ConnectorProvider {
         }
       }
     } catch (err) {
+      // A Disconnect closed the socket or woke the pause: not the network
+      if (this._conn !== conn) {
+        return fail("canceled", "Disconnected while connecting.");
+      }
       this._stop(conn);
       return { success: false, error: toFailure(err) };
     }
+    // A stop between _start resolving and this
     if (this._conn !== conn) {
-      return fail("unknown", "Disconnected while connecting.");
+      return fail("canceled", "Disconnected while connecting.");
     }
 
     conn.up = true;
@@ -168,6 +174,10 @@ export class KickConnector extends ConnectorProvider {
     conn.chatroomId = channel.chatroomId;
     const url = await realtime(this._config, conn.clientId);
     const token = await guestToken(this._config, conn.clientId);
+    // A stop meanwhile already closed the socket: opening it would leak it
+    if (this._conn !== conn) {
+      throw connectFailure("canceled", "Disconnected while connecting.");
+    }
     // Chat's first. Never chatrooms.<id>: it repeats the hosts.
     await conn.socket.open(url, token, [
       `chatrooms.${channel.chatroomId}.v2`,

@@ -141,6 +141,29 @@ describe("YouTubeConnector", () => {
       expect(youtube.state.urls).toHaveLength(3);
       expect(connector.isConnected()).toBe(false);
     });
+
+    it("calls a connect a Disconnect stopped canceled", async () => {
+      const onConnected = capture(TOKIO_EVENTS.CONNECTED);
+      const connecting = connector.connect("madeup");
+      await connector.disconnect();
+
+      expect(await connecting).toMatchObject({
+        success: false,
+        error: { kind: "canceled" },
+      });
+      expect(onConnected).not.toHaveBeenCalled();
+      expect(connector.isConnected()).toBe(false);
+    });
+
+    it("calls a connect stopped while it waits to try again canceled", async () => {
+      youtube.state.override = () => {
+        setTimeout(() => void connector.disconnect(), 0);
+        throw new TypeError("fetch failed");
+      };
+
+      expect((await connector.connect("madeup")).error?.kind).toBe("canceled");
+      expect(youtube.state.urls).toHaveLength(1);
+    });
   });
 
   describe("the chat", () => {

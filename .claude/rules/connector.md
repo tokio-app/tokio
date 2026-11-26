@@ -36,5 +36,5 @@ This is TikTok's connector. The service that runs one LIVE across platforms, `Co
   - Any other gift ends at once (`isStreakEnd`).
 - Chat goes out through `emitChat` (every platform's provider, Twitch's and YouTube's too), which runs Chat translation's stage first (`.claude/rules/translation.md`). Emitting `CHAT` directly would skip it.
 - A comment made only of emotes is its own TikTok message (`emote`, never also a `chat`). `_listen` maps it to `CHAT` with an empty `content` and `lang`, each emote at `index` 0, so Emote alerts and game actions fire and its emotes are saved.
-- A failed connect's `error.kind` (`ConnectErrorKind`, `services/connector/common`) picks the message `home.ts` shows.
+- A failed connect's `error.kind` (`ConnectErrorKind`, `services/connector/common`) picks the message `home.ts` shows. `canceled` is a Disconnect during the connect (the library's `ABORTED`, or the woken retry wait): no message, `CONNECT` replies the state, and the service logs it at info.
 - The library's warnings and errors go to `connector.log` through its `logger` option, with the error they carry, and so do its info lines (connects with their attempt, reconnect attempts, the LIVE's end, stops with their error), so a connection that stopped says why. Its debug lines go to `Logger.debug`. An error with the same code is logged once per `LOG_REPEAT_MS`.

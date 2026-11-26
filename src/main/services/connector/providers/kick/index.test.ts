@@ -207,6 +207,39 @@ describe("KickConnector", () => {
       expect(kick.urls).toHaveLength(3);
       expect(connector.isConnected()).toBe(false);
     });
+
+    it("opens no socket for a connect a Disconnect stopped, and calls it canceled", async () => {
+      const onConnected = capture(TOKIO_EVENTS.CONNECTED);
+      // The tab's Disconnect while the lookup is out
+      kick.override = (url) => {
+        if (url.endsWith("/channels/streamer")) void connector.disconnect();
+        return undefined;
+      };
+
+      expect(await connector.connect("streamer")).toMatchObject({
+        success: false,
+        error: { kind: "canceled" },
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(kick.sockets).toHaveLength(0);
+      expect(onConnected).not.toHaveBeenCalled();
+      expect(connector.isConnected()).toBe(false);
+    });
+
+    it("calls a connect stopped while it waits to try again canceled", async () => {
+      kick.override = (url) => {
+        if (!url.endsWith("/auth/connection")) return undefined;
+        setTimeout(() => void connector.disconnect(), 0);
+        throw new TypeError("fetch failed");
+      };
+
+      expect((await connector.connect("streamer")).error?.kind).toBe(
+        "canceled",
+      );
+      expect(
+        kick.urls.filter((u) => u.endsWith("/channels/streamer")),
+      ).toHaveLength(1);
+    });
   });
 
   describe("events", () => {

@@ -124,6 +124,14 @@ events.push(
       : ["tiktok"];
     // A row's Connect asks for its platform alone
     const platforms = only ? used.filter((p) => only.includes(p)) : used;
+    // As main holds it: a connect during a reconnect stays reconnecting
+    const replyState = () =>
+      e.reply(APP_EVENTS_RESPONSE.CONNECTED, connectionState(services));
+    // None the profile uses: nothing to connect or tell
+    if (platforms.length === 0) {
+      replyState();
+      return;
+    }
     // Connected or connecting, a platform stays on its channel
     const on = connectorService.status();
     const channelOf = (platform: Platform, typed: string) =>
@@ -159,9 +167,6 @@ events.push(
       const target = targets[platform] ?? "";
       return target.includes("/") ? target : `@${target}`;
     };
-    // As main holds it: a connect during a reconnect stays reconnecting
-    const replyState = () =>
-      e.reply(APP_EVENTS_RESPONSE.CONNECTED, connectionState(services));
     const several = platforms.length > 1;
     // The connected event comes before connect() resolves, answer on the first.
     let answered = false;
@@ -186,6 +191,11 @@ events.push(
         const res = await connectorService.connect({
           [platform]: targets[platform],
         });
+        // The user's own Disconnect stopped it: nothing to tell
+        if (res.error?.kind === "canceled") {
+          replyState();
+          return;
+        }
         if (!res.success) {
           throw new AppFailure(
             FEEDBACK_CODES.CONNECT_FAILED,
@@ -200,7 +210,9 @@ events.push(
       // All of them failing throws nothing, which would add a notice.
       await connectorService.connect(targets, (platform, res) => {
         const key = `connect:${platform}`;
-        if (!res.success) {
+        if (res.error?.kind === "canceled") {
+          // The user's own Disconnect stopped it: nothing to tell
+        } else if (!res.success) {
           notifier.error(
             "connector",
             FEEDBACK_CODES.CONNECT_FAILED,
@@ -229,11 +241,10 @@ events.push(
       code: FEEDBACK_CODES.CONNECT_FAILED,
       message: "main.failure.connect",
     },
-    onError: (e, error) =>
+    // What main holds: a tab's failed connect leaves the others' LIVE on
+    onError: (e, error, _data, services) =>
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
-        success: false,
-        live: false,
-        stats: NO_STATS,
+        ...connectionState(services),
         error,
       }),
   },

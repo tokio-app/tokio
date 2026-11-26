@@ -146,6 +146,24 @@ describe("ConnectorService", () => {
     );
   });
 
+  it("logs a connect a Disconnect stopped at info, as the user's", async () => {
+    const error = vi.spyOn(Logger, "error");
+    const info = vi.spyOn(Logger, "info");
+    const { service, provider } = setup();
+    const cause = connectFailure("canceled", "Disconnected while connecting.");
+    provider.connect.mockResolvedValue({ success: false, error: cause });
+
+    expect(await service.connect({ tiktok: "streamer" })).toEqual({
+      success: false,
+      error: cause,
+    });
+    expect(error).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledWith(
+      "<Connector> Stopped connecting to streamer: the user disconnected.",
+      "connector.log",
+    );
+  });
+
   it("passes everything else to the active provider", async () => {
     const { service, provider } = setup();
     const listener = vi.fn();
