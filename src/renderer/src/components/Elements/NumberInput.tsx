@@ -68,6 +68,8 @@ export function NumberInput({
     (min === undefined || number >= min) &&
     (max === undefined || number <= max);
 
+  // Typed text that isn't reported, put back when the field is left
+  const invalid = text.trim() !== "" && !valid(Number(text));
   const step = integer ? 1 : Number(rest.step) || 1;
   const release = () => {
     clearTimeout(holding.current);
@@ -132,6 +134,7 @@ export function NumberInput({
     <Input
       {...rest}
       {...scrubbing}
+      aria-invalid={invalid || undefined}
       className={cx(className, pressed && styles.scrubbing)}
       type="number"
       min={min}

@@ -1,10 +1,24 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { describe, expect, it, vi } from "vitest";
 import { Modal } from ".";
 
 const dialog = () => within(screen.getByRole("dialog"));
+const dropFocus = () =>
+  act(() => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  });
 
 describe("Modal", () => {
   it("shows its title and description", () => {
@@ -255,6 +269,122 @@ describe("Modal", () => {
     expect(help).toHaveFocus();
     await user.tab({ shift: true });
     expect(cancel).toHaveFocus();
+  });
+
+  it("makes the page behind inert, but not what stays over dialogs", () => {
+    const page = (open: boolean) => (
+      <>
+        <button>Behind</button>
+        <div data-over-dialogs>
+          <button>Minimize</button>
+        </div>
+        {open && <Modal title="Settings" onClose={vi.fn()} />}
+      </>
+    );
+    const { rerender } = render(page(true));
+    const behind = screen.getByText("Behind");
+
+    expect(behind).toHaveAttribute("inert");
+    expect(screen.getByText("Minimize")).not.toHaveAttribute("inert");
+    expect(screen.getByRole("dialog")).not.toHaveAttribute("inert");
+
+    rerender(page(false));
+    expect(behind).not.toHaveAttribute("inert");
+  });
+
+  it("makes a lower dialog inert while one is open over it", () => {
+    const stack = (picker: boolean) => (
+      <Modal title="Edit alert" onClose={vi.fn()}>
+        <button>Pick a sound</button>
+        {picker && <Modal title="Select a sound" onClose={vi.fn()} />}
+      </Modal>
+    );
+    const { rerender } = render(stack(true));
+    const pick = screen.getByText("Pick a sound");
+
+    expect(pick).toHaveAttribute("inert");
+    expect(
+      screen.getByRole("dialog", { name: "Select a sound" }),
+    ).not.toHaveAttribute("inert");
+
+    rerender(stack(false));
+    expect(pick).not.toHaveAttribute("inert");
+  });
+
+  it("still takes Escape and Tab after its focused control leaves", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    function Rows() {
+      const [rows, setRows] = useState(["Gift", "Follow"]);
+      return rows.map((row) => (
+        <button
+          key={row}
+          onClick={() => setRows((r) => r.filter((x) => x !== row))}
+        >
+          {`Remove ${row}`}
+        </button>
+      ));
+    }
+    render(
+      <Modal title="Edit alert" onClose={onClose}>
+        <Rows />
+      </Modal>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Remove Gift" }));
+    // Chromium drops the focus on <body>, jsdom keeps it
+    dropFocus();
+    expect(document.body).toHaveFocus();
+
+    // Before the dialog takes the focus back on its own
+    fireEvent.keyDown(document.body, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "Remove Follow" })).toHaveFocus();
+
+    dropFocus();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("takes the focus back when it falls on <body>", async () => {
+    render(<Modal title="Settings" onClose={vi.fn()} />);
+
+    dropFocus();
+
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveFocus());
+  });
+
+  it("gives the focus to the dialog under it when its opener left", () => {
+    const stack = (sound: boolean, confirm: boolean) => (
+      <Modal title="Select a sound" onClose={vi.fn()}>
+        {sound && <button>Delete</button>}
+        {confirm && <Modal title="Delete sound?" onClose={vi.fn()} />}
+      </Modal>
+    );
+    const { rerender } = render(stack(true, false));
+    screen.getByRole("button", { name: "Delete" }).focus();
+    rerender(stack(true, true));
+    // Deleted, with its button
+    rerender(stack(false, false));
+
+    expect(
+      screen.getByRole("dialog", { name: "Select a sound" }),
+    ).toHaveFocus();
+  });
+
+  it("gives the focus to the page when its opener left", () => {
+    const page = (about: boolean, tour: boolean) => (
+      <main tabIndex={-1}>
+        {about && <button>Take the tour</button>}
+        {tour && <Modal title="Welcome to Tokio" onClose={vi.fn()} />}
+      </main>
+    );
+    const { rerender } = render(page(true, false));
+    screen.getByRole("button", { name: "Take the tour" }).focus();
+    rerender(page(true, true));
+    rerender(page(false, true));
+    rerender(page(false, false));
+
+    expect(screen.getByRole("main")).toHaveFocus();
   });
 
   it("closes only the innermost dialog on Escape", async () => {

@@ -11,6 +11,8 @@ Object.defineProperties(HTMLElement.prototype, {
 
 // useSoundSearch scrolls its list, and the router can scroll the window.
 Element.prototype.scrollTo = () => {};
+// The tour scrolls the piece it lights into view
+Element.prototype.scrollIntoView = () => {};
 globalThis.scrollTo = () => {};
 
 // Overlay Studio measures a text's words with a range, which jsdom can't lay

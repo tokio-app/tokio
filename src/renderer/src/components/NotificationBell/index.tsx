@@ -76,7 +76,15 @@ export function NotificationBell({
               {t("components.notifications.title")}
             </span>
             {history.length > 0 && (
-              <Btn variant="icon" onClick={onClear}>
+              <Btn
+                variant="icon"
+                onClick={() => {
+                  // The button leaves with the notices: the focus goes back
+                  // to the bell, not to <body>
+                  toggleRef.current?.focus();
+                  onClear();
+                }}
+              >
                 {t("components.notifications.clear")}
               </Btn>
             )}

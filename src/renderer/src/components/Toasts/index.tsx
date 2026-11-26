@@ -63,7 +63,10 @@ type ToastProps = {
 function Toast({ notification, onExpire, onClose }: ToastProps) {
   const { id, level, message } = notification;
   const duration = TOAST_MS[level];
-  const [paused, setPaused] = useState(false);
+  // Hovered or with the focus inside, so its close button can be reached
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const paused = hovered || focused;
   // Time left, kept while hovering pauses the timer
   const remaining = useRef(duration);
   const t = useT();
@@ -80,10 +83,15 @@ function Toast({ notification, onExpire, onClose }: ToastProps) {
 
   return (
     <div
-      role={level === "error" ? "alert" : "status"}
+      // The rest is read out by the viewport, which is there before them
+      role={level === "error" ? "alert" : undefined}
       className={cx(styles.toast, LEVELS[level])}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false);
+      }}
     >
       <LevelIcon level={level} />
       <p className={styles.message}>{message}</p>
@@ -113,7 +121,12 @@ export function Toasts({ toasts, onExpire, onClose }: Props) {
     <div
       role="region"
       aria-label={t("components.notifications.title")}
+      // One live region from the start: one shown already filled, as each
+      // toast would be, is often skipped by screen readers
+      aria-live="polite"
       className={styles.viewport}
+      // Live over dialogs, which don't make it inert (components/Modal)
+      data-over-dialogs
     >
       {toasts.map((n) => (
         <Toast

@@ -15,8 +15,9 @@ function setup(toasts: AppNotification[]) {
   return { onExpire, onClose, user };
 }
 
-const region = () =>
-  within(screen.getByRole("region", { name: "Notifications" }));
+const viewport = () => screen.getByRole("region", { name: "Notifications" });
+const region = () => within(viewport());
+const toasts = () => [...viewport().children].map((t) => t.textContent);
 const wait = (ms: number) => act(() => vi.advanceTimersByTime(ms));
 
 beforeEach(() => {
@@ -28,7 +29,7 @@ afterEach(() => {
 });
 
 describe("Toasts", () => {
-  it("announces errors as alerts and the rest as status", () => {
+  it("announces through one polite region, and errors as alerts", () => {
     setup([
       notification("Profile saved.", { level: "success" }),
       notification("No audio.", { level: "error" }),
@@ -36,12 +37,15 @@ describe("Toasts", () => {
       notification("Update ready.", { level: "info" }),
     ]);
 
+    expect(viewport()).toHaveAttribute("aria-live", "polite");
     expect(region().getByRole("alert")).toHaveTextContent("No audio.");
-    expect(
-      region()
-        .getAllByRole("status")
-        .map((t) => t.textContent),
-    ).toEqual(["Profile saved.", "Port in use.", "Update ready."]);
+    expect(region().queryAllByRole("status")).toEqual([]);
+  });
+
+  it("has its live region before any toast", () => {
+    setup([]);
+
+    expect(viewport()).toHaveAttribute("aria-live", "polite");
   });
 
   it.each<[FeedbackLevel, number]>([
@@ -65,11 +69,11 @@ describe("Toasts", () => {
     const { onExpire, user } = setup([toast]);
 
     await wait(3000);
-    await user.hover(region().getByRole("status"));
+    await user.hover(region().getByText("Port in use."));
     await wait(20000);
     expect(onExpire).not.toHaveBeenCalled();
 
-    await user.unhover(region().getByRole("status"));
+    await user.unhover(region().getByText("Port in use."));
     await wait(3999);
     expect(onExpire).not.toHaveBeenCalled();
 
@@ -80,7 +84,7 @@ describe("Toasts", () => {
   it("keeps the time left across several hovers", async () => {
     const toast = notification("Profile saved.", { level: "success" });
     const { onExpire, user } = setup([toast]);
-    const status = region().getByRole("status");
+    const status = region().getByText("Profile saved.");
 
     for (const elapsed of [1000, 1500]) {
       await wait(elapsed);
@@ -93,6 +97,23 @@ describe("Toasts", () => {
 
     await wait(1);
     expect(onExpire).toHaveBeenCalledOnce();
+  });
+
+  it("pauses while the focus is inside, so its close button can be reached", async () => {
+    const toast = notification("Port in use.", { level: "warning" });
+    const { onExpire, user } = setup([toast]);
+
+    await wait(3000);
+    await user.tab();
+    expect(region().getByRole("button", { name: "Close" })).toHaveFocus();
+    await wait(20000);
+    expect(onExpire).not.toHaveBeenCalled();
+
+    await user.tab();
+    await wait(3999);
+    expect(onExpire).not.toHaveBeenCalled();
+    await wait(1);
+    expect(onExpire).toHaveBeenCalledExactlyOnceWith(toast.id);
   });
 
   it("closes a toast with its Close button", async () => {
@@ -112,11 +133,7 @@ describe("Toasts", () => {
       notification("Third"),
     ]);
 
-    expect(
-      region()
-        .getAllByRole("status")
-        .map((t) => t.textContent),
-    ).toEqual(["First", "Second", "Third"]);
+    expect(toasts()).toEqual(["First", "Second", "Third"]);
   });
 
   it("expires each toast on its own timer", async () => {

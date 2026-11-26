@@ -143,6 +143,8 @@ describe("NotificationBell", () => {
     await user.click(screen.getByRole("button", { name: "Clear all" }));
 
     expect(onClear).toHaveBeenCalledOnce();
+    // Its own button leaves with the notices
+    expect(toggle()).toHaveFocus();
   });
 
   it("has no Clear all without notices", async () => {

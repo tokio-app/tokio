@@ -361,7 +361,7 @@ describe("About", () => {
     ]);
     expect(opened()).toEqual(["notices"]);
     expect(
-      dialog().getByRole("heading", { name: "Third-party notices", level: 3 }),
+      dialog().getByRole("heading", { name: "Third-party notices", level: 2 }),
     ).toBeInTheDocument();
   });
 

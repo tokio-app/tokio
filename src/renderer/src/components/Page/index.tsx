@@ -1,5 +1,6 @@
 import { cx } from "@/helper/cx";
-import { ReactNode, useId } from "react";
+import { ReactNode, useCallback, useId, useMemo, useState } from "react";
+import { FieldContext } from "../Elements/useFieldControl";
 import styles from "./page.module.css";
 
 type PageProps = {
@@ -92,10 +93,22 @@ type FieldProps = {
 };
 
 /**
- * A labelled control. The label names the field as a group.
+ * A labelled control. The label names the field as a group, and its control
+ * too when it has one Input, Textarea or Select, which clicking it focuses.
  */
 export function Field({ label, hint, className, children }: FieldProps) {
   const id = useId();
+  const [controls, setControls] = useState<string[]>([]);
+  const claim = useCallback((control: string) => {
+    setControls((all) => [...all, control]);
+    return () => setControls((all) => all.filter((c) => c !== control));
+  }, []);
+  const control = controls.length === 1 ? controls[0] : undefined;
+  const field = useMemo(
+    () => ({ labelId: id, control, claim }),
+    [id, control, claim],
+  );
+
   return (
     <div
       className={cx(styles.field, className)}
@@ -103,12 +116,24 @@ export function Field({ label, hint, className, children }: FieldProps) {
       aria-labelledby={label ? id : undefined}
     >
       {label && (
-        <label id={id} className={styles.field_label}>
+        <label
+          id={id}
+          htmlFor={control}
+          className={styles.field_label}
+          onClick={() => {
+            // A Select is a div, which a <label for> doesn't focus
+            const el = control && document.getElementById(control);
+            if (el && el.getAttribute("role") === "combobox") el.focus();
+          }}
+        >
           {label}
           {hint && <span className={styles.field_hint}>{hint}</span>}
         </label>
       )}
-      {children}
+      {/* Without a label, nor an outer field's either */}
+      <FieldContext.Provider value={label ? field : null}>
+        {children}
+      </FieldContext.Provider>
     </div>
   );
 }

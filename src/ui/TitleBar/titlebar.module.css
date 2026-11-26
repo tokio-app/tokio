@@ -69,7 +69,11 @@
   align-items: center;
 }
 
+/* Over a dialog's backdrop, or the window would seem stuck while one is open.
+   The bar's other items stay under it. */
 .controls {
+  position: relative;
+  z-index: var(--z-toast);
   display: flex;
   height: 100%;
   -webkit-app-region: no-drag;

@@ -15,7 +15,7 @@ import { forgetMedia } from "@/pages/StudioEditor/clipboard";
 import { useT } from "@/ui/i18n";
 import { TitleBar } from "@/ui/TitleBar";
 import { Link, Outlet } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   LuFlaskConical,
   LuGamepad2,
@@ -61,6 +61,7 @@ export function Layout() {
     name: "",
   });
   const [namesHidden, setNamesHidden] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
 
   useIpcRequest(APP_EVENTS.GET_SETTINGS);
   // Main pushes CONNECTED only as the connection changes, so ask after a
@@ -101,6 +102,18 @@ export function Layout() {
 
   return (
     <div className={styles.container}>
+      {/* Past the title bar's and the sidebar's stops */}
+      <a
+        href="#content"
+        className={styles.skip}
+        onClick={(e) => {
+          // The router owns the hash
+          e.preventDefault();
+          mainRef.current?.focus();
+        }}
+      >
+        {t("layout.skipToContent")}
+      </a>
       <TitleBar target="main" logo={Logo} live={live}>
         <ProfileDropdown
           disabled={isConnected}
@@ -145,7 +158,14 @@ export function Layout() {
           ))}
         </nav>
 
-        <main className={styles.content}>
+        {/* Focusable for the skip link, and for a dialog that closes after
+            its opener left */}
+        <main
+          ref={mainRef}
+          id="content"
+          className={styles.content}
+          tabIndex={-1}
+        >
           <Outlet />
         </main>
       </div>

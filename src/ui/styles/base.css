@@ -50,6 +50,12 @@ textarea {
   font-family: inherit;
 }
 
+/* The app's link color, as its own link styles have it: the browser's blue
+   is about 2:1 on Ink. A link styled as something else sets its own. */
+a {
+  color: var(--accent-primary);
+}
+
 /* Chromium lets every link and image be dragged out like a browser's */
 a,
 img {

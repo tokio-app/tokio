@@ -49,6 +49,7 @@ The look follows the `frontend-design` skill. The palette's values and the logos
 - One Ink surface (`--background-primary`). Panels (`--background-tertiary`) only for grouped content such as lists and cards. Controls on Field (`--background-secondary`), with `--border` for hairlines and Iron (`--background-secondary-hover`) for hover.
 - Rose (`--accent-primary`) means LIVE or "do this": the tally, primary actions, selection and focus, never decoration.
 - Text on rose is Paper (`--font-primary`), and checkboxes and radios keep the browser's light look (the user's call: they rejected dark text and gray dark-mode boxes).
+- Rose behind text or an icon, like an accent button's, is the darker `--accent-strong`, which Paper reads on at 4.5:1, and `--accent-strong-hover` on hover, darker again (the user's call). `--accent-primary` stays for the LIVE dot, links, focus rings, toggles and lines.
 - Radii: `--radius-md` for controls, `--radius-lg` for panels, `--radius-xl` for dialogs.
 - No shadows on cards, pills, or uppercase labels.
 - Type is Archivo, at 400 for text, 500 for labels and controls, 600 for titles. Live numbers use the readout: `font-stretch: var(--stretch-readout)`, 700, `tabular-nums`.
@@ -60,9 +61,10 @@ The look follows the `frontend-design` skill. The palette's values and the logos
 ## Keyboard
 
 - Don't remove focus outlines: anything without its own focus style gets `base.css`'s rose `:focus-visible` ring, drawn inset on the title bar's controls and in the sidebar.
-- `Modal` takes the focus while open and gives it back, and keeps Tab inside it, `video[controls]` and `audio[controls]` included. A media element's controls live in its shadow DOM, so Tab from a video skips them (a known limit).
+- `Modal` takes the focus while open and gives it back (to the dialog under it, or the page's `main`, when its opener left), and keeps Tab inside it, `video[controls]` and `audio[controls]` included. A media element's controls live in its shadow DOM, so Tab from a video skips them (a known limit).
+- While a `Modal` is open, everything behind the top one is `inert`, lower dialogs too. What carries `data-over-dialogs` stays live: the title bar's window controls, drawn over the backdrop so the window never looks stuck, and the toasts. Popovers portaled to `<body>` mount after the dialog, so they stay live. Not native `<dialog>`: its top layer would cover those portaled popovers.
 - Escape closes the innermost `Modal`; popovers inside it (`Select`, `Color`) handle Escape first and stop it.
-- A focused control that moves in the DOM, or leaves it, drops the focus on `<body>` in Chromium, where a `Modal` no longer sees Escape or Tab. Put it back after a `flushSync`, as `TableField`, the games builder's rows and Overlay Studio's Elements list do. jsdom keeps the focus, so only the real app shows it.
+- A focused control that moves in the DOM, or leaves it, drops the focus on `<body>` in Chromium. A `Modal` still takes Escape and Tab from there, and takes the focus back after a click on its backdrop. A control that moves should keep the focus, so the user keeps their place: put it back after a `flushSync`, as `TableField`, the games builder's rows and Overlay Studio's Elements list do. jsdom keeps the focus on a moved element, so only the real app shows it.
 - `Color`'s picker is portaled: its text field takes the focus when it opens, and Tab out of it goes back to its swatch.
 - Overlay previews (`Iframe`) are out of the Tab order.
 - `Select` is a combobox with a listbox. Its `OPTION_HEIGHT` is the item's `--control-height` plus the row's 2px padding on each side, so change them together.

@@ -39,13 +39,14 @@
 
 .btn_accent {
   border-color: transparent;
-  background-color: var(--accent-primary);
+  background-color: var(--accent-strong);
   font-weight: 600;
 }
 
+/* Darker, not lighter, so its text stays readable */
 .btn_accent:hover:not(:disabled) {
   border-color: transparent;
-  background-color: var(--accent-primary-hover);
+  background-color: var(--accent-strong-hover);
 }
 
 /* Gray, not a faded rose: there's nothing to do yet */
@@ -158,6 +159,12 @@
 .input:disabled {
   color: var(--font-secondary);
   cursor: not-allowed;
+}
+
+/* Text that isn't a value it takes, such as a number past its limits. Not
+   :user-invalid: NumberInput's own limits decide, not the native step. */
+.input[aria-invalid="true"]:not(:disabled) {
+  border-color: var(--danger);
 }
 
 .textarea {
@@ -586,9 +593,18 @@
 
 /* TABS START */
 
+/* The row a caller styles: the tablist itself, or with a × the list and the
+   ×s, each anchored to its tab */
 .tabs {
+  position: relative;
   display: flex;
   gap: var(--space-1);
+  anchor-scope: all;
+}
+
+/* Its tabs lay out in the row, the list only says what they are */
+.tablist {
+  display: contents;
 }
 
 .tabs_underline {
@@ -661,18 +677,18 @@
 /* A tab that can be closed: its × sits in the tab's own right padding, so
    the underline runs under both */
 .tab_closable {
-  position: relative;
-  display: flex;
+  anchor-name: var(--tab-anchor);
 }
 
-.tabs_underline .tab_closable .tab {
+.tabs_underline .tab_closable {
   padding-right: calc(var(--space-2) + 22px);
 }
 
 .tab_close {
   position: absolute;
-  top: 50%;
-  right: var(--space-2);
+  position-anchor: var(--tab-anchor);
+  top: anchor(center);
+  right: calc(anchor(right) + var(--space-2));
   display: flex;
   padding: 4px;
   border: none;

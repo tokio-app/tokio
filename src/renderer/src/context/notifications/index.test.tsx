@@ -50,6 +50,8 @@ const notify = (message: string, patch?: Partial<AppNotification>) =>
   send(APP_EVENTS_RESPONSE.NOTIFY, notification(message, patch));
 
 const toasts = () => screen.getByRole("region", { name: "Notifications" });
+// The toasts on screen, by their text
+const shown = () => [...toasts().children].map((t) => t.textContent);
 const history = () =>
   within(screen.getByRole("list", { name: "History" }))
     .queryAllByRole("listitem")
@@ -71,9 +73,7 @@ describe("NotificationsProvider", () => {
 
     await notify("The LIVE has ended.");
 
-    expect(within(toasts()).getByRole("status")).toHaveTextContent(
-      "The LIVE has ended.",
-    );
+    expect(shown()).toEqual(["The LIVE has ended."]);
     expect(history()).toEqual(["The LIVE has ended."]);
     // Still on screen, so not missed
     expect(screen.getByText("Unread: 0")).toBeInTheDocument();
@@ -92,10 +92,10 @@ describe("NotificationsProvider", () => {
     await notify("Port in use.", { level: "warning" });
 
     await wait(6999);
-    expect(within(toasts()).getByRole("status")).toBeInTheDocument();
+    expect(shown()).toEqual(["Port in use."]);
 
     await wait(1);
-    expect(within(toasts()).queryByRole("status")).not.toBeInTheDocument();
+    expect(shown()).toEqual([]);
     expect(screen.getByText("Unread: 1")).toBeInTheDocument();
   });
 
@@ -114,7 +114,7 @@ describe("NotificationsProvider", () => {
 
     await user.click(within(toasts()).getByRole("button", { name: "Close" }));
 
-    expect(within(toasts()).queryByRole("status")).not.toBeInTheDocument();
+    expect(shown()).toEqual([]);
     expect(history()).toEqual(["Port in use."]);
     expect(screen.getByText("Unread: 0")).toBeInTheDocument();
   });
@@ -133,13 +133,7 @@ describe("NotificationsProvider", () => {
 
     for (const n of [1, 2, 3, 4, 5]) await notify(`Notice ${n}`);
 
-    const shown = within(toasts()).getAllByRole("status");
-    expect(shown.map((t) => t.textContent)).toEqual([
-      "Notice 2",
-      "Notice 3",
-      "Notice 4",
-      "Notice 5",
-    ]);
+    expect(shown()).toEqual(["Notice 2", "Notice 3", "Notice 4", "Notice 5"]);
     expect(history()).toHaveLength(5);
     // Notice 1 left without being read
     expect(screen.getByText("Unread: 1")).toBeInTheDocument();
@@ -169,7 +163,7 @@ describe("NotificationsProvider", () => {
     await notify("Three");
     await user.click(screen.getByRole("button", { name: "Clear" }));
     expect(history()).toEqual([]);
-    expect(within(toasts()).queryByRole("status")).not.toBeInTheDocument();
+    expect(shown()).toEqual([]);
   });
 
   it("keeps the same history when there's nothing to mark", async () => {

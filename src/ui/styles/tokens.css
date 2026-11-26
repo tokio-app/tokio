@@ -10,6 +10,9 @@
   --border: #27272a;
   --accent-primary: #f43f5e;
   --accent-primary-hover: #fb7185;
+  /* Rose behind text, such as an accent button's: Paper reads on it */
+  --accent-strong: #e11d48;
+  --accent-strong-hover: #be123c;
   --accent-soft: rgba(244, 63, 94, 0.12);
   --font-primary: #f1f5f9;
   --font-secondary: #a1a1aa;

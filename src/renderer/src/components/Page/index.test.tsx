@@ -1,6 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 import { EmptyState, Field, FormGrid, Page, Section } from ".";
+import { Input, NumberInput, Select } from "../Elements";
+import { Modal } from "../Modal";
 
 describe("Page", () => {
   it("renders its sections", () => {
@@ -117,6 +120,60 @@ describe("Field", () => {
 
     const group = screen.getByRole("group", { name: /Cooldown/ });
     expect(within(group).getByRole("spinbutton")).toBeInTheDocument();
+  });
+
+  it("ties its label to its one control, which a click on it focuses", async () => {
+    const user = userEvent.setup();
+    render(
+      <Field label="Cooldown" hint="(seconds)">
+        <NumberInput value={2} onChange={vi.fn()} />
+      </Field>,
+    );
+
+    await user.click(screen.getByText("Cooldown"));
+
+    expect(screen.getByRole("spinbutton", { name: /^Cooldown/ })).toHaveFocus();
+  });
+
+  it("names a Select it holds, and focuses it on a click", async () => {
+    const user = userEvent.setup();
+    render(
+      <Field label="Voice">
+        <Select options={[]} value={undefined} onChange={vi.fn()} />
+      </Field>,
+    );
+
+    await user.click(screen.getByText("Voice"));
+
+    expect(screen.getByRole("combobox", { name: "Voice" })).toHaveFocus();
+  });
+
+  it("ties its label to no control when it has two", () => {
+    render(
+      <Field label="Range">
+        <Input placeholder="From" />
+        <Input placeholder="To" />
+      </Field>,
+    );
+
+    expect(screen.getByText("Range")).not.toHaveAttribute("for");
+    expect(screen.getByRole("group", { name: "Range" })).toBeInTheDocument();
+  });
+
+  it("doesn't name the controls of a dialog opened from it", () => {
+    render(
+      <Field label="Font">
+        <Modal title="Fonts" onClose={vi.fn()}>
+          <Input placeholder="Search fonts..." />
+        </Modal>
+      </Field>,
+    );
+
+    expect(screen.getByText("Font")).not.toHaveAttribute("for");
+    expect(screen.getByPlaceholderText("Search fonts...")).toHaveProperty(
+      "labels.length",
+      0,
+    );
   });
 
   it("shows only the control without a label", () => {
