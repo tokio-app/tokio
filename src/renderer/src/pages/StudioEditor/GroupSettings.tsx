@@ -37,9 +37,9 @@ const near = (a: Turned, b: Turned) =>
   );
 
 /**
- * The selected group's name, how its elements move together, its frame's
- * position, size, turn, flips and opacity, which its elements take, and its
- * When, which moves it as one around its elements.
+ * The selected group's name, its When, which moves it as one around its
+ * elements, how its elements move together, and its frame's position, size,
+ * turn, flips and opacity, which its elements take.
  */
 export function GroupSettings({
   group,
@@ -80,6 +80,16 @@ export function GroupSettings({
           onChange={(e) => onChange({ ...group, name: e.target.value })}
         />
       </Field>
+      <ReactionFields
+        value={group}
+        whens={whens}
+        triggers={triggers}
+        untilEnd={false}
+        gifts={gifts}
+        emotes={emotes}
+        counters={counters}
+        onChange={onChange}
+      />
       <p className={styles.note}>
         {t(
           group.hidden
@@ -115,16 +125,6 @@ export function GroupSettings({
           onOpacity={(opacity) => onChange({ ...group, opacity })}
         />
       )}
-      <ReactionFields
-        value={group}
-        whens={whens}
-        triggers={triggers}
-        untilEnd={false}
-        gifts={gifts}
-        emotes={emotes}
-        counters={counters}
-        onChange={onChange}
-      />
     </div>
   );
 }

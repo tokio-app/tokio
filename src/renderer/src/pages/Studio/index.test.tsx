@@ -167,7 +167,11 @@ describe("Studio", () => {
       }),
     );
 
-    expect(page().getByText(/^The overlay server is off\./)).toBeVisible();
+    const notice = page().getByText(/^The overlay server is off\./);
+    expect(notice).toBeVisible();
+    expect(
+      within(notice).getByRole("link", { name: "Settings" }),
+    ).toHaveAttribute("href", "/settings");
   });
 
   it("goes back to Tools", async () => {

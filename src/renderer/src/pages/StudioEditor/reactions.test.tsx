@@ -46,6 +46,7 @@ import {
   canvas,
   drawn,
   field,
+  addItems,
   addMenu,
   sized,
   handle,
@@ -164,13 +165,13 @@ describe("StudioEditor", () => {
       // Twitch sends none, Kick sends Kicks
       await usingPlatforms(["twitch", "kick"]);
       await user.click(addMenu());
-      expect(screen.queryByRole("menuitem", { name: "Gift" })).toBeNull();
-      expect(screen.getByRole("menuitem", { name: "Emote" })).toBeVisible();
+      expect(addItems().queryByRole("button", { name: "Gift" })).toBeNull();
+      expect(addItems().getByRole("button", { name: "Emote" })).toBeVisible();
       await user.keyboard("{Escape}");
 
       await usingPlatforms(["youtube"]);
       await user.click(addMenu());
-      expect(screen.getByRole("menuitem", { name: "Gift" })).toBeVisible();
+      expect(addItems().getByRole("button", { name: "Gift" })).toBeVisible();
     });
 
     it("picks from TikTok's gifts only with TikTok, or to change one picked", async () => {
@@ -874,6 +875,30 @@ describe("StudioEditor", () => {
     expect(
       drawn(always.id).querySelector(".studio-body")!.className,
     ).not.toMatch(/studio-enter/);
+  });
+
+  it("offers Test only while something reacts to an event", async () => {
+    const shown = text({ text: "Hello" });
+    const { user } = await open(scene(shown));
+    const test = () =>
+      page().getByRole("button", {
+        name: "Test the elements and groups that react to events",
+      });
+    expect(test()).toBeDisabled();
+
+    await user.click(row(/^Hello/));
+    // When comes right after the name, before the text it gives variables to
+    const [name, when, words] = ["Name", "When", "Text"].map((label) =>
+      page().getByRole("group", { name: label }),
+    );
+    expect(name.nextElementSibling).toBe(when);
+    expect(when.compareDocumentPosition(words)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    await user.click(
+      field("When").getByRole("radio", { name: "Shows on an event" }),
+    );
+    expect(test()).toBeEnabled();
   });
 
   it("tests the groups that react too, not a hidden one", async () => {

@@ -13,10 +13,10 @@ import {
 } from "@/components";
 import { useIpcListener, useIpcRequest, useServerEnabled } from "@/hooks";
 import toolsStyles from "@/pages/Tools/tools.module.css";
-import { useT } from "@/ui/i18n";
+import { rich, useT } from "@/ui/i18n";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { FiPlus, FiTrash2 } from "react-icons/fi";
+import { FiLink, FiPlus, FiTrash2 } from "react-icons/fi";
 import { LuCopyPlus } from "react-icons/lu";
 import { copyName, newOverlayName, sizeText } from "./helper";
 import styles from "./studio.module.css";
@@ -107,6 +107,8 @@ export function Studio() {
                 <CopyButton
                   value={getStudioOverlayURL(overlay.id)}
                   title={t("studio.copyUrl")}
+                  // Apart from Duplicate's copy icon
+                  icon={<FiLink size={18} />}
                 />
                 <Btn
                   variant="icon"
@@ -135,7 +137,11 @@ export function Studio() {
   return (
     <Page>
       {!serverEnabled && (
-        <p className={toolsStyles.notice}>{t("studio.serverOff")}</p>
+        <p className={toolsStyles.notice}>
+          {rich(t("studio.serverOff"), {
+            link: (text) => <Link to="/settings">{text}</Link>,
+          })}
+        </p>
       )}
 
       <Section

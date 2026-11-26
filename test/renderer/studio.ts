@@ -91,13 +91,17 @@ export const rowOf = (name: RegExp) =>
   within(row(name).closest<HTMLElement>("[data-row]")!);
 export const grip = (id: string) =>
   document.querySelector<HTMLElement>(`[data-grip="${id}"]`)!;
-export const canvas = () => page().getByLabelText(/^Canvas\./);
+export const canvas = () =>
+  page().getByLabelText("Canvas", { selector: "[role=application]" });
 export const drawn = (id: string) =>
   canvas().querySelector<HTMLElement>(`[data-element="${id}"]`)!;
 export const field = (name: string) =>
   within(page().getByRole("group", { name }));
 export const addMenu = () =>
   page().getByRole("button", { name: "Add a group or an element" });
+// The + menu's buttons, while it's open
+export const addItems = () =>
+  within(addMenu().nextElementSibling as HTMLElement);
 export const deleteButton = (name: string) =>
   page().getByRole("button", { name });
 export const undo = () => page().getByRole("button", { name: "Undo (Ctrl+Z)" });

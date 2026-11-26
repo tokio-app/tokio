@@ -102,6 +102,9 @@ type Plan = {
   run: () => void;
 };
 
+// The keys a row's select button takes
+const KEYS = "ArrowUp ArrowDown ArrowLeft ArrowRight Home End Delete Backspace";
+
 // Up the list is toward the front
 const stepOf = (e: KeyboardEvent) =>
   e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : 0;
@@ -144,7 +147,7 @@ export function LayersPanel({
   } | null>(null);
 
   // Top = front
-  const rows = [...items].reverse();
+  const rows = items.toReversed();
   const groups = items.filter((item) => item.kind === "group");
   const groupName = (group: StudioGroup) =>
     group.name.trim() || t("studio.editor.untitledGroup");
@@ -152,7 +155,7 @@ export function LayersPanel({
   const order = rows.flatMap((item) => [
     item.id,
     ...(item.kind === "group" && !item.folded
-      ? [...item.elements].reverse().map((e) => e.id)
+      ? item.elements.toReversed().map((e) => e.id)
       : []),
   ]);
 
@@ -179,6 +182,7 @@ export function LayersPanel({
     <>
       <Btn
         variant="icon"
+        tabIndex={-1}
         className={cx(styles.toggle, flags.locked && styles.toggle_on)}
         title={labels.lock}
         aria-label={labels.lock}
@@ -189,6 +193,7 @@ export function LayersPanel({
       </Btn>
       <Btn
         variant="icon"
+        tabIndex={-1}
         className={cx(styles.toggle, flags.hidden && styles.toggle_on)}
         title={labels.hide}
         aria-label={labels.hide}
@@ -199,6 +204,9 @@ export function LayersPanel({
       </Btn>
     </>
   );
+
+  // The list is one Tab stop: the front-most selected row, else the top one
+  const current = order.find((id) => selected.includes(id)) ?? order[0];
 
   // The one selected, null for none or several
   const single = selected.length === 1 ? selected[0] : null;
@@ -393,9 +401,43 @@ export function LayersPanel({
     }
   };
 
+  // Up and Down (Home, End) select the row above or below, as LIVE history's
+  // list does; Left and Right go through a row's buttons. The grip keeps Up
+  // and Down to move its row.
+  const roam = (e: KeyboardEvent<HTMLUListElement>) => {
+    if (e.defaultPrevented || !(e.target instanceof HTMLElement)) return;
+    const row = e.target.closest<HTMLElement>("[data-row]");
+    if (!row) return;
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      const buttons = Array.from(row.querySelectorAll<HTMLElement>("button"));
+      const at = buttons.indexOf(e.target) + (e.key === "ArrowLeft" ? -1 : 1);
+      if (at < 0 || at >= buttons.length) return;
+      e.preventDefault();
+      buttons[at].focus();
+      return;
+    }
+    const at = order.indexOf(row.dataset.row!);
+    const to =
+      e.key === "ArrowUp"
+        ? at - 1
+        : e.key === "ArrowDown"
+          ? at + 1
+          : e.key === "Home"
+            ? 0
+            : e.key === "End"
+              ? order.length - 1
+              : -1;
+    const id = order[to];
+    if (id === undefined) return;
+    e.preventDefault();
+    onSelect([id]);
+    list.current?.querySelector<HTMLElement>(`[data-select="${id}"]`)?.focus();
+  };
+
   const grip = (id: string, group: boolean, move: (by: 1 | -1) => void) => (
     <Btn
       variant="icon"
+      tabIndex={-1}
       className={styles.grip}
       title={reorder}
       aria-label={reorder}
@@ -416,7 +458,7 @@ export function LayersPanel({
     return (
       <li
         key={element.id}
-        data-row
+        data-row={element.id}
         className={cx(
           styles.layer,
           styles.element_row,
@@ -435,6 +477,8 @@ export function LayersPanel({
           type="button"
           className={styles.layer_select}
           aria-pressed={selected.includes(element.id)}
+          aria-keyshortcuts={KEYS}
+          tabIndex={element.id === current ? 0 : -1}
           data-select={element.id}
           onClick={(e) => pick(e, element.id, inGroup ? item : null)}
         >
@@ -476,7 +520,7 @@ export function LayersPanel({
         data-item={group.id}
       >
         <div
-          data-row
+          data-row={group.id}
           className={cx(
             styles.layer,
             styles.group_row,
@@ -489,6 +533,7 @@ export function LayersPanel({
           {group.elements.length > 0 ? (
             <Btn
               variant="icon"
+              tabIndex={-1}
               title={fold}
               aria-label={fold}
               aria-expanded={!group.folded}
@@ -507,6 +552,8 @@ export function LayersPanel({
             type="button"
             className={styles.layer_select}
             aria-pressed={selected.includes(group.id)}
+            aria-keyshortcuts={KEYS}
+            tabIndex={group.id === current ? 0 : -1}
             data-select={group.id}
             onClick={(e) => pick(e, group.id, null)}
           >
@@ -530,8 +577,8 @@ export function LayersPanel({
 
         {shown && (
           <ul className={styles.elements} aria-label={name}>
-            {[...group.elements]
-              .reverse()
+            {group.elements
+              .toReversed()
               .map((element) => elementRow(element, group.id))}
           </ul>
         )}
@@ -550,18 +597,6 @@ export function LayersPanel({
             className={styles.menu_anchor}
             menuClassName={styles.menu}
           >
-            <button
-              type="button"
-              role="menuitem"
-              className={styles.menu_item}
-              disabled={groupsFull}
-              onClick={() => {
-                menu.close();
-                onAddGroup();
-              }}
-            >
-              {t("studio.editor.newGroup")}
-            </button>
             <div
               role="group"
               aria-labelledby={caption}
@@ -576,7 +611,6 @@ export function LayersPanel({
                 <button
                   key={kind}
                   type="button"
-                  role="menuitem"
                   className={styles.menu_item}
                   disabled={elementsFull}
                   onClick={() => {
@@ -588,6 +622,18 @@ export function LayersPanel({
                 </button>
               ))}
             </div>
+            {/* Last: a first overlay needs an element before a group */}
+            <button
+              type="button"
+              className={styles.menu_item}
+              disabled={groupsFull}
+              onClick={() => {
+                menu.close();
+                onAddGroup();
+              }}
+            >
+              {t("studio.editor.newGroup")}
+            </button>
             {(elementsFull || groupsFull) && (
               <p className={styles.menu_note}>
                 {elementsFull
@@ -646,7 +692,10 @@ export function LayersPanel({
           }}
           // Also when it's cancelled or dropped elsewhere: nothing moves
           onDragEnd={() => setDrag(null)}
-          onKeyDown={removeByKey}
+          onKeyDown={(e) => {
+            removeByKey(e);
+            roam(e);
+          }}
           // A click past the items, under them or between them, lets go of
           // the selection, as a click on the empty canvas does
           onClick={(e) => {

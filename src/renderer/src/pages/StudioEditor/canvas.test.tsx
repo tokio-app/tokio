@@ -1083,7 +1083,7 @@ describe("StudioEditor", () => {
         ...patch,
       });
     // The canvas, named for cropping while it crops
-    const stage = () => page().getByLabelText(/^(Canvas|Cropping)\./);
+    const stage = canvas;
     // The stage read the picture's own size
     const loaded = (id: string, width: number, height: number) => {
       const img = drawn(id).querySelector("img")!;
@@ -1174,7 +1174,7 @@ describe("StudioEditor", () => {
 
       // Its middle, (300, 200) on the canvas
       fireEvent.doubleClick(stage(), { clientX: 150, clientY: 100 });
-      expect(stage()).toHaveAccessibleName(/^Cropping\./);
+      expect(stage()).toHaveAccessibleDescription(/^Cropping\./);
       expect(document.querySelectorAll("[data-crop]")).toHaveLength(8);
       expect(undo()).toBeDisabled();
 
@@ -1197,7 +1197,7 @@ describe("StudioEditor", () => {
           height: 200,
         }),
       );
-      expect(stage()).toHaveAccessibleName(/^Canvas\./);
+      expect(stage()).toHaveAccessibleDescription(/^Move the selection/);
       expect(document.querySelector("[data-crop]")).toBeNull();
 
       await studio(lastSave()!);
@@ -1231,7 +1231,7 @@ describe("StudioEditor", () => {
           name: "Crop on the canvas (double-click)",
         }),
       );
-      expect(stage()).toHaveAccessibleName(/^Cropping\./);
+      expect(stage()).toHaveAccessibleDescription(/^Cropping\./);
       fireEvent.pointerDown(cropHandle("e"), {
         button: 0,
         clientX: 250,

@@ -39,6 +39,7 @@ import {
   canvas,
   drawn,
   field,
+  addItems,
   addMenu,
   deleteButton,
   undo,
@@ -143,7 +144,7 @@ describe("StudioEditor", () => {
       // The one just added is selected, so nothing goes into a group
       await user.click(addMenu());
       expect(screen.getByText("Add an element")).toBeVisible();
-      await user.click(screen.getByRole("menuitem", { name: kind }));
+      await user.click(addItems().getByRole("button", { name: kind }));
       expect(page().getByRole("heading", { name: kind })).toBeVisible();
     }
 
@@ -191,7 +192,11 @@ describe("StudioEditor", () => {
     );
 
     await user.click(addMenu());
-    await user.click(screen.getByRole("menuitem", { name: "New group" }));
+    // Last: a first overlay needs an element first
+    expect(addItems().getAllByRole("button").at(-1)).toHaveAccessibleName(
+      "New group",
+    );
+    await user.click(addItems().getByRole("button", { name: "New group" }));
 
     await waitFor(() =>
       expect(savedNames()).toEqual(["Group 1", "", "Group 3", "Group 2"]),
@@ -212,7 +217,7 @@ describe("StudioEditor", () => {
     await user.click(row(/^Front/));
     await user.click(addMenu());
     expect(screen.getByText("Add to Front")).toBeVisible();
-    await user.click(screen.getByRole("menuitem", { name: "Shape" }));
+    await user.click(addItems().getByRole("button", { name: "Shape" }));
     await waitFor(() =>
       expect(savedGroup(1)?.elements.map((e) => e.kind)).toEqual(["shape"]),
     );
@@ -221,7 +226,7 @@ describe("StudioEditor", () => {
     await user.click(row(/^In back/));
     await user.click(addMenu());
     expect(screen.getByText("Add to Back")).toBeVisible();
-    await user.click(screen.getByRole("menuitem", { name: "Text" }));
+    await user.click(addItems().getByRole("button", { name: "Text" }));
 
     // In front in its group
     await waitFor(() =>
@@ -254,6 +259,41 @@ describe("StudioEditor", () => {
     expect(row(/^Alone/).closest("ul")).toBe(
       layers().getAllByRole("listitem")[0].closest("ul"),
     );
+  });
+
+  it("is one Tab stop, with the arrows between rows and their buttons", async () => {
+    const back = group("Back", [text({ text: "B1" })]);
+    const alone = text({ text: "Alone" });
+    const { user } = await open(holding(back, alone));
+    const tabStops = () =>
+      layers()
+        .getAllByRole("button")
+        .filter((button) => button.tabIndex === 0);
+
+    // The top row, until one is selected
+    expect(tabStops()).toEqual([row(/^Alone/)]);
+    await user.click(row(/^B1/));
+    expect(tabStops()).toEqual([row(/^B1/)]);
+
+    // Up and Down select the row above or below
+    await user.keyboard("{ArrowUp}");
+    expect(row(/^Back/)).toHaveFocus();
+    expect(row(/^Back/)).toHaveAttribute("aria-pressed", "true");
+    await user.keyboard("{ArrowUp}");
+    expect(row(/^Alone/)).toHaveFocus();
+    await user.keyboard("{End}");
+    expect(row(/^B1/)).toHaveFocus();
+    expect(tabStops()).toEqual([row(/^B1/)]);
+
+    // Left and Right reach the grip, the lock and the eye
+    await user.keyboard("{ArrowLeft}");
+    expect(grip(back.elements[0].id)).toHaveFocus();
+    await user.keyboard("{ArrowRight}{ArrowRight}");
+    expect(
+      rowOf(/^B1/).getByRole("button", { name: "Lock element" }),
+    ).toHaveFocus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(savedGroup(0)?.elements[0].locked).toBe(true));
   });
 
   it("folds a group, and a pick on the canvas unfolds it", async () => {

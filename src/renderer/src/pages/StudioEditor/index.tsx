@@ -66,11 +66,12 @@ import { useTimerPush } from "@/pages/CountdownTimer/helper";
 import { newOverlayName, sizeText } from "@/pages/Studio/helper";
 import toolsStyles from "@/pages/Tools/tools.module.css";
 import { PlatformsContext } from "@/context/platforms";
-import { useLanguage, useT } from "@/ui/i18n";
-import { useParams } from "@tanstack/react-router";
+import { rich, useLanguage, useT } from "@/ui/i18n";
+import { Link, useParams } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
-import { FiPlay } from "react-icons/fi";
+import { FiLink } from "react-icons/fi";
 import { LuRedo2, LuUndo2 } from "react-icons/lu";
+import { PiShootingStarThin } from "react-icons/pi";
 import { ElementSettings } from "./ElementSettings";
 import { Embed } from "./Embed";
 import {
@@ -689,6 +690,12 @@ function Editor({ saved }: { saved: StudioOverlay }) {
 
   // Plays every element and group that reacts, elements with fresh
   // samples, each after its delay as on stream, here and on stream
+  // What Test plays: the elements and the shown groups that react
+  const testable =
+    elements.some(reactsToEvents) ||
+    overlay.items.some(
+      (item) => item.kind === "group" && !item.hidden && reactsToEvents(item),
+    );
   const test = () => {
     flushSettings();
     const fresh = new Samples(platforms);
@@ -793,13 +800,16 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               variant="icon"
               title={t("studio.editor.test")}
               aria-label={t("studio.editor.test")}
+              // With nothing reacting, it would show nothing
+              disabled={!testable}
               onClick={test}
             >
-              <FiPlay size={20} />
+              <PiShootingStarThin size={20} />
             </Btn>
             <CopyButton
               value={getStudioOverlayURL(overlay.id)}
               title={t("studio.copyUrl")}
+              icon={<FiLink size={18} />}
             />
           </>
         }
@@ -841,7 +851,11 @@ function Editor({ saved }: { saved: StudioOverlay }) {
 
           <div className={styles.canvas_column}>
             {!serverEnabled && (
-              <p className={toolsStyles.notice}>{t("studio.serverOff")}</p>
+              <p className={toolsStyles.notice}>
+                {rich(t("studio.serverOff"), {
+                  link: (text) => <Link to="/settings">{text}</Link>,
+                })}
+              </p>
             )}
             <StudioStage
               view={view}
