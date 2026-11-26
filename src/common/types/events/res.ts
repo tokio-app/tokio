@@ -118,6 +118,7 @@ export enum APP_EVENTS_RESPONSE {
   LIVE_GIFTERS = "app:home:res:gifters",
   SONGS = "app:home:res:songs",
   SET_PLATFORMS = "app:home:res:set:platforms",
+  SET_CHANNELS = "app:home:res:set:channels",
 
   // LIVES
   LIVES = "app:lives:res:get",
@@ -186,10 +187,13 @@ export interface AppEventsResponseMap {
   // INIT
   // updatedFrom: on the first load after an update, the version Tokio ran as
   // before ("" from before it was kept), for What's new. newStore: on the
-  // first load of a store that started from the defaults, for the tour
+  // first load of a store that started from the defaults, for the tour.
+  // welcome: newStore with the profile still untouched (TikTok alone, no
+  // names), for the first-start dialog before the tour
   [APP_EVENTS_RESPONSE.LOAD_APP]: Reply<{
     updatedFrom?: string;
     newStore?: boolean;
+    welcome?: boolean;
   }>;
 
   // GLOBAL
@@ -355,6 +359,12 @@ export interface AppEventsResponseMap {
 
   // The platforms as main holds them, failures included
   [APP_EVENTS_RESPONSE.SET_PLATFORMS]: Reply<{ platforms: Platform[] }>;
+
+  // The names as main holds them, failures included
+  [APP_EVENTS_RESPONSE.SET_CHANNELS]: Reply<{
+    username: string;
+    channels: Partial<Record<Platform, string>>;
+  }>;
 
   [APP_EVENTS_RESPONSE.VIEWS]: {
     data: {

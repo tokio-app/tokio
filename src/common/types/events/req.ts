@@ -107,6 +107,8 @@ export enum APP_EVENTS {
   GET_SONGS = "app:home:songs",
   // The platforms the profile connects to, picked on Home
   SET_PLATFORMS = "app:home:set:platforms",
+  // The names typed for them, saved without connecting
+  SET_CHANNELS = "app:home:set:channels",
 
   // LIVES
   GET_LIVES = "app:lives:get",
@@ -392,6 +394,13 @@ export interface AppEventsMap {
   [APP_EVENTS.GET_LIVE_GIFTERS]: void;
   [APP_EVENTS.GET_SONGS]: void;
   [APP_EVENTS.SET_PLATFORMS]: { platforms: Platform[] };
+  // Saves the profile's names as CONNECT would, without connecting: username
+  // is TikTok's, channels the others' that take one. A platform that's on
+  // keeps its own.
+  [APP_EVENTS.SET_CHANNELS]: {
+    username?: string;
+    channels?: Partial<Record<Platform, string>>;
+  };
 
   // LIVES
   [APP_EVENTS.GET_LIVES]: void;
