@@ -122,6 +122,22 @@ describe("YouTubeConnector", () => {
       expect(youtube.state.urls).toHaveLength(1);
     });
 
+    it("tries a page whose body broke again, as the network", async () => {
+      youtube.state.override = (url) =>
+        url.includes("/@madeup/live")
+          ? new Response(
+              new ReadableStream({
+                start(controller) {
+                  controller.error(new TypeError("terminated"));
+                },
+              }),
+            )
+          : undefined;
+
+      expect((await connector.connect("madeup")).error?.kind).toBe("network");
+      expect(youtube.state.urls).toHaveLength(3);
+    });
+
     it("tries a network failure again", async () => {
       let failures = 2;
       youtube.state.override = () => {

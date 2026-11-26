@@ -98,7 +98,14 @@ function check(res: Response, what: string) {
 async function getPage(config: YouTubeConfig, path: string, what: string) {
   const res = await request(config, withLocale(`${config.BASE_URL}${path}`));
   check(res, what);
-  return res.text();
+  // A body that breaks midway is the network too, so a connect tries again
+  try {
+    return await res.text();
+  } catch (err) {
+    throw Object.assign(failure("network", `${what} broke off.`), {
+      cause: err,
+    });
+  }
 }
 
 // The JSON object a page assigns after start, read to where its braces
