@@ -3,6 +3,10 @@ import { APP_EVENTS, LiveSummary, OverlayApp } from "@/common/types";
 import { formatDate } from "@/helper/format";
 import { useLanguage, useT } from "@/ui/i18n";
 import { Modal } from "../Modal";
+import { EntityMetadata } from "@/common/schemas";
+import { useState } from "react";
+import { Select } from "../Elements";
+import { Field } from "../Page";
 
 type Props<T> = {
   // The item waiting for the user to confirm it's deleted
@@ -134,6 +138,45 @@ export function DeleteStudioOverlayModal({
         onClose();
       }}
     />
+  );
+}
+
+// A profile picked among those that can go: the active one can't
+export function DeleteProfileModal({
+  profiles,
+  onClose,
+}: {
+  profiles: EntityMetadata[];
+  onClose: () => void;
+}) {
+  const t = useT();
+  const [file, setFile] = useState(profiles[0]?.file ?? "");
+  const item = profiles.find((p) => p.file === file);
+  return (
+    <Modal
+      title={t("components.deleteModals.profileTitle")}
+      description={
+        item &&
+        t("components.deleteModals.profileDescription", { name: item.name })
+      }
+      confirmText={t("common.delete")}
+      onClose={onClose}
+      onConfirm={() => {
+        if (item) window.api.emit(APP_EVENTS.DELETE_PROFILE, { file });
+        onClose();
+      }}
+    >
+      <Field
+        label={t("components.deleteModals.profileFrom")}
+        hint={t("components.deleteModals.profileHint")}
+      >
+        <Select
+          options={profiles.map((p) => ({ label: p.name, value: p.file }))}
+          value={file}
+          onChange={setFile}
+        />
+      </Field>
+    </Modal>
   );
 }
 

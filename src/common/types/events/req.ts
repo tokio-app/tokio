@@ -64,6 +64,7 @@ export enum APP_EVENTS {
   CREATE_PROFILE = "app:settings:create:profile",
   CLONE_PROFILE = "app:settings:clone:profile",
   RENAME_PROFILE = "app:settings:rename:profile",
+  DELETE_PROFILE = "app:settings:delete:profile",
   IMPORT_ENTITY = "app:settings:import:entity",
   EXPORT_ENTITY = "app:settings:export:entity",
   EXPORT_LOGS = "app:settings:export:logs",
@@ -290,6 +291,11 @@ export interface AppEventsMap {
   [APP_EVENTS.RENAME_PROFILE]: {
     file: string;
     name: string;
+  };
+
+  // A profile that isn't the active one, with its fans and LIVE history
+  [APP_EVENTS.DELETE_PROFILE]: {
+    file: string;
   };
 
   [APP_EVENTS.IMPORT_ENTITY]: {

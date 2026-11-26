@@ -570,6 +570,126 @@ describe("settings events", () => {
     });
   });
 
+  describe("DELETE_PROFILE", () => {
+    const deleting = (res: "deleted" | "unsaved" | null = "deleted") => {
+      const store = profileStore();
+      const profiles = [defaultProfile, streamProfile];
+      return {
+        ...store,
+        getProfiles: () => [...profiles],
+        deleteProfile: vi.fn(async (file: string) => {
+          if (res === "deleted") {
+            profiles.splice(
+              profiles.findIndex((p) => p.file === file),
+              1,
+            );
+          }
+          return res;
+        }),
+      };
+    };
+
+    it("deletes the profile, then sends the settings and a notice", async () => {
+      const store = deleting();
+      const h = createHandler({ storeManagerService: store });
+
+      const log = await run(h, APP_EVENTS.DELETE_PROFILE, {
+        file: "stream.json",
+      });
+
+      expect(store.deleteProfile).toHaveBeenCalledExactlyOnceWith(
+        "stream.json",
+      );
+      expect(log).toEqual([
+        [
+          APP_EVENTS_RESPONSE.DELETE_PROFILE,
+          { success: true, file: "stream.json" },
+        ],
+        [
+          APP_EVENTS_RESPONSE.GET_SETTINGS,
+          {
+            success: true,
+            data: { settings: appSettings, profiles: [defaultProfile] },
+          },
+        ],
+        notice({
+          level: "success",
+          code: FEEDBACK_CODES.PROFILE_DELETED,
+          message: 'Profile "Stream" deleted.',
+        }),
+      ]);
+    });
+
+    it("refuses the active profile, with a warning", async () => {
+      const store = deleting();
+      const h = createHandler({ storeManagerService: store });
+
+      await h.invoke(settings, APP_EVENTS.DELETE_PROFILE, {
+        file: "default.json",
+      });
+
+      expect(store.deleteProfile).not.toHaveBeenCalled();
+      const error = {
+        code: FEEDBACK_CODES.PROFILE_DELETE_FAILED,
+        message: "Switch to another profile before deleting this one.",
+      };
+      expect(h.replies(APP_EVENTS_RESPONSE.DELETE_PROFILE)).toEqual([
+        { success: false, file: "default.json", error },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "warning", ...error }),
+      ]);
+    });
+
+    it.each([
+      ["one it doesn't list", "missing.json", deleting()],
+      ["one the store doesn't delete", "stream.json", deleting(null)],
+    ])("replies and notifies for %s", async (_, file, store) => {
+      const h = createHandler({ storeManagerService: store });
+
+      await h.invoke(settings, APP_EVENTS.DELETE_PROFILE, { file });
+
+      const failure = {
+        code: FEEDBACK_CODES.PROFILE_DELETE_FAILED,
+        message: "Unable to delete the profile.",
+      };
+      expect(h.replies(APP_EVENTS_RESPONSE.DELETE_PROFILE)).toEqual([
+        { success: false, file, error: failure },
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "error", ...failure }),
+      ]);
+    });
+
+    it("sends the profiles main holds when the store can't be saved", async () => {
+      const h = createHandler({ storeManagerService: deleting("unsaved") });
+
+      await h.invoke(settings, APP_EVENTS.DELETE_PROFILE, {
+        file: "stream.json",
+      });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([
+        {
+          success: true,
+          data: {
+            settings: appSettings,
+            profiles: [defaultProfile, streamProfile],
+          },
+        },
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.DELETE_PROFILE)).toEqual([
+        expect.objectContaining({ success: false, file: "stream.json" }),
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+        }),
+      ]);
+    });
+  });
+
   describe("SET_PROFILE", () => {
     const timer = TimerProfileSchema.parse({
       status: "paused",
@@ -603,6 +723,7 @@ describe("settings events", () => {
         ),
         getProfiles: () => profiles,
         getSettings: () => ({ activeProfile: active }),
+        deleteProfile: vi.fn(async (_file: string) => "deleted" as const),
       };
       const timerService = {
         save: vi.fn(async () => timerSaved),
@@ -716,6 +837,38 @@ describe("settings events", () => {
       expect(timerService.save.mock.invocationCallOrder[1]).toBeGreaterThan(
         switched,
       );
+    });
+
+    it("deletes the profile it switches away from only once it's done", async () => {
+      const { h, storeManagerService, timerService } = setup();
+      let release: (() => void) | undefined;
+      timerService.save.mockImplementationOnce(
+        () =>
+          new Promise<boolean>((resolve) => (release = () => resolve(true))),
+      );
+
+      const switched = h.invoke(settings, APP_EVENTS.SET_PROFILE, {
+        file: "stream.json",
+      });
+      const deleted = h.invoke(settings, APP_EVENTS.DELETE_PROFILE, {
+        file: "default.json",
+      });
+      try {
+        await vi.waitFor(() => expect(release).toBeDefined());
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(storeManagerService.deleteProfile).not.toHaveBeenCalled();
+      } finally {
+        // Always, or the next tests' switches wait behind this one
+        release?.();
+        await Promise.allSettled([switched, deleted]);
+      }
+
+      expect(storeManagerService.deleteProfile).toHaveBeenCalledExactlyOnceWith(
+        "default.json",
+      );
+      expect(h.replies(APP_EVENTS_RESPONSE.DELETE_PROFILE)).toEqual([
+        { success: true, file: "default.json" },
+      ]);
     });
 
     it("refuses to switch while a LIVE is connected", async () => {

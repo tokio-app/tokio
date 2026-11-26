@@ -508,6 +508,65 @@ describe("Settings", () => {
       ]);
     });
 
+    it("deletes a profile picked among those that aren't active", async () => {
+      const { user, container } = await setup(
+        settingsReply((s) => {
+          s.profiles = [
+            { file: "default.json", name: "Default" },
+            { file: "horror.json", name: "Horror" },
+            { file: "chill.json", name: "Chill" },
+          ];
+          s.settings.activeProfile = { file: "horror.json", name: "Horror" };
+        }),
+      );
+
+      await user.click(
+        section("Profiles").getByRole("button", { name: "Delete profile" }),
+      );
+      expect(
+        dialog().getByText(
+          "Delete the profile Default? Its LIVE history and fans go too.",
+        ),
+      ).toBeVisible();
+      await user.click(dialog().getByText("Default"));
+      expect(inList(container, "Horror")).toBeNull();
+      await user.click(inList(container, "Chill")!);
+      expect(
+        dialog().getByText(
+          "Delete the profile Chill? Its LIVE history and fans go too.",
+        ),
+      ).toBeVisible();
+      await user.click(dialog().getByRole("button", { name: "Delete" }));
+
+      expect(sent(APP_EVENTS.DELETE_PROFILE)).toEqual([{ file: "chill.json" }]);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("deletes nothing on Cancel", async () => {
+      const { user } = await setup();
+      await user.click(
+        section("Profiles").getByRole("button", { name: "Delete profile" }),
+      );
+
+      await user.click(dialog().getByRole("button", { name: "Cancel" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(sent(APP_EVENTS.DELETE_PROFILE)).toEqual([]);
+    });
+
+    it("can't delete the only profile, and says why", async () => {
+      await setup(settingsReply());
+
+      const button = section("Profiles").getByRole("button", {
+        name: "Delete profile",
+      });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute(
+        "title",
+        "Tokio needs at least one profile",
+      );
+    });
+
     const rename = async () => {
       const app = await setup();
       await app.user.click(
