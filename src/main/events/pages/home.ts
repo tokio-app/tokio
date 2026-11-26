@@ -1,6 +1,8 @@
+import { Profile } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
+  AppError,
   FEEDBACK_CODES,
   Platform,
   PLATFORMS,
@@ -17,6 +19,8 @@ import { AppFailure, saveFailure } from "@/helper/feedback";
 import { refreshTikTokGifts, usesTikTok } from "@/helper/gifts";
 import { t } from "@/helper/i18n";
 import { ConnectorFailure } from "@/services/connector/common";
+import { StoreManagerService } from "@/services/store";
+import { ReplyEvent } from "@/types";
 import { normalizeUsername } from "@tokioapp/connector";
 
 const events = createStack("connector");
@@ -96,6 +100,20 @@ const toUsername = (input: string) => {
   }
 };
 
+// Saves the profile's names as CONNECT and SET_CHANNELS both do: TikTok's
+// @username as given, the channels as typed, over the saved ones (MCP sends
+// only the channel it was given)
+const saveNames = (
+  store: StoreManagerService,
+  profile: Profile | null,
+  username: string | undefined,
+  channels: Partial<Record<Platform, string>> | undefined,
+) =>
+  store.updateProfileData({
+    ...(username !== undefined && { connector: { username } }),
+    ...(channels && { channels: { ...profile?.channels, ...channels } }),
+  });
+
 events.push(
   APP_EVENTS.CONNECT,
   async (services, e, { username, channels, platforms: only }) => {
@@ -122,11 +140,12 @@ events.push(
             ? storeManagerService.getTwitchAccount().login
             : channelOf(platform, typed.trim().replace(/^@/, ""));
     }
-    const saved = await storeManagerService.updateProfileData({
-      ...(platforms.includes("tiktok") && { connector: { username: name } }),
-      // Over the saved ones: MCP sends only the channel it was given
-      ...(channels && { channels: { ...profile?.channels, ...channels } }),
-    });
+    const saved = await saveNames(
+      storeManagerService,
+      profile,
+      platforms.includes("tiktok") ? name : undefined,
+      channels,
+    );
     // The LIVE matters more than remembering the username: connect anyway.
     if (!saved) {
       notifier.warn(
@@ -260,6 +279,56 @@ events.push(
             platforms: profile?.platforms ?? ["tiktok"],
           }),
         ),
+  },
+);
+
+// The names as main holds them, failures included
+const replyNames = async (
+  e: ReplyEvent,
+  store: StoreManagerService,
+  error?: AppError,
+) => {
+  const profile = await store.getProfileData().catch(() => null);
+  e.reply(APP_EVENTS_RESPONSE.SET_CHANNELS, {
+    success: !error,
+    ...(error && { error }),
+    username: profile?.connector.username ?? "",
+    channels: profile?.channels ?? {},
+  });
+};
+
+// The names typed for the profile's platforms, saved without connecting. No
+// notice: it saves like an autosave.
+events.push(
+  APP_EVENTS.SET_CHANNELS,
+  async ({ storeManagerService, connectorService }, e, data) => {
+    const profile = await storeManagerService.getProfileData();
+    // A platform that's on keeps the name it's on: MCP can write while live
+    const on = connectorService.status();
+    const typed = data.channels;
+    const channels =
+      typed &&
+      Object.fromEntries(
+        PLATFORMS.flatMap((p) =>
+          typed[p] === undefined || on[p] ? [] : [[p, typed[p]]],
+        ),
+      );
+    const username =
+      data.username === undefined || on.tiktok
+        ? undefined
+        : toUsername(data.username);
+    if (!(await saveNames(storeManagerService, profile, username, channels))) {
+      throw saveFailure();
+    }
+    await replyNames(e, storeManagerService);
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+      message: "main.failure.setChannels",
+    },
+    onError: (e, error, _data, { storeManagerService }) =>
+      void replyNames(e, storeManagerService, error),
   },
 );
 

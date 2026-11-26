@@ -1357,6 +1357,7 @@
   "main.failure.disconnect": "Unable to disconnect from the LIVE.",
   "main.failure.setActivityFeed": "Unable to save the activity feed.",
   "main.failure.setPlatforms": "Unable to save the platforms.",
+  "main.failure.setChannels": "Unable to save the usernames and channels.",
   "main.failure.activeFeatures": "Unable to change the active features.",
   "main.failure.updateMusicSettings": "Unable to save the music settings.",
   "main.failure.connectMusic": "Unable to connect the music provider.",

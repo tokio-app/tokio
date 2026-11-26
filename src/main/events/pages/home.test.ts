@@ -640,6 +640,114 @@ describe("home events", () => {
     });
   });
 
+  describe("SET_CHANNELS", () => {
+    const setup = (
+      on: Partial<Record<Platform, PlatformStatus>> = {},
+      saved = true,
+    ) => {
+      const profile = {
+        connector: { username: "old" },
+        channels: { youtube: "@saved", kick: "savedkick" } as Partial<
+          Record<Platform, string>
+        >,
+      };
+      const storeManagerService = {
+        updateProfileData: vi.fn(async (updates: Partial<typeof profile>) => {
+          if (saved) Object.assign(profile, updates);
+          return saved;
+        }),
+        getProfileData: async () => profile,
+      };
+      const h = createHandler({
+        connectorService: { status: () => on },
+        storeManagerService,
+      });
+      return { h, storeManagerService };
+    };
+
+    it("saves a TikTok link as its @username and the channels as typed, with no notice", async () => {
+      const { h, storeManagerService } = setup();
+
+      await h.invoke(home, APP_EVENTS.SET_CHANNELS, {
+        username: "https://www.tiktok.com/@streamer/live",
+        channels: { youtube: " youtube.com/@me " },
+      });
+
+      expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
+        connector: { username: "streamer" },
+        channels: { youtube: " youtube.com/@me ", kick: "savedkick" },
+      });
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_CHANNELS)).toEqual([
+        {
+          success: true,
+          username: "streamer",
+          channels: { youtube: " youtube.com/@me ", kick: "savedkick" },
+        },
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+
+    it("saves only what it's sent", async () => {
+      const { h, storeManagerService } = setup();
+
+      await h.invoke(home, APP_EVENTS.SET_CHANNELS, {
+        channels: { kick: "newkick" },
+      });
+
+      expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
+        channels: { youtube: "@saved", kick: "newkick" },
+      });
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_CHANNELS)).toEqual([
+        expect.objectContaining({ username: "old" }),
+      ]);
+    });
+
+    it("leaves a platform that's on alone", async () => {
+      const { h, storeManagerService } = setup({
+        tiktok: "connected",
+        kick: "reconnecting",
+      });
+
+      await h.invoke(home, APP_EVENTS.SET_CHANNELS, {
+        username: "other",
+        channels: { youtube: "@new", kick: "otherkick" },
+      });
+
+      expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
+        channels: { youtube: "@new", kick: "savedkick" },
+      });
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_CHANNELS)).toEqual([
+        {
+          success: true,
+          username: "old",
+          channels: { youtube: "@new", kick: "savedkick" },
+        },
+      ]);
+    });
+
+    it("says when they can't be saved, replying what main holds", async () => {
+      const { h } = setup({}, false);
+
+      await h.invoke(home, APP_EVENTS.SET_CHANNELS, { username: "streamer" });
+
+      expect(h.notices).toEqual([
+        expect.objectContaining({ code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED }),
+      ]);
+      await vi.waitFor(() =>
+        expect(h.replies(APP_EVENTS_RESPONSE.SET_CHANNELS)).toEqual([
+          {
+            success: false,
+            error: expect.objectContaining({
+              code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+            }),
+            username: "old",
+            channels: { youtube: "@saved", kick: "savedkick" },
+          },
+        ]),
+      );
+    });
+  });
+
   describe("DISCONNECT", () => {
     it("disconnects and answers empty stats", async () => {
       const disconnect = vi.fn(async () => {});

@@ -1357,6 +1357,7 @@
   "main.failure.disconnect": "No se pudo desconectar del LIVE.",
   "main.failure.setActivityFeed": "No se pudo guardar el feed de actividad.",
   "main.failure.setPlatforms": "No se pudieron guardar las plataformas.",
+  "main.failure.setChannels": "No se pudieron guardar los usuarios y canales.",
   "main.failure.activeFeatures": "No se pudieron cambiar las funciones activas.",
   "main.failure.updateMusicSettings": "No se pudo guardar la configuración de música.",
   "main.failure.connectMusic": "No se pudo conectar el proveedor de música.",
