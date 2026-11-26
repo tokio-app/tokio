@@ -924,7 +924,7 @@ const registerStudio = (handler: AppHandlerVariables) => {
   // push goes, so they're never old ones. The goals reached react first.
   const sendNumbers = throttle(() => {
     try {
-      studio.goals(store.getStudio(), liveNumbers(handler));
+      studio.goals(store.getStudio(), () => liveNumbers(handler));
     } catch (error) {
       notifier.report({
         source: "overlays",

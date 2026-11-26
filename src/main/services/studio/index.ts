@@ -207,9 +207,14 @@ export class StudioService extends Service {
   /**
    * Reacts each item with a goal trigger whose number is at or past its
    * goal, once per LIVE, after its delay. It shows the item's last event
-   * again, so a text's {username} doesn't empty. numbers are the LIVE's.
+   * again, so a text's {username} doesn't empty. numbers are the LIVE's,
+   * read once for the checks and again by each react when it plays.
    */
-  public goals(overlays: readonly StudioOverlay[], numbers: StudioNumbers) {
+  public goals(
+    overlays: readonly StudioOverlay[],
+    numbers: () => StudioNumbers,
+  ) {
+    const now = numbers();
     for (const overlay of overlays) {
       const counts = this.counts(overlay);
       for (const item of itemsOf(overlay)) {
@@ -217,29 +222,19 @@ export class StudioService extends Service {
         for (const trigger of triggersOf(item)) {
           if (trigger.type !== GOAL_TRIGGER) continue;
           const { number, goal } = trigger;
-          if (goalValue(number, numbers, counts) < goal) continue;
+          if (goalValue(number, now, counts) < goal) continue;
           // A changed goal can be reached again
           const key = JSON.stringify([item.id, number, goal]);
           const reached = mapOf(this._reached, overlay.id);
           if (reached.has(key)) continue;
           reached.set(key, true);
-          this._schedule(
-            overlay.id,
-            item,
-            () => numbers,
-            false,
-            (read) =>
-              this._onReact?.(
-                overlay.id,
-                item.kind === "group"
-                  ? { element: item.id }
-                  : this._react(
-                      overlay,
-                      item,
-                      this.kept(overlay.id, item),
-                      read,
-                    ),
-              ),
+          this._schedule(overlay.id, item, numbers, false, (read) =>
+            this._onReact?.(
+              overlay.id,
+              item.kind === "group"
+                ? { element: item.id }
+                : this._react(overlay, item, this.kept(overlay.id, item), read),
+            ),
           );
         }
       }
