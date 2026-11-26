@@ -6,6 +6,7 @@ import {
   Check,
   CopyField,
   Field,
+  Modal,
   QRCode,
   Section,
   Select,
@@ -31,6 +32,8 @@ export function RemoteSection({ remote, serverEnabled, onChange }: Props) {
   const [picked, setPicked] = useState("");
   // Hidden until asked, as OBS hides stream keys: streamers show their screen
   const [shown, setShown] = useState(false);
+  // A new key cuts off every phone, Stream Deck and assistant, so it asks
+  const [asking, setAsking] = useState(false);
   const [name, setName] = useState(ASSISTANTS[0].name);
   const assistant = ASSISTANTS.find((a) => a.name === name) ?? ASSISTANTS[0];
 
@@ -103,15 +106,8 @@ export function RemoteSection({ remote, serverEnabled, onChange }: Props) {
         </Field>
         <p className={styles.note}>{t("settings.remote.mcpNote")}</p>
       </div>
-      <div>
-        <Btn onClick={() => setShown(false)}>{t("settings.remote.hide")}</Btn>
-      </div>
     </>
-  ) : (
-    <div>
-      <Btn onClick={() => setShown(true)}>{t("settings.remote.show")}</Btn>
-    </div>
-  );
+  ) : null;
 
   return (
     <Section
@@ -119,15 +115,29 @@ export function RemoteSection({ remote, serverEnabled, onChange }: Props) {
       title={t("settings.remote.title")}
       description={t("settings.remote.description")}
       actions={
-        <Btn
-          variant="icon"
-          title={t("settings.remote.newKey")}
-          onClick={() => window.api.emit(APP_EVENTS.NEW_REMOTE_KEY)}
-        >
-          <FiRefreshCw size={18} />
-        </Btn>
+        remote.enabled && (
+          <Btn
+            variant="icon"
+            title={t("settings.remote.newKey")}
+            onClick={() => setAsking(true)}
+          >
+            <FiRefreshCw size={18} />
+          </Btn>
+        )
       }
     >
+      {asking && (
+        <Modal
+          title={t("settings.remote.newKeyTitle")}
+          description={t("settings.remote.newKeyDescription")}
+          confirmText={t("settings.remote.newKeyConfirm")}
+          onClose={() => setAsking(false)}
+          onConfirm={() => {
+            setAsking(false);
+            window.api.emit(APP_EVENTS.NEW_REMOTE_KEY);
+          }}
+        />
+      )}
       <Check
         label={t("settings.remote.label")}
         checked={remote.enabled}
@@ -136,8 +146,18 @@ export function RemoteSection({ remote, serverEnabled, onChange }: Props) {
       {!serverEnabled && (
         <p className={styles.note}>{t("settings.remote.serverOff")}</p>
       )}
-      {/* The key comes with main's echo of the settings */}
-      {remote.enabled && remote.key && details}
+      {/* The key comes with main's echo of the settings. One button whose
+          text changes, so the focus stays on it. */}
+      {remote.enabled && remote.key && (
+        <>
+          <div>
+            <Btn onClick={() => setShown(!shown)}>
+              {t(shown ? "settings.remote.hide" : "settings.remote.show")}
+            </Btn>
+          </div>
+          {details}
+        </>
+      )}
     </Section>
   );
 }

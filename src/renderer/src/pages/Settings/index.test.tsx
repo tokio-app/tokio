@@ -658,9 +658,10 @@ describe("Settings", () => {
       expect(remote().queryByRole("img")).not.toBeInTheDocument();
       expect(document.body.textContent).not.toContain(key);
 
-      await user.click(
-        remote().getByRole("button", { name: "Show QR code and key" }),
-      );
+      const toggle = remote().getByRole("button", {
+        name: "Show QR code and key",
+      });
+      await user.click(toggle);
       expect(
         remote().getByRole("img", {
           name: "QR code of the remote control link",
@@ -669,9 +670,14 @@ describe("Settings", () => {
       expect(remote().getByTitle("Copy link")).toHaveTextContent(link);
       expect(remote().getByTitle("Copy key")).toHaveTextContent(key);
 
-      await user.click(remote().getByRole("button", { name: "Hide" }));
+      // The same button, so the focus stays on it
+      expect(toggle).toHaveTextContent("Hide");
+      expect(toggle).toHaveFocus();
+      await user.click(toggle);
       expect(remote().queryByRole("img")).not.toBeInTheDocument();
       expect(document.body.textContent).not.toContain(key);
+      expect(toggle).toHaveTextContent("Show QR code and key");
+      expect(toggle).toHaveFocus();
     });
 
     it("shows the MCP address and each assistant's setup after Show", async () => {
@@ -737,12 +743,35 @@ describe("Settings", () => {
       expect(remote().getByTitle("Copy key")).toHaveTextContent(key);
     });
 
-    it("makes a new key from the title row", async () => {
+    const newKey = () =>
+      remote().queryByTitle("New key (old links stop working)");
+
+    it("makes a new key from the title row, once confirmed", async () => {
       const { user } = await setup(on);
 
-      await user.click(remote().getByTitle("New key (old links stop working)"));
+      await user.click(newKey()!);
+      expect(
+        dialog().getByText(
+          "Your phone, Stream Deck and AI assistants will need the new one.",
+        ),
+      ).toBeVisible();
+      await user.click(dialog().getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(sent(APP_EVENTS.NEW_REMOTE_KEY)).toEqual([]);
 
+      await user.click(newKey()!);
+      await user.click(dialog().getByRole("button", { name: "New key" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(sent(APP_EVENTS.NEW_REMOTE_KEY)).toEqual([undefined]);
+    });
+
+    it("offers a new key only while remote control is on", async () => {
+      await setup();
+      expect(newKey()).not.toBeInTheDocument();
+
+      await send(APP_EVENTS_RESPONSE.GET_SETTINGS, on);
+      expect(newKey()).toBeVisible();
     });
   });
 });
