@@ -3,7 +3,8 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { DeleteTestOverlayModal, Page } from "@/components";
 import { useIpcListener, useIpcRequest, useServerEnabled } from "@/hooks";
 import toolsStyles from "@/pages/Tools/tools.module.css";
-import { useT } from "@/ui/i18n";
+import { rich, useT } from "@/ui/i18n";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { TestStatus } from "./helper";
 import { TestOverlaysSection } from "./sections/TestOverlaysSection";
@@ -33,7 +34,11 @@ export function TestOverlays() {
   return (
     <Page width="wide" layout="aside">
       {!serverEnabled && (
-        <p className={toolsStyles.notice}>{t("tools.test.serverOff")}</p>
+        <p className={toolsStyles.notice}>
+          {rich(t("tools.test.serverOff"), {
+            link: (text) => <Link to="/settings">{text}</Link>,
+          })}
+        </p>
       )}
 
       <TestOverlaysSection

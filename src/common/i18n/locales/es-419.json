@@ -676,7 +676,7 @@
   "coinStats.gifters.emptyDatesSubs": "No hubo suscripciones regaladas en esas fechas.",
   "tools.back": "Volver a Herramientas",
   "tools.countdown.serverOff": "El servidor de overlays está apagado. Actívalo en <link>Configuración</link> para mostrar el temporizador en el stream.",
-  "tools.test.serverOff": "El servidor de overlays está apagado. Actívalo en Configuración para enviar eventos de prueba.",
+  "tools.test.serverOff": "El servidor de overlays está apagado. Actívalo en <link>Configuración</link> para enviar eventos de prueba.",
   "tools.list.fans#one": "fan",
   "tools.list.fans#other": "fans",
   "tools.list.lives#one": "LIVE",
