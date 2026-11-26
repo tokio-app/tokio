@@ -96,10 +96,7 @@ export const remoteState = ({
   return {
     paused: controlsService.isPaused(),
     // As Home's tally: a connect still in progress isn't on the LIVE yet
-    live:
-      liveService.getSession().startedAt === null
-        ? null
-        : connectorService.username,
+    live: liveService.startedAt === null ? null : connectorService.username,
     music,
     song: song ? { title: song.title, thumbnail: song.thumbnail } : null,
     canReplay: controlsService.lastAlerts().length > 0,

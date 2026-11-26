@@ -298,7 +298,7 @@ export class TimerService extends Service {
           this._file === null &&
           store.getSettings().activeProfile.file === file
         ) {
-          this.load(profile.timer, file);
+          this.load(profile.timer, file, profile.platforms);
         }
       })
       .catch((error) => {

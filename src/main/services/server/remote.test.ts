@@ -56,7 +56,7 @@ describe("remoteState", () => {
     const { handler } = createHandler({
       controlsService,
       connectorService: { username: "lucia.lima" },
-      liveService: { getSession: () => ({ startedAt }) },
+      liveService: { startedAt },
       musicService: { isActive: () => active, songs: () => SONGS },
     });
     return remoteState(handler);

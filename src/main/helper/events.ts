@@ -35,7 +35,7 @@ export const connectionState = ({
   // Connecting, connected, coming back or looking again: the profile lock
   success: connectorService.isConnected(),
   // A connect in progress, or a look for the LIVE, has no session
-  live: liveService.getSession().startedAt !== null,
+  live: liveService.startedAt !== null,
   reconnecting: connectorService.isReconnecting(),
   waiting: connectorService.isWaiting(),
   platforms: connectorService.status(),

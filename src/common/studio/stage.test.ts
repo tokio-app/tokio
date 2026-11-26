@@ -2113,6 +2113,43 @@ describe("groups and motion", () => {
     expect(body("t").className).toBe("studio-body studio-hidden");
   });
 
+  it("draws an element that takes a group's id on its own, even mid-entrance", () => {
+    const alone = layered({
+      id: "g",
+      z: 0,
+      opacity: 1,
+      group: null,
+      elements: [text("g")],
+    });
+    draw(layered(grouped({ when: "event" }, text("a"))));
+    draw(alone);
+    expect(el("g").parentElement).toBe(layerNode("g"));
+    expect(root.querySelector(".studio-hidden")).toBeNull();
+
+    draw(layered(grouped({ when: "event", seconds: 2 }, text("a"))));
+    stage.react({ element: "g" });
+    draw(alone);
+    vi.advanceTimersByTime(2000 + EXIT_MS);
+    expect(el("g").parentElement).toBe(layerNode("g"));
+    expect(root.querySelector(".studio-group, .studio-hidden")).toBeNull();
+  });
+
+  it("gives a lone element's id its wrapper when a group takes it", () => {
+    draw(
+      layered({
+        id: "g",
+        z: 0,
+        opacity: 1,
+        group: null,
+        elements: [text("g")],
+      }),
+    );
+    draw(layered(grouped({ when: "event" }, text("g"))));
+
+    expect(el("g").parentElement).toBe(wrapper());
+    expect(wrapper().className).toBe("studio-group studio-hidden");
+  });
+
   it("frees a group's timer when it goes, and when the stage does", () => {
     draw(layered(grouped({ when: "event", seconds: 2 }, text("a"))));
     stage.react({ element: "g" });

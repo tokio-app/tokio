@@ -11,7 +11,12 @@ import {
   StudioOverlaySchema,
   StudioTriggerSchema,
 } from "@/common/schemas";
-import { APP_EVENTS, APP_EVENTS_RESPONSE, AppEventsMap } from "@/common/types";
+import {
+  APP_EVENTS,
+  APP_EVENTS_RESPONSE,
+  AppEventsMap,
+  type Platform,
+} from "@/common/types";
 import {
   ALERT_MESSAGE_VARIABLES,
   catalogState,
@@ -564,6 +569,7 @@ function takeId(raw: Record<string, unknown>, taken: Set<string>): string {
 function newElement(
   raw: unknown,
   size: StudioOverlay["size"],
+  platforms: readonly Platform[],
   taken: Set<string>,
 ): StudioElement {
   const kind = isRecord(raw) ? elementSchema(raw.kind)?.shape.kind.value : "";
@@ -573,7 +579,7 @@ function newElement(
   const id = takeId(raw, taken);
   return parseItem(
     StudioElementSchema,
-    deepMerge(newStudioElement(kind, size), { ...raw, id }),
+    deepMerge(newStudioElement(kind, size, platforms), { ...raw, id }),
   );
 }
 
@@ -633,6 +639,7 @@ function applyEdit(
   op: EditOp,
   path: string,
   size: StudioOverlay["size"],
+  platforms: readonly Platform[],
 ): string[] {
   const extra = Object.entries(op)
     .filter(
@@ -661,7 +668,7 @@ function applyEdit(
         throw new EditError("A group's elements must be a list.");
       }
       const given: unknown[] = Array.isArray(raw.elements) ? raw.elements : [];
-      const elements = given.map((e) => newElement(e, size, taken));
+      const elements = given.map((e) => newElement(e, size, platforms, taken));
       added = parseItem(
         StudioGroupSchema,
         deepMerge(newStudioGroup(newGroupName(items)), {
@@ -671,7 +678,7 @@ function applyEdit(
         }),
       );
     } else {
-      added = newElement(raw, size, taken);
+      added = newElement(raw, size, platforms, taken);
     }
     place(items, added, op);
     return added.kind === "group"
@@ -760,9 +767,12 @@ export const tools: ToolDef<any>[] = [
       if (!stored) return fail(`No studio overlay ${id}.`);
       const items = structuredClone(stored.items);
       const added: string[] = [];
+      const platforms = (await activeProfile(handler))?.platforms ?? ["tiktok"];
       for (const [i, op] of ops.entries()) {
         try {
-          added.push(...applyEdit(items, op, `ops.${i}`, stored.size));
+          added.push(
+            ...applyEdit(items, op, `ops.${i}`, stored.size, platforms),
+          );
         } catch (e) {
           if (!(e instanceof EditError)) throw e;
           const what = op.id === undefined ? op.op : `${op.op} ${op.id}`;

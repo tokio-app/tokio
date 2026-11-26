@@ -1366,12 +1366,18 @@ export function createStage(
       if (!ids.has(entry.element.id)) remove(entry);
     }
     // After the elements, so the videos in a layer that goes are freed
-    const layerIds = new Set(shown.map((layer) => layer.id));
+    // And a layer whose id went from a group to an element or back, so it's
+    // made again with a wrapper exactly when it's a group
+    const grouped = new Map(shown.map((layer) => [layer.id, !!layer.group]));
     for (const [id, layer] of Array.from(layers)) {
-      if (layerIds.has(id)) continue;
+      if (grouped.get(id) === !!layer.group) continue;
       clearTimeout(layer.group?.timer);
       layer.node.remove();
       layers.delete(id);
+      // Its elements that stay go into the new node below
+      for (const entry of entries.values()) {
+        if (entry.layer === id) entry.layer = "";
+      }
     }
 
     const next = view ?? { width: 0, height: 0 };

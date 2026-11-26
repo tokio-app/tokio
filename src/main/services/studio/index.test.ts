@@ -946,7 +946,7 @@ describe("StudioService's goals", () => {
     trigger: goal("likes", 1000),
     also_triggers: [{ type: TOKIO_EVENTS.FOLLOW, gifts: [] }],
   });
-  const at = (likes: number) => ({ ...NUMBERS, likes });
+  const at = (likes: number) => () => ({ ...NUMBERS, likes });
 
   it("reacts once per LIVE when a LIVE number reaches the goal, with what it kept", () => {
     const { studio, onReact, numbers } = setup();
@@ -1009,7 +1009,8 @@ describe("StudioService's goals", () => {
       ],
       items: [group],
     };
-    const goals = () => studio.goals([overlay], { ...NUMBERS, uptime: 9999 });
+    const goals = () =>
+      studio.goals([overlay], () => ({ ...NUMBERS, uptime: 9999 }));
 
     studio.handle(TOKIO_EVENTS.GIFT, gift(1, false), [overlay], numbers);
     goals();
@@ -1042,6 +1043,29 @@ describe("StudioService's goals", () => {
         ["o1", { element: "t", text: "Ana 1.2K" }],
       ]);
       expect(studio.kept("o1", late)).toMatchObject({ name: "Ana" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows the numbers when a delayed goal plays, not when it was reached", () => {
+    vi.useFakeTimers();
+    try {
+      const { studio, onReact } = setup();
+      const late = StudioElementSchema.parse({
+        ...text,
+        text: "{likes}",
+        delay: 10,
+      });
+      const numbers = vi.fn(at(1000));
+
+      studio.goals([overlayOf(late)], numbers);
+      numbers.mockImplementation(at(1500));
+      vi.advanceTimersByTime(10_000);
+
+      expect(onReact.mock.calls).toEqual([
+        ["o1", { element: "t", text: "1.5K" }],
+      ]);
     } finally {
       vi.useRealTimers();
     }

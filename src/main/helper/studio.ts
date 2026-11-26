@@ -45,17 +45,31 @@ type Services = Pick<
   | "pathManagerService"
 >;
 
+type History = Services["historyService"];
+// One push's tops, each ranked on the first list that needs it
+type Tops = {
+  gifters: () => ReturnType<History["topByPlatform"]>;
+  giftsubs: () => ReturnType<History["topSubGifters"]>;
+};
+
+const topsOf = (history: History): Tops => {
+  let gifters: ReturnType<History["topByPlatform"]> | undefined;
+  let giftsubs: ReturnType<History["topSubGifters"]> | undefined;
+  return {
+    gifters: () => (gifters ??= history.topByPlatform()),
+    giftsubs: () => (giftsubs ??= history.topSubGifters()),
+  };
+};
+
 // A top list's rows: who sent the most of the platform's money, with an
 // amount, or who gifted the most subs, apart (the user's call)
 const topOf = (
-  history: Pick<Services["historyService"], "topByPlatform" | "topSubGifters">,
+  tops: Tops,
   { source, platform }: Pick<StudioElementOf<"list">, "source" | "platform">,
 ): StudioListEntry[] =>
   source === "giftsubs"
-    ? (history.topSubGifters()[platform] ?? []).map((g) =>
-        topRow(g, g.giftSubs),
-      )
-    : (history.topByPlatform()[platform] ?? [])
+    ? (tops.giftsubs()[platform] ?? []).map((g) => topRow(g, g.giftSubs))
+    : (tops.gifters()[platform] ?? [])
         .filter((g) => g.coins > 0)
         .map((g) => topRow(g, g.coins));
 
@@ -117,6 +131,7 @@ function viewOf(
   gifts: CustomGift[],
   served: Set<string>,
   numbers: StudioNumbers,
+  tops: Tops,
 ): StudioView {
   const { studioService: studio } = services;
   return studioView(overlay, {
@@ -149,7 +164,7 @@ function viewOf(
     // by gifted subs, else the newest first
     rows: (list) =>
       (list.source === "gifters" || list.source === "giftsubs"
-        ? topOf(services.historyService, list)
+        ? topOf(tops, list)
         : studio.list(list.source)
       ).map((entry) => listRow(entry, language(), listInUsd(list))),
     // The page doesn't show it; the editor names embeds itself
@@ -217,9 +232,11 @@ export async function sendStudioOverlays(
       ...(await overlayService.getCustomGifts()),
     ];
     const served = new Set(overlayService.getOverlays().map((o) => o.id));
+    // After the awaits, so a push can't show a LIVE that ended meanwhile
     const numbers = liveNumbers(services);
+    const tops = topsOf(services.historyService);
     for (const overlay of overlays) {
-      const view = viewOf(overlay, services, gifts, served, numbers);
+      const view = viewOf(overlay, services, gifts, served, numbers, tops);
       sendStudioMessage(services, overlay.id, { view });
     }
   } catch (error) {

@@ -924,7 +924,7 @@ const registerStudio = (handler: AppHandlerVariables) => {
   // push goes, so they're never old ones. The goals reached react first.
   const sendNumbers = throttle(() => {
     try {
-      studio.goals(store.getStudio(), liveNumbers(handler));
+      studio.goals(store.getStudio(), () => liveNumbers(handler));
     } catch (error) {
       notifier.report({
         source: "overlays",
@@ -994,7 +994,7 @@ const registerStudio = (handler: AppHandlerVariables) => {
   // clock on the page, since OBS on another PC has its own. Upgrade to a
   // start time in the view if overlays that show it get heavy.
   setInterval(() => {
-    if (live.getSession().startedAt === null) return;
+    if (live.startedAt === null) return;
     void sendStudioOverlays(handler, showsUptime);
   }, 1000).unref();
 
