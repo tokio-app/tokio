@@ -257,7 +257,7 @@ const findProfile = (handler: Handler, wanted: string) => {
 
 const ProfileInput = z
   .object({
-    action: z.enum(["switch", "create", "clone"]),
+    action: z.enum(["switch", "create", "clone", "rename"]),
     name: z.string(),
     from: z.string().optional(),
   })
@@ -448,11 +448,25 @@ export const tools: ToolDef<any>[] = [
     name: "profile",
     title: "Profiles",
     description:
-      "switch makes `name` (a profile's name or id, see list kind profiles) the active profile: refused during a LIVE. create makes an empty profile called `name`; clone copies the profile `from` (name or id) as `name`. Neither switches to it. There's no delete.",
+      "switch makes `name` (a profile's name or id, see list kind profiles) the active profile: refused during a LIVE. create makes an empty profile called `name`; clone copies the profile `from` (name or id) as `name`. Neither switches to it. rename gives the profile `from` (name or id; the active one without it) the name `name`, also during a LIVE; its id stays. There's no delete.",
     input: ProfileInput,
     annotations: WRITE,
     run: async (handler, { action, name, from }) => {
       const { storeManagerService } = handler;
+      if (action === "rename") {
+        const target =
+          from === undefined
+            ? storeManagerService.getSettings().activeProfile
+            : findProfile(handler, from);
+        if (!target) return fail(`There's no profile ${from}.`);
+        const { error } = await invokeOk(
+          handler,
+          APP_EVENTS.RENAME_PROFILE,
+          { file: target.file, name },
+          APP_EVENTS_RESPONSE.RENAME_PROFILE,
+        );
+        return error ?? ok({ id: target.file, name: name.trim() });
+      }
       if (action === "switch") {
         const target = findProfile(handler, name);
         if (!target) return fail(`There's no profile ${name}.`);

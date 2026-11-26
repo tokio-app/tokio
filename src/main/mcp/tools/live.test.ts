@@ -673,6 +673,11 @@ describe("live MCP tools", () => {
         cloneProfile: vi.fn(async (_ref: string, file: string, name: string) =>
           add(file, name),
         ),
+        renameProfile: vi.fn(async (file: string, name: string) => {
+          const index = profiles.findIndex((p) => p.file === file);
+          profiles[index] = { file, name };
+          return "renamed" as const;
+        }),
       };
       const h = createHandler(
         {
@@ -788,6 +793,60 @@ describe("live MCP tools", () => {
         isError: true,
         text: t("main.settings.nameTaken", { name: "main" }),
       });
+    });
+
+    it("renames the active profile through RENAME_PROFILE", async () => {
+      const { h, store } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("profile", { action: "rename", name: " Stream " });
+
+      expect(res.value).toEqual({ id: "main.json", name: "Stream" });
+      expect(store.renameProfile).toHaveBeenCalledExactlyOnceWith(
+        "main.json",
+        "Stream",
+      );
+      expect(h.pushed(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ code: FEEDBACK_CODES.PROFILE_RENAMED }),
+      ]);
+    });
+
+    it("renames the profile `from` names, and refuses one that doesn't exist", async () => {
+      const { h, store } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("profile", {
+        action: "rename",
+        name: "Late show",
+        from: "game NIGHT",
+      });
+      const missing = await call("profile", {
+        action: "rename",
+        name: "Late show",
+        from: "Nope",
+      });
+
+      expect(res.value).toEqual({ id: "game-night.json", name: "Late show" });
+      expect(missing.isError).toBe(true);
+      expect(store.renameProfile).toHaveBeenCalledOnce();
+    });
+
+    it("gives the handler's message for a rename to a name in use", async () => {
+      const { h, store } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("profile", {
+        action: "rename",
+        name: "game night",
+        from: "Main",
+      });
+
+      expect(res).toMatchObject({
+        isError: true,
+        text: t("main.settings.nameTaken", { name: "game night" }),
+      });
+      expect(store.renameProfile).not.toHaveBeenCalled();
     });
   });
 
