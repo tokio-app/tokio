@@ -292,6 +292,24 @@ describe("Kick mapping", () => {
     });
   });
 
+  it("gives every event chat's handle, the slug", () => {
+    const handles = [
+      fromPublication("SubscriptionEvent", { username: "Shark_34" }),
+      fromPublication("GiftedSubscriptionsEvent", {
+        gifter_username: "Shark_34",
+        gifted_usernames: ["a"],
+      }),
+      fromPublication("StreamHostEvent", { host_username: "Shark_34" }),
+      fromPublication("RewardRedeemedEvent", { username: "Shark_34" }),
+      fromPublication("KicksGifted", {
+        sender: { id: 1, username: "Shark_34" },
+        gift: { gift_id: "hype", name: "Hype", amount: 50 },
+      }),
+    ].map((mapped) => mapped?.data.user?.handle);
+
+    expect(handles).toEqual(Array(5).fill("shark-34"));
+  });
+
   it("ignores what Tokio doesn't use", () => {
     for (const event of [
       "App\\Events\\UserBannedEvent",

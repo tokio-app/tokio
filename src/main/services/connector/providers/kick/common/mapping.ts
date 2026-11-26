@@ -7,6 +7,7 @@ import {
   TokioEventMap,
   UserData,
 } from "@/common/types";
+import { slugOf } from "./api";
 
 type Sender = {
   id: number;
@@ -84,8 +85,8 @@ const emotePicture = (id: string) =>
 function named(username: string): UserData {
   return {
     username,
-    // A slug is its username in lowercase
-    handle: username.toLowerCase(),
+    // Chat's handle is the slug, which slugOf makes of a username
+    handle: slugOf(username),
     profilePictures: [],
     // Kick's feed doesn't say who follows
     follower: false,
@@ -177,7 +178,7 @@ export function fromPublication(event: string, data: any): Mapped | null {
         data: {
           user: {
             username: e.sender.username,
-            handle: e.sender.username.toLowerCase(),
+            handle: slugOf(e.sender.username),
             profilePictures: picture ? [picture] : [],
             follower: false,
             userId: `kick:${e.sender.id}`,
