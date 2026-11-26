@@ -15,6 +15,7 @@ import { createPortal } from "react-dom";
 import { FiChevronDown } from "react-icons/fi";
 import { VscClose } from "react-icons/vsc";
 import styles from "./elements.module.css";
+import { useFieldControl } from "./useFieldControl";
 
 type Value = string | number;
 
@@ -169,6 +170,8 @@ function SelectBase<V extends Value>({
   const { open, toggle, close, position, anchorRef, popoverRef } = usePopover();
   const displayRef = useRef<HTMLDivElement>(null);
   const listId = useId();
+  // A div, which a <label for> doesn't name: the field's label does
+  const field = useFieldControl();
   const [search, setSearch] = useState("");
   // Option the keyboard is on, -1 for none
   const [active, setActive] = useState(-1);
@@ -249,8 +252,10 @@ function SelectBase<V extends Value>({
     <div ref={anchorRef} className={className}>
       <div
         ref={displayRef}
+        id={field.id}
         role="combobox"
         aria-label={ariaLabel}
+        aria-labelledby={ariaLabel ? undefined : field.labelledBy}
         tabIndex={disabled ? -1 : 0}
         aria-haspopup="listbox"
         aria-expanded={open}

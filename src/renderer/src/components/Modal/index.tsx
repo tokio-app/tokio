@@ -10,6 +10,7 @@ import {
 } from "react";
 import { VscClose } from "react-icons/vsc";
 import { Btn } from "../Elements";
+import { FieldContext } from "../Elements/useFieldControl";
 import styles from "./modal.module.css";
 
 const FOCUSABLE =
@@ -184,59 +185,62 @@ export function Modal({
     ));
 
   return (
-    <div
-      ref={backdropRef}
-      className={styles.backdrop}
-      data-placed={at ? "" : undefined}
-      data-top={top ? "" : undefined}
-    >
+    // A field the dialog was opened from doesn't name what's in it
+    <FieldContext.Provider value={null}>
       <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={description ? descriptionId : undefined}
-        tabIndex={-1}
-        className={styles.card}
-        style={{ maxWidth, ...at }}
-        // A click on the backdrop drops the focus on <body>: it comes back
-        onBlur={(e) => {
-          const dialog = e.currentTarget;
-          setTimeout(() => {
-            const top = topDialog() === backdropRef.current;
-            if (top && focusLost() && document.hasFocus()) dialog.focus();
-          });
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Tab") keepTab(e);
-          if (e.key !== "Escape") return;
-          // Only the innermost dialog closes, e.g. a picker over a modal
-          e.stopPropagation();
-          onClose();
-        }}
+        ref={backdropRef}
+        className={styles.backdrop}
+        data-placed={at ? "" : undefined}
+        data-top={top ? "" : undefined}
       >
-        <div className={styles.header}>
-          <h2 id={titleId} className={styles.title}>
-            {title}
-          </h2>
-          {actions && <div className={styles.actions}>{actions}</div>}
-          {closeButton && (
-            <Btn variant="icon" title={t("common.close")} onClick={onClose}>
-              <VscClose size={24} />
-            </Btn>
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={description ? descriptionId : undefined}
+          tabIndex={-1}
+          className={styles.card}
+          style={{ maxWidth, ...at }}
+          // A click on the backdrop drops the focus on <body>: it comes back
+          onBlur={(e) => {
+            const dialog = e.currentTarget;
+            setTimeout(() => {
+              const top = topDialog() === backdropRef.current;
+              if (top && focusLost() && document.hasFocus()) dialog.focus();
+            });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Tab") keepTab(e);
+            if (e.key !== "Escape") return;
+            // Only the innermost dialog closes, e.g. a picker over a modal
+            e.stopPropagation();
+            onClose();
+          }}
+        >
+          <div className={styles.header}>
+            <h2 id={titleId} className={styles.title}>
+              {title}
+            </h2>
+            {actions && <div className={styles.actions}>{actions}</div>}
+            {closeButton && (
+              <Btn variant="icon" title={t("common.close")} onClick={onClose}>
+                <VscClose size={24} />
+              </Btn>
+            )}
+          </div>
+
+          {description && (
+            <p id={descriptionId} className={styles.description}>
+              {description}
+            </p>
           )}
+
+          {children && <div className={styles.body}>{children}</div>}
+
+          {buttons && <div className={styles.footer}>{buttons}</div>}
         </div>
-
-        {description && (
-          <p id={descriptionId} className={styles.description}>
-            {description}
-          </p>
-        )}
-
-        {children && <div className={styles.body}>{children}</div>}
-
-        {buttons && <div className={styles.footer}>{buttons}</div>}
       </div>
-    </div>
+    </FieldContext.Provider>
   );
 }
