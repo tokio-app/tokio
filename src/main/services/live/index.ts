@@ -305,6 +305,11 @@ export class LiveService extends Service {
     return starts && viewers.length > 1;
   }
 
+  /** When the LIVE started, null while not LIVE, without getSession's copy. */
+  public get startedAt(): number | null {
+    return this._startedAt;
+  }
+
   /** A copy, so later events don't change what was sent. */
   public getSession(): LiveSession {
     return {

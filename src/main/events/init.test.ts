@@ -1530,8 +1530,11 @@ describe("init events", () => {
       s.conn.emit(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
       await vi.advanceTimersByTimeAsync(0);
       s.serverService.sendToClient.mockClear();
+      // Each tick reads the start alone, never a copy of the whole session
+      const copies = vi.spyOn(s.liveService, "getSession");
       await vi.advanceTimersByTimeAsync(3000);
       expect(texts(s)).toEqual([]);
+      expect(copies).not.toHaveBeenCalled();
     });
 
     it("sends zeros when the LIVE ends, after any push waiting", async () => {

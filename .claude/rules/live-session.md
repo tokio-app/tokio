@@ -35,7 +35,7 @@ paths:
 
 ## Super Chats in US dollars
 
-- `LiveService` keeps each Super Chat's amount by currency (`parseAmount`, `src/main/helper/amount.ts`, which reads YouTube's en-US text with a symbol map built from `Intl`), and `getSession()` adds them up in US dollars through `RatesService.toUsd` (the user's calls: always USD, no setting). So a Super Chat that came before the rates loaded isn't lost: `usd` is null until they do, and Home's tile shows a dash (`NO_MONEY`).
+- `LiveService` keeps each Super Chat's amount by currency (`parseAmount`, `src/main/helper/amount.ts`, which reads YouTube's en-US text with a symbol map built from `Intl`), and `getSession()` adds them up in US dollars through `RatesService.toUsd` (the user's calls: always USD, no setting). So a Super Chat that came before the rates loaded isn't lost: `usd` is null until they do, and Home's tile shows a dash (`NO_MONEY`). Code that only asks whether it's LIVE, like the uptime tick, reads the `startedAt` getter instead of that copy.
 - `RatesService` (`src/main/services/rates`) reads Frankfurter's US dollar rates (`api.frankfurter.dev`, free, no key, listed in the notices), keeps them in memory for a day, sends one request at a time and backs off from a minute to an hour after a failure, with a warning and no notice. Dollars need no rates, so a LIVE without other currencies never fetches. A currency the rates lack is left out of the total, warned once.
 - **Each Super Chat's own dollars:**
   - `ConnectorService` puts `usd` on each `SUPER_CHAT` as it forwards it (`setRates`, `RatesService.usdOf`), so alerts, Studio, games, history and overlays all get the same value.

@@ -59,7 +59,9 @@ describe("home events", () => {
         getLiveStats: () => stats,
       };
       const liveService = {
-        getSession: vi.fn(() => ({ startedAt: on ? 1000 : null })),
+        get startedAt() {
+          return on ? 1000 : null;
+        },
       };
       const h = createHandler({
         connectorService,
@@ -491,9 +493,9 @@ describe("home events", () => {
         getLiveStats: () => stats,
       };
       const liveService = {
-        getSession: () => ({
-          startedAt: Object.keys(status).length > 0 ? 1000 : null,
-        }),
+        get startedAt() {
+          return Object.keys(status).length > 0 ? 1000 : null;
+        },
       };
       const h = createHandler({
         connectorService,
@@ -878,7 +880,7 @@ describe("home events", () => {
           status: () => ({ twitch: "connected" }),
           viewers: () => ({ twitch: 1 }),
         },
-        liveService: { getSession: () => ({ startedAt: 1000 }) },
+        liveService: { startedAt: 1000 },
         storeManagerService: { getLiveStats: () => stats },
       });
 
@@ -930,7 +932,7 @@ describe("home events", () => {
         status: () => ({}),
         viewers: () => ({ tiktok: 2 }),
       },
-      liveService: { getSession: () => ({ startedAt }) },
+      liveService: { startedAt },
       storeManagerService: { getLiveStats: () => stats },
     });
 

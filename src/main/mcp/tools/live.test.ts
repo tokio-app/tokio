@@ -548,7 +548,9 @@ describe("live MCP tools", () => {
             username: "streamer",
           },
           liveService: {
-            getSession: () => ({ startedAt: on ? 1000 : null }),
+            get startedAt() {
+              return on ? 1000 : null;
+            },
           },
         },
         { stack: home },
