@@ -212,6 +212,21 @@ export const showsUptime = (overlay: StudioOverlay) =>
     (e) => e.kind === "text" && e.text.includes("{uptime}"),
   );
 
+// The gifts a view draws, and the ids of the overlays Tokio serves
+const giftsAndServed = async (
+  overlayService: Pick<
+    Services["overlayService"],
+    "getGifts" | "getCustomGifts" | "getOverlays"
+  >,
+) => ({
+  // TikTok's first, so its entry wins for a gift on both lists
+  gifts: [
+    ...(await overlayService.getGifts()),
+    ...(await overlayService.getCustomGifts()),
+  ],
+  served: new Set(overlayService.getOverlays().map((o) => o.id)),
+});
+
 /**
  * Sends the studio overlays' pages what to draw: every overlay, or those
  * `only` keeps. Best effort: a failure is logged, never thrown, so it can't
@@ -225,13 +240,7 @@ export async function sendStudioOverlays(
     const overlays = services.storeManagerService.getStudio().filter(only);
     if (overlays.length === 0) return;
 
-    const { overlayService } = services;
-    // TikTok's first, so its entry wins for a gift on both lists
-    const gifts = [
-      ...(await overlayService.getGifts()),
-      ...(await overlayService.getCustomGifts()),
-    ];
-    const served = new Set(overlayService.getOverlays().map((o) => o.id));
+    const { gifts, served } = await giftsAndServed(services.overlayService);
     // After the awaits, so a push can't show a LIVE that ended meanwhile
     const numbers = liveNumbers(services);
     const tops = topsOf(services.historyService);
@@ -281,12 +290,7 @@ export async function studioSampleView(
   overlay: StudioOverlay,
 ): Promise<StudioView> {
   const profile = await storeManagerService.getProfileData();
-  // As sendStudioOverlays takes them
-  const gifts = [
-    ...(await overlayService.getGifts()),
-    ...(await overlayService.getCustomGifts()),
-  ];
-  const served = new Set(overlayService.getOverlays().map((o) => o.id));
+  const { gifts, served } = await giftsAndServed(overlayService);
   return studioView(overlay, {
     gifts,
     served: (id) => served.has(id),
