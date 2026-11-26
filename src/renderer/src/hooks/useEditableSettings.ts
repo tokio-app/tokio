@@ -79,11 +79,8 @@ export function useEditableSettings<K extends Section>(
   // Until then the settings are the defaults, which a save would write over
   // the profile
   const loaded = useRef(false);
-  // Name of the profile last loaded. A reply also comes for a resync or
-  // another component's request, which isn't a switch.
-  // shortcut: names are unique per profile, but a rebuilt store copies the
-  // files' names and can repeat one; send the active file in GET_PROFILE if
-  // that ever matters
+  // File of the profile last loaded. A reply also comes for a resync, a
+  // rename or another component's request, which aren't switches.
   const shown = useRef<string | null>(null);
 
   const flush = useCallback(() => {
@@ -105,8 +102,9 @@ export function useEditableSettings<K extends Section>(
     loaded.current = true;
     setSettings(res.profile![section]);
     setSaved(res.profile![section]);
-    const switched = res.profile!.name !== shown.current;
-    shown.current = res.profile!.name;
+    const file = res.file ?? null;
+    const switched = file !== shown.current;
+    shown.current = file;
     onLoad?.(res.profile!, switched);
   });
 

@@ -346,12 +346,21 @@ export const failure = (message = "Something went wrong.") => ({
 
 /**
  * The GET_PROFILE reply with the default profile, changed by `recipe`. The
- * defaults are cloned, so tests never change the shared ones.
+ * defaults are cloned, so tests never change the shared ones. Its `file` is
+ * the name's, "default.json" for Default, unless one is given: a rename keeps
+ * the file.
  */
-export function profileReply(recipe?: (profile: Profile) => void) {
+export function profileReply(
+  recipe?: (profile: Profile) => void,
+  file?: string,
+) {
   const profile = structuredClone(defaultProfile);
   recipe?.(profile);
-  return { success: true, profile };
+  return {
+    success: true,
+    profile,
+    file: file ?? `${profile.name.toLowerCase()}.json`,
+  };
 }
 
 /** The GET_SETTINGS reply with the default store, changed by `recipe`. */
