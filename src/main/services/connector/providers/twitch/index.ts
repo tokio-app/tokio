@@ -62,6 +62,8 @@ type Connection = {
   // The wait before a connect's or a reconnect's next try, and its end
   retry?: NodeJS.Timeout;
   wake?: () => void;
+  // Events waiting for their picture, which a stop sends without it
+  held: Set<Mapped>;
 };
 
 /**
@@ -216,6 +218,7 @@ export class TwitchConnector
       reconnecting: false,
       live: false,
       wasLive: false,
+      held: new Set(),
       eventsub: new EventSub(
         this._config.EVENTSUB_URL,
         this._config.KEEPALIVE_GRACE_MS,
@@ -367,8 +370,11 @@ export class TwitchConnector
     }
     const mapped = MAPPERS[type]?.(event);
     if (!mapped) return;
+    conn.held.add(mapped);
     void this._picture(mapped.data.user).then(() => {
-      if (this._conn === conn) this.emit(mapped.event, mapped.data);
+      if (conn.held.delete(mapped) && this._conn === conn) {
+        this.emit(mapped.event, mapped.data);
+      }
     });
   }
 
@@ -488,6 +494,9 @@ export class TwitchConnector
     clearTimeout(conn.retry);
     conn.wake?.();
     if (!conn.up) return;
+    // Before DISCONNECTED, as they came before the stop
+    for (const mapped of conn.held) this.emit(mapped.event, mapped.data);
+    conn.held.clear();
     const why =
       reason === "ended"
         ? " -- the stream ended"

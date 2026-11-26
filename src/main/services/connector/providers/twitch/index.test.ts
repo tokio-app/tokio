@@ -388,6 +388,31 @@ describe("TwitchConnector", () => {
       expect(pictured).toHaveLength(10);
     });
 
+    it("sends an event still waiting for its picture when the stream ends", async () => {
+      const order: string[] = [];
+      connector.on(TOKIO_EVENTS.CHEER, () => order.push("cheer"));
+      connector.on(TOKIO_EVENTS.DISCONNECTED, () => order.push("disconnected"));
+      await connector.connect("");
+      let release: (() => void) | undefined;
+      twitch.override = (url) =>
+        url.includes("/users?id=")
+          ? new Promise((resolve) => {
+              release = () =>
+                resolve(json(200, { data: [{ profile_image_url: "x" }] }));
+            })
+          : undefined;
+
+      notify("stream.online", { broadcaster_user_id: BROADCASTER });
+      notify("channel.bits.use", { ...viewer, bits: 500, type: "cheer" });
+      await vi.waitFor(() => expect(release).toBeDefined());
+      notify("stream.offline", { broadcaster_user_id: BROADCASTER });
+      await vi.waitFor(() => expect(order).toContain("disconnected"));
+      release!();
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(order).toEqual(["cheer", "disconnected"]);
+    });
+
     it("sends the viewers while live, and ends with the stream", async () => {
       twitch.live = 120;
       const onRoom = capture(TOKIO_EVENTS.ROOM_USER);

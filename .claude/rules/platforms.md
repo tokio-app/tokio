@@ -78,7 +78,7 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - A community gift counts once, from its `community_sub_gift` notice. Each `sub_gift` that carries a `community_gift_id` is dropped.
 - A **Redeem** row's keyword is the reward's title, matched in any case, empty for any (`matchesTrigger`).
 - Anonymous gifters and cheerers get a user with `platform` and no id.
-- Pictures (follows, subs, cheers, redeems) are looked up at most `PICTURE_LOOKUPS` (200) a minute, so a follow train can't spend Helix's 800 a minute; past it an event goes out without one, cached pictures still apply.
+- Pictures (follows, subs, cheers, redeems) are looked up at most `PICTURE_LOOKUPS` (200) a minute, so a follow train can't spend Helix's 800 a minute; past it an event goes out without one, cached pictures still apply. An event waiting for its picture is held on the connection (`held`), and a stop sends it without one before `DISCONNECTED`.
 - The sign-in code stays hidden until **Show** (`TwitchSignIn`, which Settings and the first-start dialog share): streamers show their screen, and a viewer who typed it would sign Tokio into their own account. Sign-in and sign-out are never in MCP (`.claude/rules/mcp.md`), since they need the streamer at a browser, and Sign out is refused while Twitch is connected.
 - `CLIENT_ID` in `providers/twitch/config` is the Tokio app the user registered on dev.twitch.tv: a public client (no secret), its only redirect `http://localhost`, which the device flow never uses. It isn't a secret.
 
