@@ -37,7 +37,7 @@ describe("ProfileDropdown", () => {
   it("shows the active profile, closed", () => {
     setup();
 
-    expect(toggle()).toHaveAccessibleName("Default");
+    expect(toggle()).toHaveAccessibleName("Profile: Default");
     expect(toggle()).toHaveAttribute("aria-expanded", "false");
     expect(listed()).toEqual([]);
   });
@@ -102,12 +102,17 @@ describe("ProfileDropdown", () => {
     expect(listed()).toEqual([]);
   });
 
-  it("can't be opened while disabled", async () => {
+  it("can't be opened while disabled, and says why", async () => {
     const { user } = setup({ disabled: true });
 
+    // Still in the Tab order, so the reason can be read
+    await user.tab();
+    expect(toggle()).toHaveFocus();
+    await user.keyboard("{Enter}");
     await user.click(toggle());
 
-    expect(toggle()).toBeDisabled();
+    expect(toggle()).toHaveAttribute("aria-disabled", "true");
+    expect(toggle()).toHaveAttribute("title", "(disconnect to switch)");
     expect(listed()).toEqual([]);
   });
 

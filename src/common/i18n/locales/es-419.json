@@ -137,6 +137,7 @@
   "components.update.download": "Descargar actualización",
   "components.variables.label": "Variables:",
   "components.variables.insert": "Insertar {variable}",
+  "components.profileDropdown.label": "Perfil: {name}",
   "components.notifications.title": "Notificaciones",
   "components.notifications.unread#one": "Notificaciones, {count} sin leer",
   "components.notifications.unread#other": "Notificaciones, {count} sin leer",

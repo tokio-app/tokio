@@ -1,6 +1,7 @@
 import { EntityMetadata } from "@/common/schemas";
 import { cx } from "@/helper/cx";
 import { useMenu } from "@/hooks/useMenu";
+import { useT } from "@/ui/i18n";
 import { FiCheck, FiChevronDown } from "react-icons/fi";
 import styles from "./profiledropdown.module.css";
 
@@ -17,6 +18,7 @@ export function ProfileDropdown({
   active,
   disabled,
 }: Props) {
+  const t = useT();
   const { open, ref, toggleRef, toggle, close, onKeyDown } = useMenu();
 
   return (
@@ -24,9 +26,15 @@ export function ProfileDropdown({
       <button
         ref={toggleRef}
         type="button"
+        aria-label={t("components.profileDropdown.label", {
+          name: active.name,
+        })}
         aria-expanded={open}
-        disabled={disabled}
-        onClick={toggle}
+        // Not disabled, which would drop it from the Tab order and say
+        // nothing: its title says why it's locked
+        aria-disabled={disabled || undefined}
+        title={disabled ? t("settings.profiles.locked") : undefined}
+        onClick={disabled ? undefined : toggle}
         className={cx(
           styles.toggle,
           open && styles.toggle_open,
