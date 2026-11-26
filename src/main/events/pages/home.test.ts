@@ -340,7 +340,7 @@ describe("home events", () => {
         }),
       ]);
     });
-    it("saves the channel typed over the profile's others", async () => {
+    it("saves only the channel typed, which the store merges over the others", async () => {
       const { h, profile, storeManagerService } = setup({ success: true });
       profile.platforms = ["youtube"];
       profile.channels = { youtube: "old", other: "kept" };
@@ -351,7 +351,7 @@ describe("home events", () => {
       });
 
       expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
-        channels: { youtube: "@new", other: "kept" },
+        channels: { youtube: "@new" },
       });
     });
     it.each([
@@ -751,8 +751,14 @@ describe("home events", () => {
         >,
       };
       const storeManagerService = {
+        // Merges the channels, as the store does
         updateProfileData: vi.fn(async (updates: Partial<typeof profile>) => {
-          if (saved) Object.assign(profile, updates);
+          if (saved) {
+            Object.assign(profile, {
+              ...updates,
+              channels: { ...profile.channels, ...updates.channels },
+            });
+          }
           return saved;
         }),
         getProfileData: async () => profile,
@@ -774,7 +780,7 @@ describe("home events", () => {
 
       expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
         connector: { username: "streamer" },
-        channels: { youtube: " youtube.com/@me ", kick: "savedkick" },
+        channels: { youtube: " youtube.com/@me " },
       });
       expect(h.replies(APP_EVENTS_RESPONSE.SET_CHANNELS)).toEqual([
         {
@@ -794,7 +800,7 @@ describe("home events", () => {
       });
 
       expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
-        channels: { youtube: "@saved", kick: "newkick" },
+        channels: { kick: "newkick" },
       });
       expect(h.replies(APP_EVENTS_RESPONSE.SET_CHANNELS)).toEqual([
         expect.objectContaining({ username: "old" }),
@@ -813,7 +819,7 @@ describe("home events", () => {
       });
 
       expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
-        channels: { youtube: "@new", kick: "savedkick" },
+        channels: { youtube: "@new" },
       });
       expect(h.replies(APP_EVENTS_RESPONSE.SET_CHANNELS)).toEqual([
         {

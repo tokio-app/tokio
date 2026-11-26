@@ -1,4 +1,3 @@
-import { Profile } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -101,17 +100,17 @@ const toUsername = (input: string) => {
 };
 
 // Saves the profile's names as CONNECT and SET_CHANNELS both do: TikTok's
-// @username as given, the channels as typed, over the saved ones (MCP sends
-// only the channel it was given)
+// @username as given, the channels as typed. Only those sent: the store
+// merges them over the saved ones, so an older read can't write old ones
+// back (MCP sends only the channel it was given).
 const saveNames = (
   store: StoreManagerService,
-  profile: Profile | null,
   username: string | undefined,
   channels: Partial<Record<Platform, string>> | undefined,
 ) =>
   store.updateProfileData({
     ...(username !== undefined && { connector: { username } }),
-    ...(channels && { channels: { ...profile?.channels, ...channels } }),
+    ...(channels && { channels }),
   });
 
 events.push(
@@ -150,7 +149,6 @@ events.push(
     }
     const saved = await saveNames(
       storeManagerService,
-      profile,
       platforms.includes("tiktok") ? name : undefined,
       channels,
     );
@@ -313,7 +311,6 @@ const replyNames = async (
 events.push(
   APP_EVENTS.SET_CHANNELS,
   async ({ storeManagerService, connectorService }, e, data) => {
-    const profile = await storeManagerService.getProfileData();
     // A platform that's on keeps the name it's on: MCP can write while live
     const on = connectorService.status();
     const typed = data.channels;
@@ -328,7 +325,7 @@ events.push(
       data.username === undefined || on.tiktok
         ? undefined
         : toUsername(data.username);
-    if (!(await saveNames(storeManagerService, profile, username, channels))) {
+    if (!(await saveNames(storeManagerService, username, channels))) {
       throw saveFailure();
     }
     await replyNames(e, storeManagerService);
