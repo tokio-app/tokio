@@ -190,11 +190,13 @@ export class TwitchConnector
         }
       }
     } catch (err) {
+      // A Disconnect closed the socket or woke the pause; a sign-out also
+      // stops the connection but says so itself
+      if (this._conn !== conn && !this._auth.lost) {
+        return fail("canceled", "Disconnected while connecting.");
+      }
       this._stop(conn);
       return { success: false, error: toFailure(err) };
-    }
-    if (this._conn !== conn) {
-      return fail("unknown", "Disconnected while connecting.");
     }
 
     conn.up = true;
@@ -252,6 +254,10 @@ export class TwitchConnector
    */
   private async _start(conn: Connection): Promise<number | null> {
     const { userId, login } = await this._auth.validate();
+    // Stopped meanwhile: a socket opened now would never be closed
+    if (this._conn !== conn) {
+      throw connectFailure("canceled", "Disconnected while connecting.");
+    }
     conn.userId = userId;
     const session = await conn.eventsub.open();
     await this._subscribe(session, userId);

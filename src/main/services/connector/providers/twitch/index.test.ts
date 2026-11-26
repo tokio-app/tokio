@@ -310,6 +310,92 @@ describe("TwitchConnector", () => {
       expect(connector.isConnected()).toBe(false);
     });
 
+    describe("a Disconnect while connecting cancels it", () => {
+      // Holds the first token check until release()
+      const hold = () => {
+        let release: (() => void) | undefined;
+        twitch.override = (url) => {
+          if (url !== config.VALIDATE_URL || release) return undefined;
+          return new Promise((resolve) => {
+            release = () =>
+              resolve(json(200, { login: "streamer", user_id: BROADCASTER }));
+          });
+        };
+        return () => release;
+      };
+
+      it("during the token check, opening no socket", async () => {
+        const released = hold();
+        const connecting = connector.connect("");
+        await vi.waitFor(() => expect(released()).toBeDefined());
+
+        await connector.disconnect();
+        released()!();
+
+        const res = await connecting;
+        expect(res.success).toBe(false);
+        expect(res.error?.kind).toBe("canceled");
+        await new Promise((r) => setTimeout(r, 50));
+        expect(twitch.sockets).toHaveLength(0);
+        expect(twitch.subscriptions).toHaveLength(0);
+        expect(connector.isConnected()).toBe(false);
+      });
+
+      it("during the welcome wait", async () => {
+        twitch.welcome = false;
+        const connecting = connector.connect("");
+        await vi.waitFor(() => expect(twitch.sockets).toHaveLength(1));
+
+        await connector.disconnect();
+
+        expect((await connecting).error?.kind).toBe("canceled");
+      });
+
+      it("during the wait before trying again", async () => {
+        make({ CONNECT_RETRY_MS: 60_000 });
+        const info = vi.spyOn(Logger, "info");
+        twitch.override = (url) => {
+          if (url === config.VALIDATE_URL) throw new TypeError("fetch failed");
+          return undefined;
+        };
+        const connecting = connector.connect("");
+        await vi.waitFor(() =>
+          expect(info).toHaveBeenCalledWith(
+            expect.stringContaining("Connecting again"),
+            expect.anything(),
+          ),
+        );
+
+        await connector.disconnect();
+
+        expect((await connecting).error?.kind).toBe("canceled");
+      });
+
+      it("but a sign-out keeps its own failure", async () => {
+        twitch.override = (url) =>
+          url === config.TOKEN_URL
+            ? json(400, { message: "Invalid refresh token" })
+            : undefined;
+
+        expect((await connector.connect("")).error?.kind).toBe("badKey");
+        expect(connector.isConnected()).toBe(false);
+      });
+
+      it("during a reconnect's token check, opening no socket", async () => {
+        await connector.connect("");
+        const released = hold();
+        socket().terminate();
+        await vi.waitFor(() => expect(released()).toBeDefined());
+
+        await connector.disconnect();
+        released()!();
+
+        await new Promise((r) => setTimeout(r, 50));
+        expect(twitch.sockets).toHaveLength(1);
+        expect(twitch.subscriptions).toHaveLength(7);
+      });
+    });
+
     it("tells a rate limit", async () => {
       twitch.override = (url) =>
         url === config.TOKEN_URL ? json(429, {}) : undefined;
