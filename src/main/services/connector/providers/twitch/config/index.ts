@@ -33,6 +33,9 @@ const config = {
 
   // Viewers whose pictures are kept, the last ones looked up
   PICTURES_KEPT: 500,
+  // Pictures looked up a minute at most, a quarter of Helix's 800 requests
+  // a minute, so a follow train leaves the rest for the connection
+  PICTURE_LOOKUPS: 200,
   // A repeating error is logged at most this often
   LOG_REPEAT_MS: 30_000,
 };

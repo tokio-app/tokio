@@ -13,7 +13,7 @@ import {
 import { WebSocket, WebSocketServer } from "ws";
 import type { PlatformAccount, ReconnectState } from "../../common";
 import { NO_ACCOUNT } from "./common/auth";
-import config from "./config";
+import config, { type TwitchConfig } from "./config";
 import { TwitchConnector } from "./index";
 
 const BROADCASTER = "1971641";
@@ -97,6 +97,25 @@ describe("TwitchConnector", () => {
   let saved: Mock<(account: PlatformAccount) => Promise<boolean>>;
   let states: ReconnectState[];
 
+  // The suite's connector, with the delays short and these options
+  const make = (options: Partial<TwitchConfig> = {}) => {
+    connector = new TwitchConnector({
+      CLIENT_ID: "client",
+      EVENTSUB_URL: `ws://127.0.0.1:${port}/ws`,
+      KEEPALIVE_GRACE_MS: 0,
+      CONNECT_RETRY_MS: 10,
+      RECONNECT_MIN_MS: 10,
+      RECONNECT_MAX_MS: 40,
+      STREAMS_POLL_MS: 50,
+      ...options,
+    });
+    connector.setAccount(ACCOUNT);
+    saved = vi.fn(async () => true);
+    connector.onAccount(saved);
+    states = [];
+    connector.onReconnect((state) => states.push(state));
+  };
+
   const capture = (event: TOKIO_EVENTS) => {
     const listener = vi.fn();
     connector.on(event, listener);
@@ -175,20 +194,7 @@ describe("TwitchConnector", () => {
       }),
     );
 
-    connector = new TwitchConnector({
-      CLIENT_ID: "client",
-      EVENTSUB_URL: `ws://127.0.0.1:${port}/ws`,
-      KEEPALIVE_GRACE_MS: 0,
-      CONNECT_RETRY_MS: 10,
-      RECONNECT_MIN_MS: 10,
-      RECONNECT_MAX_MS: 40,
-      STREAMS_POLL_MS: 50,
-    });
-    connector.setAccount(ACCOUNT);
-    saved = vi.fn(async () => true);
-    connector.onAccount(saved);
-    states = [];
-    connector.onReconnect((state) => states.push(state));
+    make();
   });
 
   afterEach(async () => {
@@ -294,14 +300,7 @@ describe("TwitchConnector", () => {
 
     it("fails a try on a socket Twitch never welcomes", async () => {
       twitch.welcome = false;
-      connector = new TwitchConnector({
-        CLIENT_ID: "client",
-        EVENTSUB_URL: `ws://127.0.0.1:${port}/ws`,
-        REQUEST_TIMEOUT_MS: 50,
-        CONNECT_RETRY_MS: 10,
-      });
-      connector.setAccount(ACCOUNT);
-      connector.onAccount(saved);
+      make({ REQUEST_TIMEOUT_MS: 50 });
 
       const res = await connector.connect("");
 
@@ -368,6 +367,25 @@ describe("TwitchConnector", () => {
         profilePictures: ["https://pic/4145994.png"],
       });
       expect(onChat.mock.calls[0][0].comment.content).toBe("hi");
+    });
+
+    it("looks up at most PICTURE_LOOKUPS pictures a minute, sending every event", async () => {
+      make({ PICTURE_LOOKUPS: 10 });
+      const onFollow = capture(TOKIO_EVENTS.FOLLOW);
+      await connector.connect("");
+
+      for (let i = 0; i < 50; i++) {
+        notify("channel.follow", { ...viewer, user_id: `${1000 + i}` });
+      }
+
+      await vi.waitFor(() => expect(onFollow).toHaveBeenCalledTimes(50));
+      expect(twitch.calls.filter((u) => u.includes("/users?id="))).toHaveLength(
+        10,
+      );
+      const pictured = onFollow.mock.calls.filter(
+        ([follow]) => follow.user.profilePictures.length,
+      );
+      expect(pictured).toHaveLength(10);
     });
 
     it("sends the viewers while live, and ends with the stream", async () => {

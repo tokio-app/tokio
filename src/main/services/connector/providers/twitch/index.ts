@@ -80,6 +80,9 @@ export class TwitchConnector
   private _connecting: Promise<ConnectorResponse> | null = null;
   // Viewers' pictures by Twitch id, the last looked up kept
   private _pictures = new Map<string, string>();
+  // The picture lookups of the minute since lookupsSince
+  private _lookups = 0;
+  private _lookupsSince = 0;
   // When each repeating error was last logged
   private _logged = new Map<string, number>();
 
@@ -376,6 +379,14 @@ export class TwitchConnector
     if (!id || user.profilePictures.length) return;
     let url = this._pictures.get(id);
     if (url === undefined) {
+      const now = Date.now();
+      if (now - this._lookupsSince >= 60_000) {
+        this._lookupsSince = now;
+        this._lookups = 0;
+      }
+      // Past the minute's lookups, it goes out without its picture
+      if (this._lookups >= this._config.PICTURE_LOOKUPS) return;
+      this._lookups++;
       try {
         const res = await this._auth.request(
           `${this._config.HELIX_URL}/users?id=${id}`,
