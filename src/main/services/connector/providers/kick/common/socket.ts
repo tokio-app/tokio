@@ -68,11 +68,6 @@ export class KickSocket {
     private _handlers: KickSocketHandlers,
   ) {}
 
-  // Connected and subscribed, and not dropped since
-  public get connected(): boolean {
-    return this._socket !== null && this._opening === null;
-  }
-
   // A fresh socket: resolves once the server took the token and answered
   // every subscribe. Rejects with a failure that says whether it's terminal.
   public open(url: string, token: string, feeds: string[]): Promise<void> {

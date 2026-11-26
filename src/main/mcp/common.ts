@@ -43,15 +43,6 @@ export const fail = (message: string): CallToolResult => ({
   isError: true,
 });
 
-/** A provider or engine without its key: only whether it has one. */
-export const masked = <T extends { key: string }>({
-  key,
-  ...rest
-}: T): Omit<T, "key"> & { hasKey: boolean } => ({
-  ...rest,
-  hasKey: key !== "",
-});
-
 // FLUSH_SETTINGS ids the window hasn't answered, with what ends the wait
 const flushing = new Map<string, () => void>();
 

@@ -80,7 +80,6 @@ describe("KickSocket", () => {
   it("connects from kick.com's origin with the token, then subscribes", async () => {
     await socket.open(url, "token-1", FEEDS);
 
-    expect(socket.connected).toBe(true);
     expect(client().req.headers.origin).toBe("https://kick.com");
     expect(client().req.headers["user-agent"]).toBe("Tokio/test");
     expect(client().got).toEqual([
@@ -185,7 +184,6 @@ describe("KickSocket", () => {
         false,
       ),
     );
-    expect(socket.connected).toBe(false);
   });
 
   it("tells a reconnecting close from a terminal one", async () => {

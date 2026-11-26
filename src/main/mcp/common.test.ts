@@ -18,7 +18,6 @@ import {
   flushWindow,
   guardProfile,
   invokeOk,
-  masked,
   pushProfile,
   pushSettings,
   settingsFlushed,
@@ -265,19 +264,6 @@ describe("checkPath", () => {
     expect(await checkPath(dir)).toMatchObject({ isError: true });
     expect(await checkPath(join(dir, "none.mp3"))).toMatchObject({
       isError: true,
-    });
-  });
-});
-
-describe("masked", () => {
-  it("leaves only whether there's a key", () => {
-    expect(masked({ name: "edge", key: "secret" })).toEqual({
-      name: "edge",
-      hasKey: true,
-    });
-    expect(masked({ name: "edge", key: "" })).toEqual({
-      name: "edge",
-      hasKey: false,
     });
   });
 });

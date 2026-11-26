@@ -165,7 +165,7 @@ const LABELS: Record<string, string> = {
 };
 
 // Keys whose name the locale files hold
-export const KEY_LABELS = [
+const KEY_LABELS = [
   "Shift",
   "Space",
   "Home",

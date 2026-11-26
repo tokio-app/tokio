@@ -144,7 +144,7 @@ export async function runEvent<K extends APP_EVENTS>(
 
 // Replies a page acts on as the answer to its own request, by closing a
 // dialog or taking the data, so the window only gets them when it asked.
-export const PRIVATE_REPLIES: ReadonlySet<APP_EVENTS_RESPONSE> = new Set([
+const PRIVATE_REPLIES: ReadonlySet<APP_EVENTS_RESPONSE> = new Set([
   APP_EVENTS_RESPONSE.CREATE_PROFILE,
   APP_EVENTS_RESPONSE.CLONE_PROFILE,
   APP_EVENTS_RESPONSE.RENAME_PROFILE,
