@@ -26,7 +26,7 @@ import ARCHIVO from "@fontsource-variable/archivo/files/archivo-latin-wdth-norma
 import ARCHIVO_ITALIC from "@fontsource-variable/archivo/files/archivo-latin-wdth-italic.woff2?inline";
 import Logger from "@/logger";
 import express, { Express, Router } from "express";
-import { randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { Server as HttpServer } from "node:http";
 import { networkInterfaces } from "node:os";
 import type { WebSocket } from "ws";
@@ -39,6 +39,7 @@ import { CameraFeeds } from "./camera";
 import GAMES_HTML from "./games.html?raw";
 import STUDIO_HTML from "./studio.html?raw";
 import TIMER_HTML from "./timer.html?raw";
+import { sameKey } from "./remote";
 import { CustomWebSocketServer } from "./websocket";
 
 // Inlined, so streaming apps on any computer get the app's typeface, without
@@ -347,14 +348,11 @@ export class ServerService extends Service {
         this._logFile,
       ),
     );
-    const given = Buffer.from(url.pathname.slice(CAMERA_PREFIX.length));
-    const key = Buffer.from(this._cameraKey);
     const query = CameraQuerySchema.safeParse(
       Object.fromEntries(url.searchParams),
     );
     if (
-      given.length !== key.length ||
-      !timingSafeEqual(given, key) ||
+      !sameKey(url.pathname.slice(CAMERA_PREFIX.length), this._cameraKey) ||
       !query.success
     ) {
       client.close(1008);
