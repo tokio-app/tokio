@@ -471,6 +471,27 @@ describe("sendStudioOverlays", () => {
     ]);
   });
 
+  it("ranks the gifters once per push, and only for a gifters or subs list", async () => {
+    const lists = (id: string) =>
+      overlay(id, [
+        element("k", { kind: "list" }),
+        element("s", { kind: "list", source: "giftsubs" }),
+      ]);
+    const { handler } = setup([lists(ID), lists("o2")]);
+    const tops = vi.spyOn(handler.historyService, "topByPlatform");
+    const subs = vi.spyOn(handler.historyService, "topSubGifters");
+
+    await sendStudioOverlays(handler);
+    expect([tops.mock.calls.length, subs.mock.calls.length]).toEqual([1, 1]);
+
+    const { handler: plain } = setup([
+      overlay(ID, [element("f", { kind: "list", source: "followers" })]),
+    ]);
+    const none = vi.spyOn(plain.historyService, "topByPlatform");
+    await sendStudioOverlays(plain);
+    expect(none).not.toHaveBeenCalled();
+  });
+
   it("fills a list with the LIVE's newest followers, gifts or chat", async () => {
     const studio = new StudioService();
     const ana = { username: "Ana", handle: "ana", profilePictures: ["a.png"] };
