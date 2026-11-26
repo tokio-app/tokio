@@ -259,6 +259,15 @@ describe("fromAction", () => {
     expect(
       fromAction(purchase([{ text: "Sent a Channel gift membership" }]))?.data,
     ).toMatchObject({ count: 1 });
+    // The channel's name has digits of its own
+    expect(
+      fromAction(purchase([{ text: "Sent a Gamer4Life gift membership" }]))
+        ?.data,
+    ).toMatchObject({ count: 1 });
+    expect(
+      fromAction(purchase([{ text: "Sent 20 Gamer4Life gift memberships" }]))
+        ?.data,
+    ).toMatchObject({ count: 20 });
     // Each recipient's, already counted by the purchase
     expect(
       fromAction(

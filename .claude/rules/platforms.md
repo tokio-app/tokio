@@ -102,7 +102,7 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
   - `GIFT_CURRENCY` says what each platform's gifts cost in: `coins` for TikTok, none for the others (YouTube's Gifts have no price; Twitch and Kick send no gifts). `giftCurrencies(platforms)` gives the ones a profile pays in.
   - Both are `Record`s, so a new platform has to decide.
 - A gift without a currency counts as a gift, never as an amount, and makes its sender a gifter only beside money or gifted subs (the user's call: hide the zero, `.claude/rules/history.md`).
-- A gifted membership counts once, from its purchase announcement, with the count read from its text; each recipient's redemption is dropped.
+- A gifted membership counts once, from its purchase announcement, with the count read right after its text's "Sent" (a channel's name can hold digits), else 1; each recipient's redemption is dropped.
 - Super Chat amounts stay as YouTube shows them (`amount`), and `LiveService` adds them up in US dollars (`.claude/rules/live-session.md`). The timer adds the same seconds per Super Chat whatever it cost. `ConnectorService` gives each one its own `usd`, which history and alert minimums use.
 - Placeholder items (`liveChatPlaceholderItemRenderer`) are messages held from readers and never filled in: ignored.
 
