@@ -14,7 +14,8 @@ import {
 } from "@/hooks";
 import { PlatformsContext } from "@/context/platforms";
 import { useT } from "@/ui/i18n";
-import { useState } from "react";
+import ttsStyles from "@/pages/TTS/tts.module.css";
+import { useId, useState } from "react";
 import { ControlsSection } from "./sections/ControlsSection";
 import { ProviderSection } from "./sections/ProviderSection";
 
@@ -22,6 +23,9 @@ export function Music() {
   const t = useT();
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
+  // The protection boxes' hints, under each
+  const onePerViewer = useId();
+  const limitControls = useId();
 
   // The permissions' tabs, one per platform
   const [platforms, setPlatforms] = useState(defaultProfile.platforms);
@@ -72,26 +76,36 @@ export function Music() {
           protection={settings.protection}
           update={scopeUpdater(update, "protection")}
         >
-          <Check
-            label={t("music.protection.onePerViewer")}
-            title={t("music.protection.onePerViewerHint")}
-            checked={settings.protection.one_per_viewer}
-            onChange={(e) =>
-              update((s) => {
-                s.protection.one_per_viewer = e.target.checked;
-              })
-            }
-          />
-          <Check
-            label={t("music.protection.limitControls")}
-            title={t("music.protection.limitControlsHint")}
-            checked={settings.protection.limit_controls}
-            onChange={(e) =>
-              update((s) => {
-                s.protection.limit_controls = e.target.checked;
-              })
-            }
-          />
+          <div className={ttsStyles.check_group}>
+            <Check
+              label={t("music.protection.onePerViewer")}
+              aria-describedby={onePerViewer}
+              checked={settings.protection.one_per_viewer}
+              onChange={(e) =>
+                update((s) => {
+                  s.protection.one_per_viewer = e.target.checked;
+                })
+              }
+            />
+            <p id={onePerViewer} className={ttsStyles.check_hint}>
+              {t("music.protection.onePerViewerHint")}
+            </p>
+          </div>
+          <div className={ttsStyles.check_group}>
+            <Check
+              label={t("music.protection.limitControls")}
+              aria-describedby={limitControls}
+              checked={settings.protection.limit_controls}
+              onChange={(e) =>
+                update((s) => {
+                  s.protection.limit_controls = e.target.checked;
+                })
+              }
+            />
+            <p id={limitControls} className={ttsStyles.check_hint}>
+              {t("music.protection.limitControlsHint")}
+            </p>
+          </div>
         </ProtectionSection>
       </Page>
     </PlatformsContext>
