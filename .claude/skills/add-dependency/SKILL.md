@@ -29,6 +29,10 @@ The source and the distributed app are MIT, with one LGPL file (see Licensing in
 ## Traps
 
 - On Windows, VS Code's Fallow extension runs its language server from `node_modules/@fallow-cli/<platform>/fallow.exe`, which Yarn can't replace while it runs (EPERM). Before an install that changes `fallow`, ask the user to disable the extension; **Fallow: Restart Language Server** locks the new binary at once.
+- On Windows, VS Code's oxc extension runs the project's `oxlint --lsp`, which loads `node_modules/@oxlint/binding-win32-x64-msvc/oxlint.win32-x64-msvc.node`.
+  - A `yarn upgrade` of any package can relink that file and fail with EPERM before it writes `package.json` and `yarn.lock`, leaving the upgraded package's folder half done: Electron's new `package.json` over the old `dist`.
+  - Make the lockfile in a worktree instead: `yarn install --frozen-lockfile --ignore-scripts`, then the upgrade with `--ignore-scripts`. Copy `package.json` and `yarn.lock` back.
+  - When the lockfile changed only that package, finish it in the checkout by hand. For Electron, `node node_modules/electron/install.js` fetches the `dist` that matches its `package.json`.
 - `yarn upgrade` can replace Electron's package folder without running the root `postinstall`, even when it upgrades another package, so the binary (`node_modules/electron/dist`) is missing until you run `yarn install`, which runs `install-electron`. Check that `dist` is there after any upgrade.
 - On Windows, VS Code can hold `node_modules/electron/dist/resources/default_app.asar`: Electron keeps an `.asar` open once anything reads a path inside it. Windows' Restart Manager names `Code.exe`, and only quitting VS Code frees it.
   - A `yarn add` relinks Electron's folder, so it then fails with EBUSY halfway. By then it has deleted `node_modules/.bin` and the rest of Electron's `dist`.
