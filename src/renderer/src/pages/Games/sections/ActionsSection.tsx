@@ -19,6 +19,7 @@ import {
   createAction,
   newRowTrigger,
   createStep,
+  NETHERITE_ARMOR,
   rowVariables,
   samplePlatform,
 } from "@/common/util";
@@ -71,7 +72,6 @@ import {
   MOBS,
   MORPH_LENGTHS,
   MORPH_MOBS,
-  NETHERITE_ARMOR,
   NETHERITE_KIT_ITEMS,
   STEP_KINDS,
   stepText,
@@ -835,7 +835,7 @@ function Enchanted({
   checked,
   onChange,
 }: {
-  items: string[];
+  items: readonly string[];
   checked: boolean;
   onChange: (enchanted: boolean) => void;
 }) {

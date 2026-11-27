@@ -15,6 +15,7 @@ import {
   JAVA_ONLY_HAZARDS,
   JAVA_ONLY_STEPS,
   MINECRAFT_NAMES,
+  NOT_MOBS,
   samplePlatform,
 } from "@/common/util";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
@@ -74,6 +75,9 @@ function stepProblem({ edition, steps }: GameAction): string | undefined {
       !Object.hasOwn(mobs, step.mob)
     ) {
       return `${step.mob} isn't a ${edition} mob id.`;
+    }
+    if (step.type === "morph" && NOT_MOBS.includes(step.mob)) {
+      return `The player can't turn into ${step.mob}: it isn't a living mob.`;
     }
     if (step.type === "give" && !Object.hasOwn(items, step.item)) {
       return `${step.item} isn't a ${edition} item id.`;

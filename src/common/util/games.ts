@@ -103,6 +103,25 @@ export const HELP_NAMES: Record<Help, MessageKey> = {
   invisibility: "minecraft.help.invisibility",
 };
 
+// What the Netherite armor help puts on: head, chest, legs, feet
+export const NETHERITE_ARMOR: readonly string[] = [
+  "netherite_helmet",
+  "netherite_chestplate",
+  "netherite_leggings",
+  "netherite_boots",
+];
+
+// What Java summons but isn't a living mob, and Tokio's chicken jockey (two
+// mobs), which the mod can't turn the player into
+export const NOT_MOBS: readonly string[] = [
+  "tnt",
+  "lightning_bolt",
+  "end_crystal",
+  "experience_orb",
+  "firework_rocket",
+  "chicken_jockey",
+];
+
 // What the Netherite kit help gives, besides the armor it puts on, and how
 // many. On Java the bow has Infinity, but a plain Bedrock bow needs arrows.
 export const NETHERITE_KIT: readonly (readonly [string, number])[] = [

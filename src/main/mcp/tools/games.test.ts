@@ -207,6 +207,10 @@ describe("games MCP tools", () => {
     it.each([
       [{ steps: [{ type: "spawn", mob: "dragonite", amount: 1 }] }, "mob id"],
       [{ steps: [{ type: "morph", mob: "creeper" }] }, "Java Edition only"],
+      [
+        { edition: "java", steps: [{ type: "morph", mob: "tnt" }] },
+        "isn't a living mob",
+      ],
       [{ overlay: { image: { name: "X", file: "x.png" } } }, "pictures"],
       [{ steps: [{ type: "spawn", mob: "zombie", amount: 0 }] }, "Invalid"],
       [{ id: "other" }, "Unknown"],

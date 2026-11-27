@@ -57,7 +57,7 @@ The **Games** page connects Minecraft to Tokio: Bedrock Edition by itself, Java 
 - Its title folds it, so the overlay gets the room; the body is `hidden` so actions keep their state. Its one **Add action** sits in the body under the tab's actions, none in the header (the user's call).
 - `MOBS` and `ITEMS` come from `src/common/games/minecraft-bedrock.json` and `minecraft-java.json` (`MINECRAFT_NAMES`, in common so main can name overlay rows). The `minecraft-lists` skill regenerates them.
 - `withEdition(action, edition)` moves ids with `idIn`: the same id, else `PAIRS` (ids and names both differ), else the id with the same English name (Bedrock's `web` is Java's `cobweb`), else a zombie or a diamond. To Bedrock it drops morph and unmorph steps and swaps each mod hazard for its stand-in in `JAVA_ONLY_HAZARDS` (the meteor Falling TNT, the lasers lightning), keeping the step's other fields (the user's call).
-- `STEP_KINDS[edition]` and `HAZARDS[edition]` offer the mod's only on Java. `MORPH_MOBS` is Java's mobs minus `NOT_MOBS`: what summons but isn't a living mob, and the chicken jockey.
+- `STEP_KINDS[edition]` and `HAZARDS[edition]` offer the mod's only on Java. `MORPH_MOBS` is Java's mobs minus `NOT_MOBS` (`src/common/util/games.ts`): what summons but isn't a living mob, and the chicken jockey. MCP refuses them for morph too.
 - Test results show the last `RESULTS_SHOWN`, so an earlier failure shows only in `testSummary`.
 
 ## Real-game check

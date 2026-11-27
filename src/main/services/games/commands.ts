@@ -1,6 +1,10 @@
 import { bestEnchantments } from "@/common/games/enchantments";
 import { GameStep, MinecraftEdition } from "@/common/schemas";
-import { NETHERITE_KIT, REPEATED_HAZARDS } from "@/common/util";
+import {
+  NETHERITE_ARMOR,
+  NETHERITE_KIT,
+  REPEATED_HAZARDS,
+} from "@/common/util";
 
 // The longest a viewer's text gets inside a command
 const MAX_VALUE_LENGTH = 100;
@@ -394,12 +398,12 @@ const HELP_EFFECTS: Partial<Record<Help, [string, number]>> = {
   invisibility: ["invisibility", 0],
 };
 
-// Each armor slot, as Java and Bedrock name it, and its netherite piece
-const ARMOR = [
-  ["armor.head", "slot.armor.head", "netherite_helmet"],
-  ["armor.chest", "slot.armor.chest", "netherite_chestplate"],
-  ["armor.legs", "slot.armor.legs", "netherite_leggings"],
-  ["armor.feet", "slot.armor.feet", "netherite_boots"],
+// Each armor slot, as Java and Bedrock name it, in NETHERITE_ARMOR's order
+const ARMOR_SLOTS = [
+  ["armor.head", "slot.armor.head"],
+  ["armor.chest", "slot.armor.chest"],
+  ["armor.legs", "slot.armor.legs"],
+  ["armor.feet", "slot.armor.feet"],
 ];
 
 // What a help gives or puts on the player
@@ -412,11 +416,12 @@ function helpCommands(
     // The kit's are always enchanted, on Java
     const enchanted = help === "netherite_kit" || step.enchanted;
     // Put on at once, replacing what the player wears (the user's call)
-    const armor = ARMOR.map(([javaSlot, bedrockSlot, item]) =>
-      java
+    const armor = NETHERITE_ARMOR.map((item, i) => {
+      const [javaSlot, bedrockSlot] = ARMOR_SLOTS[i];
+      return java
         ? `item replace entity @s ${javaSlot} with ${javaItem(item, enchanted)}`
-        : `replaceitem entity @p ${bedrockSlot} 0 ${item}`,
-    );
+        : `replaceitem entity @p ${bedrockSlot} 0 ${item}`;
+    });
     if (help === "netherite_armor") return armor;
     return [
       ...armor,
