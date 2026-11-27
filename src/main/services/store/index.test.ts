@@ -525,6 +525,30 @@ describe("StoreManagerService", () => {
       expect(other.alerts.items[0].tts.voice).toEqual(fallback);
     });
 
+    it("sweeps every profile when one is deleted during the sweep", async () => {
+      const store = await init();
+      for (const name of ["Alpha", "Bravo", "Charlie"]) {
+        await store.createNewProfile(`${name.toLowerCase()}.json`, name);
+      }
+      const update = store.updateProfileData.bind(store);
+      vi.spyOn(store, "updateProfileData").mockImplementation(
+        async (updates, file) => {
+          const saved = await update(updates, file);
+          if (file === "alpha.json") await store.deleteProfile("alpha.json");
+          return saved;
+        },
+      );
+
+      expect(await store.removeVoices("Default")).toBe(true);
+
+      for (const file of ["bravo.json", "charlie.json"]) {
+        const profile = await readJSON(
+          join(paths.folders.profilesFolder, file),
+        );
+        expect(profile.tts.voice.id).toBe("");
+      }
+    });
+
     it("keeps one entry, with the last key, for two keys saved at once", async () => {
       const store = await init();
 

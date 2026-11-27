@@ -745,7 +745,8 @@ export class StoreManagerService extends Service {
   ): Promise<boolean> {
     this._ensureInitialized();
     let saved = true;
-    for (const { file: profileFile } of this.getProfiles()) {
+    // A copy: a profile deleted meanwhile would shift the list and skip one
+    for (const { file: profileFile } of [...this.getProfiles()]) {
       const active = profileFile === this._activeProfileFile();
       const path = join(
         this._pathManagerService.folders.profilesFolder,
