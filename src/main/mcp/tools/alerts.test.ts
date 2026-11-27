@@ -509,7 +509,9 @@ describe("alerts MCP tools", () => {
 
     it("says the profile couldn't be read, not that the alert is missing", async () => {
       const s = setup();
-      s.storeManagerService.getProfileData = async () => null as never;
+      Object.assign(s.storeManagerService, {
+        getProfileData: async () => null,
+      });
       const { call } = await mcpClient(s.h.handler);
 
       for (const res of [

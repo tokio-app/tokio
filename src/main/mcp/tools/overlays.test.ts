@@ -749,7 +749,10 @@ describe("overlays MCP tools", () => {
         store.getProfileData = async () => {
           // The editor renames t1 meanwhile
           const [group, t1] = held[0].items;
-          held[0] = { ...held[0], items: [group, { ...t1, label: "Mine" }] };
+          held[0] = StudioOverlaySchema.parse({
+            ...held[0],
+            items: [group, { ...t1, label: "Mine" }],
+          });
           return { platforms: ["tiktok"] };
         };
 
