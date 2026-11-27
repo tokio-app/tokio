@@ -4,6 +4,7 @@ import {
   Platform,
   PlatformStatus,
 } from "@/common/types";
+import { defaultStoreData } from "@/common/util";
 import {
   gifter,
   liveSession,
@@ -713,6 +714,34 @@ describe("Home's platforms", () => {
       "src",
       "https://example.com/sticker.png",
     );
+  });
+
+  it("gives each platform its own tab in the feed's settings, hiding one's chats alone", async () => {
+    const { user } = await renderApp();
+    await usingPlatforms(["tiktok", "kick"]);
+    const dialog = () => within(screen.getByRole("dialog"));
+    const kind = (name: string) => dialog().getByRole("checkbox", { name });
+
+    await user.click(page().getByRole("button", { name: "Feed settings" }));
+    const tabs = dialog().getAllByRole("tab");
+    expect(tabs.map((t) => t.textContent)).toEqual(["TikTok", "Kick"]);
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    expect(dialog().getByRole("tabpanel", { name: "TikTok" })).toBeVisible();
+    expect(kind("Viewers joining")).toBeChecked();
+
+    await user.click(dialog().getByRole("tab", { name: "Kick" }));
+    expect(
+      dialog().queryByRole("checkbox", { name: "Viewers joining" }),
+    ).toBeNull();
+    await user.click(kind("Chats"));
+    expect(kind("Chats")).not.toBeChecked();
+    await user.click(dialog().getByRole("tab", { name: "TikTok" }));
+    expect(kind("Chats")).toBeChecked();
+    await user.click(dialog().getByRole("button", { name: "Save" }));
+
+    const feed = structuredClone(defaultStoreData.settings.activityFeed);
+    feed.kick.chat = false;
+    expect(sent(APP_EVENTS.SET_ACTIVITY_FEED)).toEqual([{ feed }]);
   });
 
   it("offers only the feed kinds the profile's platforms send", async () => {

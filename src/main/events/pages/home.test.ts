@@ -7,6 +7,7 @@ import {
   PlatformStatus,
   TOKIO_EVENTS,
 } from "@/common/types";
+import { defaultStoreData } from "@/common/util";
 import Logger from "@/logger";
 import { connectFailure, ConnectorFailure } from "@/services/connector/common";
 import { createHandler, eventSource } from "@test/handler";
@@ -1118,21 +1119,10 @@ describe("home events", () => {
   );
 
   describe("SET_ACTIVITY_FEED", () => {
-    const feed = {
-      chat: false,
-      gift: true,
-      follow: true,
-      share: true,
-      superfan: true,
-      join: false,
-      sub: true,
-      giftsub: true,
-      cheer: true,
-      raid: true,
-      redeem: true,
-      superchat: true,
-      kicks: true,
-    };
+    // Kick's chats and TikTok's joins hidden
+    const feed = structuredClone(defaultStoreData.settings.activityFeed);
+    feed.kick.chat = false;
+    feed.tiktok.join = false;
 
     it("saves the feed and replies with the events it still shows", async () => {
       const session = { startedAt: 1000, totals: noTotals, activity: [] };

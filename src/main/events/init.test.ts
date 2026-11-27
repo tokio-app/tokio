@@ -222,7 +222,7 @@ function setup() {
     installingVersion: "",
     tray: { enabled: true },
     language: "system",
-    activityFeed: { ...defaultStoreData.settings.activityFeed },
+    activityFeed: structuredClone(defaultStoreData.settings.activityFeed),
     games: { minecraft: { enabled: true } },
     logs: { debug: false },
     shortcuts: { ...defaultStoreData.settings.shortcuts },
@@ -1985,7 +1985,7 @@ describe("init events", () => {
 
     it("keeps the kinds of events the saved feed shows", async () => {
       const s = setup();
-      s.settings.activityFeed.chat = false;
+      s.settings.activityFeed.tiktok.chat = false;
       await load(s);
       connect(s);
 

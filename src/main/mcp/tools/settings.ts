@@ -1,5 +1,9 @@
 import { APP_LANGUAGES } from "@/common/i18n";
-import { ActivityFeedSchema, ShortcutsSchema } from "@/common/schemas";
+import {
+  FeedKindsSchema,
+  perPlatform,
+  ShortcutsSchema,
+} from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { TRANSLATION_LANGUAGES } from "@/common/util";
 import { randomUUID } from "node:crypto";
@@ -130,7 +134,7 @@ export const sections: Sections = {
   }),
 
   activity_feed: defineSection({
-    schema: ActivityFeedSchema.strict(),
+    schema: z.object(perPlatform(FeedKindsSchema.strict())).strict(),
     read: ({ storeManagerService }) => ({
       ...storeManagerService.getSettings().activityFeed,
     }),
@@ -143,7 +147,7 @@ export const sections: Sections = {
       return error ?? ok("Saved.");
     },
     notes:
-      "The kinds of events Home's activity feed keeps, for every profile. Hiding one drops its items already in the feed; they still count toward the LIVE's totals. sub and giftsub come from Twitch, YouTube (its memberships) and Kick, raid and redeem from Twitch and Kick, cheer from Twitch, superchat from YouTube and kicks from Kick.",
+      "The kinds of events Home's activity feed keeps from each platform, for every profile: kick.chat false hides Kick's chats and keeps the others'. Hiding one drops its items already in the feed; they still count toward the LIVE's totals. A platform sends only some kinds: tiktok chat, gift, follow, share, superfan and join; twitch chat, follow, sub, giftsub, cheer, raid and redeem; youtube chat, gift, sub and giftsub (its memberships) and superchat; kick chat, sub, giftsub, raid, redeem and kicks.",
   }),
 
   app: defineSection({

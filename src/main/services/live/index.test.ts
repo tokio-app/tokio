@@ -1,8 +1,10 @@
-import { ActivityFeed } from "@/common/schemas";
+import { ActivityFeed, FeedKinds } from "@/common/schemas";
 import {
   ChatEvent,
   Emotes,
   GiftEvent,
+  Platform,
+  PLATFORMS,
   TOKIO_EVENTS,
   UserData,
 } from "@/common/types";
@@ -256,7 +258,8 @@ describe("LiveService", () => {
       },
     ]);
 
-    live.setFeed({ ...defaultStoreData.settings.activityFeed, kicks: false });
+    const feed = defaultStoreData.settings.activityFeed;
+    live.setFeed({ ...feed, kick: { ...feed.kick, kicks: false } });
     expect(
       live.record(TOKIO_EVENTS.KICKS, { user, kicks: 5, message: "" }),
     ).toBe(true);
@@ -645,12 +648,47 @@ describe("LiveService", () => {
   });
 
   describe("feed", () => {
-    // Every kind of event but these
-    const hiding = (...kinds: (keyof ActivityFeed)[]): ActivityFeed => {
-      const feed = { ...defaultStoreData.settings.activityFeed };
-      for (const kind of kinds) feed[kind] = false;
+    // Every kind of event but these, from every platform
+    const hiding = (...kinds: (keyof FeedKinds)[]): ActivityFeed =>
+      onlyHiding(PLATFORMS, ...kinds);
+    // Every kind of event but these, from these platforms
+    const onlyHiding = (
+      platforms: readonly Platform[],
+      ...kinds: (keyof FeedKinds)[]
+    ): ActivityFeed => {
+      const feed = structuredClone(defaultStoreData.settings.activityFeed);
+      for (const platform of platforms) {
+        for (const kind of kinds) feed[platform][kind] = false;
+      }
       return feed;
     };
+
+    it("hides a kind from one platform, keeping the others'", () => {
+      live.setFeed(onlyHiding(["kick"], "chat"));
+      const kick = viewer("mia", { platform: "kick" });
+
+      expect(
+        live.record(TOKIO_EVENTS.CHAT, { ...chat("mia", "hi"), user: kick }),
+      ).toBe(false);
+      expect(live.record(TOKIO_EVENTS.CHAT, chat("kenji", "hola"))).toBe(true);
+      live.record(TOKIO_EVENTS.KICKS, { user: kick, kicks: 10, message: "" });
+
+      expect(live.getSession().activity.map((item) => item.type)).toEqual([
+        "kicks",
+        "chat",
+      ]);
+
+      // Hiding it now drops what's in the feed from that platform alone
+      live.record(TOKIO_EVENTS.CHAT, {
+        ...chat("kai", "yo"),
+        user: viewer("kai", { platform: "twitch" }),
+      });
+      live.setFeed(onlyHiding(["twitch"], "chat"));
+      expect(live.getSession().activity.map((item) => item.type)).toEqual([
+        "kicks",
+        "chat",
+      ]);
+    });
 
     it("leaves hidden events out, still counting them", () => {
       live.setFeed(hiding("chat", "gift", "superfan"));

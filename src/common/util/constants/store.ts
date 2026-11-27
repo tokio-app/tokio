@@ -1,4 +1,4 @@
-import { StoreSchema } from "@/common/schemas";
+import { FeedKinds, StoreSchema } from "@/common/schemas";
 
 const defaultEntity = {
   file: "default.json",
@@ -6,6 +6,23 @@ const defaultEntity = {
 };
 
 const defaultProvider = { name: "Default", key: "" };
+
+// Every kind of event, on a platform's feed
+const EVERY_KIND: FeedKinds = {
+  chat: true,
+  gift: true,
+  follow: true,
+  share: true,
+  superfan: true,
+  join: true,
+  sub: true,
+  giftsub: true,
+  cheer: true,
+  raid: true,
+  redeem: true,
+  superchat: true,
+  kicks: true,
+};
 
 // The LIVE's stats while none is connected. Frozen, as every reset shares it.
 export const EMPTY_LIVE_STATS = Object.freeze({
@@ -47,19 +64,10 @@ export const defaultStoreData: StoreSchema = {
       alerts: false,
     },
     activityFeed: {
-      chat: true,
-      gift: true,
-      follow: true,
-      share: true,
-      superfan: true,
-      join: true,
-      sub: true,
-      giftsub: true,
-      cheer: true,
-      raid: true,
-      redeem: true,
-      superchat: true,
-      kicks: true,
+      tiktok: { ...EVERY_KIND },
+      twitch: { ...EVERY_KIND },
+      youtube: { ...EVERY_KIND },
+      kick: { ...EVERY_KIND },
     },
     accounts: { twitch: { id: "", login: "", key: "" } },
     games: {

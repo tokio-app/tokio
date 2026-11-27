@@ -120,7 +120,8 @@ export class LiveService extends Service {
   private _streaks = new GiftStreaks();
   // Never reset, so ids stay unique across LIVEs
   private _lastId = 0;
-  // The kinds of events the feed keeps. Totals count all of them.
+  // The kinds of events the feed keeps from each platform. Totals count all
+  // of them.
   private _feed: ActivityFeed = { ...defaultStoreData.settings.activityFeed };
   // Each minute's highest viewer count since the LIVE started
   private _viewers: number[] = [];
@@ -261,7 +262,7 @@ export class LiveService extends Service {
   /** Sets the kinds of events the feed keeps, dropping the ones it hides. */
   public setFeed(feed: ActivityFeed) {
     this._feed = { ...feed };
-    this._activity = this._activity.filter((item) => this._feed[item.type]);
+    this._activity = this._activity.filter((item) => this._shows(item));
   }
 
   /**
@@ -347,9 +348,16 @@ export class LiveService extends Service {
     }
   }
 
+  // Whether the feed shows this kind from the item's platform. Joins are
+  // TikTok's.
+  private _shows(activity: Activity): boolean {
+    const user = activity.type === "join" ? activity.users[0] : activity.user;
+    return this._feed[platformOf(user)][activity.type];
+  }
+
   // False when the feed hides it
   private _add(activity: Activity): boolean {
-    if (!this._feed[activity.type]) return false;
+    if (!this._shows(activity)) return false;
     this._activity.unshift({ ...activity, id: ++this._lastId });
     this._activity.splice(ACTIVITY_LIMIT);
     return true;
@@ -358,7 +366,7 @@ export class LiveService extends Service {
   // Joins in a row share the newest item, so a busy LIVE doesn't fill the
   // feed with them. Hidden events between them don't count.
   private _join(user: ActivityUser): boolean {
-    if (!this._feed.join) return false;
+    if (!this._feed[platformOf(user)].join) return false;
     const last = this._activity[0];
     if (last?.type !== "join" || last.count >= JOIN_LIMIT) {
       this._add({ type: "join", users: [user], count: 1 });
