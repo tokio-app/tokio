@@ -134,10 +134,12 @@ export class FansService extends Service {
     if (this._file === null || !user.userId) return;
     const fan = this._fan(user, user.userId, type, months);
     if (!fan) return;
+    // Only a new fan can take its platform past MAX_FANS
+    const isNew = !this._fans.has(fan.userId);
     // Set again, so it's the most recently seen
     this._fans.delete(fan.userId);
     this._fans.set(fan.userId, fan);
-    if (this._fans.size > MAX_FANS) this._trim(platformOf(fan));
+    if (isNew && this._fans.size > MAX_FANS) this._trim(platformOf(fan));
     this._unsaved = true;
     this._emit();
   }

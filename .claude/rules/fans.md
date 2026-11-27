@@ -18,7 +18,7 @@ paths:
   - Their records have `platform`, `fanLevel` 0, `fanBadge` "" and `superfan` true.
   - `months` is the most known of the record's own, the badge's (`UserData.subMonths`, `.claude/rules/platforms.md`) and a sub's `months`: YouTube's badge says only its milestone.
 - A new live event with a `user` goes in `FAN_EVENTS`, and in `SUPERFAN` when it tells whether they're a Super Fan. Kick's Kicks stay out, as Twitch's cheers do: their viewer comes without badges, so they'd record nothing.
-- Up to `MAX_FANS` per platform in each profile, when recording and when loading. Each platform drops its own fan not seen for the longest first, in the `Map`'s order, which the file keeps.
+- Up to `MAX_FANS` per platform in each profile, when recording a new fan and when loading: a known fan seen again adds none, so it skips the trim's full scan. Each platform drops its own fan not seen for the longest first, in the `Map`'s order, which the file keeps.
 - No profile pictures (the user's call): TikTok signs their links (`x-expires`) and they expire about 2 days after they're sent. An overlay takes a fan's picture from their live events.
 - `fanBadge` is the fan badge's picture (`getFanBadge` in the connector): TikTok's fixed, unsigned file, one per 10 levels and with no number, so overlays draw `fanLevel` next to it.
 
