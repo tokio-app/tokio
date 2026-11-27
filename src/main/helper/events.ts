@@ -60,7 +60,6 @@ class EventStack {
     callback: EventCallback<E>,
     options: EventOptions<E> = {},
   ) {
-    if (!event || !callback) return;
     this.evs.push({
       event,
       callback,
