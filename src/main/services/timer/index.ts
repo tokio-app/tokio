@@ -328,7 +328,10 @@ export class TimerService extends Service {
   private _once(user: UserData, seconds: number): number {
     const cooldown = this._settings.chat.cooldown * 1000;
     if (seconds <= 0 || cooldown <= 0) return seconds;
-    const key = user.handle || user.username;
+    // Handles repeat across platforms, ids don't (other platforms' are prefixed).
+    const key =
+      user.userId ||
+      `${user.platform ?? "tiktok"}:${user.handle || user.username}`;
     const now = performance.now();
     const until = this._cooldowns.get(key);
     if (until !== undefined && until > now) return 0;
