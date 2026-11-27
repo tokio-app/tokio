@@ -89,6 +89,10 @@ export class KickConnector extends ConnectorProvider {
     return this._conn?.reconnecting ?? false;
   }
 
+  public override channel(): string {
+    return this._conn?.slug ?? "";
+  }
+
   public async fetchGifts(): Promise<GiftResponse> {
     return { success: true, data: [] };
   }

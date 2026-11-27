@@ -44,13 +44,17 @@ const sentBy = (platform: Platform) =>
   PLATFORM_TRIGGERS[platform].filter((type) => type !== EMOTE_TRIGGER);
 
 describe("createTestLive", () => {
-  it("sends every live event once at each press, then gifters and fans", () => {
+  it("sends every live event once at each press, then gifters, fans and the LIVE's platforms", () => {
     const live = Object.values(TOKIO_EVENTS).filter(isLiveEvent).sort();
 
     for (const press of lives.flat()) {
       const types = press.map((p) => p.type);
-      expect([...new Set(types.slice(0, -2))].sort()).toEqual(live);
-      expect(types.slice(-2)).toEqual(["tokio:gifters", "tokio:fans"]);
+      expect([...new Set(types.slice(0, -3))].sort()).toEqual(live);
+      expect(types.slice(-3)).toEqual([
+        "tokio:gifters",
+        "tokio:fans",
+        "tokio:live",
+      ]);
     }
   });
 
@@ -80,13 +84,14 @@ describe("createTestLive", () => {
       const press = createTestLive(platforms);
       for (let i = 0; i < 10; i++) {
         const payloads = press();
-        const events = payloads.slice(0, -4);
+        const events = payloads.slice(0, -5);
         expect(events).toHaveLength(platforms.flatMap(sentBy).length);
-        expect(payloads.slice(-4).map((p) => p.type)).toEqual([
+        expect(payloads.slice(-5).map((p) => p.type)).toEqual([
           TOKIO_EVENTS.MUSIC_CHANGE,
           TOKIO_EVENTS.ROOM_USER,
           "tokio:gifters",
           "tokio:fans",
+          "tokio:live",
         ]);
         let at = 0;
         for (const platform of platforms) {
@@ -106,6 +111,29 @@ describe("createTestLive", () => {
         const room = payloads.find((p) => p.type === TOKIO_EVENTS.ROOM_USER)!;
         const gifters = payloads.find((p) => p.type === "tokio:gifters")!;
         const fans = payloads.find((p) => p.type === "tokio:fans")!;
+        const on = payloads.find((p) => p.type === "tokio:live")!;
+        const ordered = PLATFORMS.filter((p) => platforms.includes(p));
+
+        // Each platform's room, adding up to the room's numbers
+        const rooms = room.data.platforms ?? [];
+        expect(rooms.map((r) => r.platform)).toEqual(ordered);
+        expect(rooms.reduce((sum, r) => sum + r.viewers, 0)).toBe(
+          room.data.viewers,
+        );
+        expect(rooms.reduce((sum, r) => sum + r.views, 0)).toBe(
+          room.data.views,
+        );
+        for (const r of rooms) {
+          if (r.platform !== "tiktok") expect(r.views).toBe(0);
+        }
+
+        // The profile's platforms, on one channel
+        expect(on.data.platforms.map((p) => p.platform)).toEqual(ordered);
+        const [{ channel }] = on.data.platforms;
+        expect(channel).toMatch(/^[a-z]+\d+$/);
+        expect(on.data.platforms.every((p) => p.channel === channel)).toBe(
+          true,
+        );
         if (!platforms.includes("tiktok")) {
           expect(room.data.ranks).toEqual([]);
           expect(gifters.data).toEqual({ live: [], allTime: [] });
@@ -280,7 +308,8 @@ describe("createTestLive", () => {
 
         const room = press.find((p) => p.type === TOKIO_EVENTS.ROOM_USER)!.data;
         expect(room.viewers).toBeGreaterThanOrEqual(watching);
-        expect(room.views).toBeGreaterThanOrEqual(room.viewers);
+        const tiktok = room.platforms?.find((r) => r.platform === "tiktok");
+        expect(tiktok?.views).toBeGreaterThanOrEqual(tiktok?.viewers ?? 0);
         watching = room.viewers;
         expect(room.ranks).toEqual(
           [...coins]

@@ -101,6 +101,18 @@ describe("YouTubeConnector", () => {
       expect(youtube.state.urls[0]).toContain(`/watch?v=${VIDEO}`);
     });
 
+    it("gives the channel's handle, or the LIVE's author for a link", async () => {
+      expect(connector.channel()).toBe("");
+      await connector.connect("madeup");
+      expect(connector.channel()).toBe("madeup");
+      await connector.disconnect();
+      expect(connector.channel()).toBe("");
+
+      youtube.state.videos[VIDEO] = "Made Up";
+      await connector.connect(`https://youtu.be/${VIDEO}`);
+      expect(connector.channel()).toBe("Made Up");
+    });
+
     it("fails at once offline, not found and with the chat off", async () => {
       const onConnected = capture(TOKIO_EVENTS.CONNECTED);
       youtube.state.channels["/@away"] = "offline";

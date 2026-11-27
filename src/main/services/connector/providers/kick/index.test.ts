@@ -175,6 +175,14 @@ describe("KickConnector", () => {
       );
     });
 
+    it("gives the channel's slug from a kick.com link, and none once stopped", async () => {
+      expect(connector.channel()).toBe("");
+      await connector.connect("https://kick.com/Streamer");
+      expect(connector.channel()).toBe("streamer");
+      await connector.disconnect();
+      expect(connector.channel()).toBe("");
+    });
+
     it("refuses what names no channel without asking Kick", async () => {
       expect((await connector.connect("two words")).error?.kind).toBe(
         "notFound",

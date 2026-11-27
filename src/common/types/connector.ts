@@ -104,6 +104,15 @@ export type RoomUserEvent = {
   ranks: (UserData & { score: number; position: number })[];
   views: number;
   viewers: number;
+  // Each platform's numbers, in PLATFORMS order: the session's room has it,
+  // a provider's doesn't
+  platforms?: PlatformRoom[];
+};
+
+export type PlatformRoom = {
+  platform: Platform;
+  viewers: number;
+  views: number;
 };
 
 export interface Emotes {
@@ -359,7 +368,15 @@ export type TokioPayload =
   | {
       type: "tokio:gifters";
       data: { live: TopGifter[]; allTime: TopGifter[] };
+    }
+  // The platforms the LIVE is on now, in PLATFORMS order, empty while offline
+  | {
+      type: "tokio:live";
+      data: { platforms: LivePlatform[] };
     };
+
+// A platform the LIVE is on, with the streamer's channel there (no "@")
+export type LivePlatform = { platform: Platform; channel: string };
 
 export interface TokioPreviewMessage {
   action: "TOKIO_PREVIEW";

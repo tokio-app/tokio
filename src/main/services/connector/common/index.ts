@@ -140,6 +140,12 @@ export abstract class ConnectorProvider extends TokioEmitter {
     return false;
   }
 
+  // The channel's name as the platform gave it once connected, "" when the
+  // one connected to is already it.
+  public channel(): string {
+    return "";
+  }
+
   // Chat translation, set once by init.ts
   public setChatStage(stage: ChatStage) {
     this._chatStage = stage;
