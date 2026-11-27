@@ -10,6 +10,7 @@ import {
 } from "@/common/types";
 import { describe, expect, it } from "vitest";
 import {
+  createFakeLive,
   createTestLive,
   generateEmoteChatSample,
   generateEventSample,
@@ -511,5 +512,90 @@ describe("samplePlatform", () => {
     expect(
       samplePlatform({ type: TOKIO_EVENTS.LIKE }, profile),
     ).toBeUndefined();
+  });
+});
+
+describe("createFakeLive", () => {
+  // A long made-up LIVE on the platform
+  const play = (platform: Platform) => {
+    const live = createFakeLive(platform);
+    return Array.from({ length: 2000 }, () => live.next());
+  };
+
+  it("sends every event its platform sends and nothing else, mostly chat", () => {
+    for (const platform of PLATFORMS) {
+      const events = play(platform);
+      const types = events.map((e) => e.type);
+      expect(new Set(types)).toEqual(new Set(sentBy(platform)));
+      const counts = new Map<string, number>();
+      for (const type of types) counts.set(type, (counts.get(type) ?? 0) + 1);
+      expect(counts.get(TOKIO_EVENTS.CHAT)).toBe(Math.max(...counts.values()));
+    }
+  });
+
+  it("keeps its viewers coming back, all on its platform, chat untranslated", () => {
+    for (const platform of PLATFORMS) {
+      const events = play(platform);
+      const handles = new Set<string>();
+      for (const event of events) {
+        const viewer = viewerOf(event);
+        if (viewer) expect(platformOf(viewer)).toBe(platform);
+        // A raid comes from another channel's streamer
+        if (viewer && event.type !== TOKIO_EVENTS.RAID) {
+          handles.add(viewer.handle);
+        }
+        if (event.type === TOKIO_EVENTS.CHAT) {
+          expect(event.data.comment.translation).toBeUndefined();
+        }
+      }
+      expect(handles.size).toBeGreaterThan(5);
+      expect(handles.size).toBeLessThanOrEqual(40);
+    }
+  });
+
+  it("grows TikTok's streaks and ends them once, and its likes only add up", () => {
+    const events = play("tiktok");
+    let open: GiftEvent[] = [];
+    let likes = 0;
+    for (const event of events) {
+      if (event.type === TOKIO_EVENTS.LIKE) {
+        expect(event.data.likeCount).toBeGreaterThanOrEqual(1);
+        expect(event.data.totalLikes).toBeGreaterThan(likes);
+        likes = event.data.totalLikes;
+      }
+      if (event.type !== TOKIO_EVENTS.GIFT) continue;
+      if (open.length > 0) {
+        expect(streakOf(event.data)).toBe(streakOf(open[0]));
+      }
+      if (!event.data.gift.repeatEnd) {
+        open.push(event.data);
+        continue;
+      }
+      const counts = open.map((e) => e.gift.comboCount);
+      expect(counts).toEqual([...new Set(counts)].sort((a, b) => a - b));
+      if (counts.length) expect(event.data.gift.comboCount).toBe(counts.at(-1));
+      open = [];
+    }
+  });
+
+  it("gives its room's viewers, views only on TikTok, ranked by coins", () => {
+    for (const platform of PLATFORMS) {
+      const live = createFakeLive(platform);
+      let views = 0;
+      for (let i = 0; i < 300; i++) {
+        for (let j = 0; j < 5; j++) live.next();
+        const room = live.room();
+        expect(room.viewers).toBeGreaterThanOrEqual(1);
+        if (platform === "tiktok") {
+          expect(room.views).toBeGreaterThan(views);
+          views = room.views;
+          const scores = room.ranks.map((r) => r.score);
+          expect(scores).toEqual([...scores].sort((a, b) => b - a));
+        } else {
+          expect(room.views).toBe(0);
+          expect(room.ranks).toEqual([]);
+        }
+      }
+    }
   });
 });

@@ -5,7 +5,12 @@ import {
   Platform,
   PlatformStatus,
 } from "@/common/types";
-import { defaultProfile, defaultStoreData, isPlatform } from "@/common/util";
+import {
+  defaultProfile,
+  defaultStoreData,
+  FAKE_LIVE,
+  isPlatform,
+} from "@/common/util";
 import { Modal } from "@/components";
 import {
   useImmerState,
@@ -119,8 +124,11 @@ export function Home() {
     const settings = res.data!.settings;
     setFeatures(settings.activeFeatures);
     setFeed(settings.activityFeed);
-    setNeedsKey(!settings.activeConnProvider.key);
-    setTwitchLogin(settings.accounts.twitch.login);
+    setNeedsKey(!FAKE_LIVE && !settings.activeConnProvider.key);
+    // yarn dev:live's made-up Twitch is on the channel main names
+    setTwitchLogin(
+      settings.accounts.twitch.login || (FAKE_LIVE ? "tokio.demo" : ""),
+    );
     setServer({
       enabled: settings.server.enabled,
       overlays: settings.overlays.length,

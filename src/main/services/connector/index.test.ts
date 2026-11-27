@@ -758,4 +758,35 @@ describe("ConnectorService", () => {
     expect(service.providerNames()).toEqual(["Default"]);
     expect(service.isConnected()).toBe(false);
   });
+
+  it("connects every platform to a made-up LIVE in yarn dev:live, gifts still from TikTok's provider", async () => {
+    vi.useFakeTimers();
+    try {
+      const service = new ConnectorService(true);
+      const tiktok = new FakeConnector();
+      service.addProvider("Fake", tiktok, true);
+      const connected = vi.fn();
+      service.on(TOKIO_EVENTS.CONNECTED, connected);
+
+      const res = service.connect({ tiktok: "", kick: "" });
+      await vi.advanceTimersByTimeAsync(1000);
+
+      await expect(res).resolves.toEqual({ success: true });
+      expect(tiktok.connect).not.toHaveBeenCalled();
+      expect(connected).toHaveBeenCalledOnce();
+      expect(service.status()).toEqual({
+        tiktok: "connected",
+        kick: "connected",
+      });
+      await service.fetchGifts();
+      expect(tiktok.fetchGifts).toHaveBeenCalledOnce();
+
+      await service.disconnect();
+      await vi.runOnlyPendingTimersAsync();
+      expect(service.isConnected()).toBe(false);
+      expect(tiktok.disconnect).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

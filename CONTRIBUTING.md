@@ -29,6 +29,8 @@ Start the application development server:
 
 Quit Tokio first if it's installed (closing its window keeps it running in the tray): only one copy runs per data folder, so `yarn dev` would quit and bring the open one to the front.
 
+To work without going LIVE, run `yarn dev:live`: **Connect** then connects every platform to a made-up LIVE, with viewers, chat, gifts and the rest. It keeps its data in `~/.tokio-dev`, apart from your own.
+
 Start making changes, commit and push to your fork and [submit a pull request][pr].
 
 [pr]: https://github.com/tokio-app/tokio/compare

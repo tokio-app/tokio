@@ -36,6 +36,7 @@
     "start": "electron-vite preview",
     "build:music:ui": "vite build --config src/music/vite.config.ts",
     "dev": "yarn build:music:ui && electron-vite dev",
+    "dev:live": "yarn build:music:ui && electron-vite dev --mode live",
     "build": "yarn typecheck && yarn build:music:ui && electron-vite build",
     "postinstall": "install-electron",
     "build:unpack": "yarn build && electron-builder --dir",
