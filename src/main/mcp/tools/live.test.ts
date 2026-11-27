@@ -506,6 +506,14 @@ describe("live MCP tools", () => {
 
       expect(res.value).toMatchObject({ activity: [{ id: 3 }] });
     });
+
+    it("filters Super Chats", async () => {
+      const { call } = await mcpClient(setup().handler);
+
+      const res = await call("get_activity", { types: ["superchat"] });
+
+      expect(res.value).toMatchObject({ activity: [{ id: 7 }] });
+    });
   });
 
   describe("live", () => {

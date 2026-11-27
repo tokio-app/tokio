@@ -1,4 +1,4 @@
-import { ProfileSchema } from "@/common/schemas";
+import { FeedKindsSchema, ProfileSchema } from "@/common/schemas";
 import { Platform, PLATFORMS } from "@/common/types";
 import {
   ActivityItem,
@@ -183,25 +183,10 @@ const CONTROLS: Record<
 
 const ControlInput = z.object({ action: z.enum(ACTIONS) }).strict();
 
-const ACTIVITY_TYPES = [
-  "chat",
-  "gift",
-  "follow",
-  "share",
-  "superfan",
-  "join",
-  "sub",
-  "giftsub",
-  "cheer",
-  "raid",
-  "redeem",
-  "kicks",
-] as const;
-
 const ActivityInput = z
   .object({
     limit: z.number().int().min(1).max(100).optional(),
-    types: z.array(z.enum(ACTIVITY_TYPES)).optional(),
+    types: z.array(FeedKindsSchema.keyof()).optional(),
   })
   .strict();
 
