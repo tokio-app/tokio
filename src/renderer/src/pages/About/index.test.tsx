@@ -120,7 +120,7 @@ describe("About", () => {
 
     await status({ state: "none", checkedAt: Date.now() });
     expect(screen.getByText("Tokio is up to date.")).toBeInTheDocument();
-    expect(screen.getByText(/^Last checked at /)).toBeInTheDocument();
+    expect(screen.getByText(/^Last checked /)).toBeInTheDocument();
 
     await status({ state: "downloading", version: "1.2.0", percent: 40 });
     expect(screen.getByText("Downloading Tokio 1.2.0…")).toBeInTheDocument();
@@ -181,7 +181,7 @@ describe("About", () => {
       screen.getByText("Couldn't check for updates. Check your connection."),
     ).toBeInTheDocument();
     expect(screen.queryByText("Tokio is up to date.")).not.toBeInTheDocument();
-    expect(screen.queryByText(/^Last checked at /)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Last checked /)).not.toBeInTheDocument();
 
     await user.click(check);
 

@@ -928,7 +928,7 @@
   "studio.loops.drift": "Drift",
   "about.update.downloadingDetail": "You can keep using Tokio while it downloads.",
   "about.update.readyDetail": "It also installs when you quit Tokio.",
-  "about.update.checkedAt": "Last checked at {time}",
+  "about.update.checkedAt": "Last checked {time}",
   "about.app.tour": "Take the tour",
   "settings.logs.title": "Logs",
   "settings.logs.description": "Send them when you report a bug.",
