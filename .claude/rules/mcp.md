@@ -63,7 +63,7 @@ Paths to import (`add_to_library`) go through `checkPath`: absolute, a file, and
 - `preview_studio_overlay` (`tools/studio.ts`) draws the stored overlay, never the editor's unsaved copy, since it's read-only and doesn't flush. It loads the page's `?preview` in a hidden window on its own in-memory partition, `studio-preview`: the app's session cancels every WebSocket to the overlay server (`initSession`), and embeds need theirs. Permissions, new windows, navigation and sound are refused there. One preview runs at a time and its window is always destroyed, with a time limit; destroying it can't quit the app, since the main window only hides. Only `tools/studio.ts` imports `helper/studioPreview.ts`.
   - Windows clamps a window to the screen, hidden or offscreen, which squeezed the canvas. So the window takes the picture's shape within the work area, the capture is of the canvas's rect alone, and it's resized to the size asked: softer when the screen is smaller than the picture.
   - A hidden page rasters only when a capture asks, so the first capture of a busy canvas missed its texts: it's thrown away, and the second, `SETTLE_MS` later, is kept.
-- The `shortcuts` section refuses what the recorder refuses (`shortcutProblem` in `tools/settings.ts`, `.claude/rules/controls.md`): `SET_SHORTCUTS` itself takes any string.
+- The `shortcuts` section refuses what the recorder refuses (`shortcutProblem` in `tools/settings.ts`, `.claude/rules/controls.md`): `SET_SHORTCUTS` itself takes any string. It also refuses a combination another action has, its parts sorted (Shift+Ctrl+S is Ctrl+Shift+S): Settings moves one off its old row, and a second can't register, so its notice would blame another app.
 
 ## Coupling
 

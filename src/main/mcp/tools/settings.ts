@@ -198,9 +198,18 @@ export const sections: Sections = {
       return { skipSong, stopTts, replayAlert, pause };
     },
     write: async (handler, values) => {
+      // The action holding each combination, its parts sorted: Shift+Ctrl+S
+      // is Ctrl+Shift+S. A second one can't register, and is reported as
+      // another app's.
+      const holders = new Map<string, string>();
       const problems = Object.entries(values).flatMap(
         ([action, accelerator]) => {
-          const problem = shortcutProblem(accelerator);
+          const keys = accelerator.split("+").sort().join("+");
+          const other = accelerator === "" ? undefined : holders.get(keys);
+          if (!other) holders.set(keys, action);
+          const problem =
+            shortcutProblem(accelerator) ??
+            (other && `${other} has it too, give one of them another`);
           return problem ? [`${action} (${accelerator}): ${problem}`] : [];
         },
       );
