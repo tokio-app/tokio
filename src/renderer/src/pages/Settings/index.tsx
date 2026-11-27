@@ -70,7 +70,10 @@ export function Settings() {
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {
-    if (res?.success) setStore(res.data!);
+    if (!res?.success) return;
+    setStore(res.data!);
+    // Only the page's own request brings them, as taken at startup
+    if (res.taken) setTaken(res.taken);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT, (res) => {

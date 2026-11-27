@@ -25,7 +25,8 @@ import { TranslationError } from "@/services/translation/common";
 import type { DeviceCode, PlatformAccount } from "@/services/connector/common";
 import { TTSService } from "@/services/tts";
 import { language } from "@/helper/i18n";
-import { app, dialog, shell } from "@test/electron";
+import { applyStoredShortcuts } from "@/helper/shortcuts";
+import { app, dialog, globalShortcut, shell } from "@test/electron";
 import { createHandler } from "@test/handler";
 import { strFromU8, unzipSync } from "fflate";
 import {
@@ -138,9 +139,29 @@ describe("settings events", () => {
             settings: appSettings,
             profiles: [defaultProfile, streamProfile],
           },
+          taken: [],
         },
       ]);
       expect(h.notices).toEqual([]);
+    });
+
+    it("says which shortcuts another app took, at startup too", async () => {
+      globalShortcut.take("F9");
+      const store = {
+        ...profileStore(),
+        getSettings: () => ({
+          ...appSettings,
+          shortcuts: { pause: "F9" },
+        }),
+      };
+      const h = createHandler({ storeManagerService: store });
+      applyStoredShortcuts(h.handler);
+
+      await h.invoke(settings, APP_EVENTS.GET_SETTINGS);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([
+        expect.objectContaining({ success: true, taken: ["pause"] }),
+      ]);
     });
 
     it("replies and notifies when the settings can't be read", async () => {

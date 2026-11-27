@@ -32,15 +32,22 @@ export function applyShortcuts(
   });
 }
 
+// The last applyStoredShortcuts result, so Settings can mark the ones
+// another app took at startup
+let lastTaken: ControlAction[] = [];
+
+/** The shortcuts that didn't fire when the stored ones were last applied. */
+export const takenShortcuts = () => lastTaken;
+
 /** Applies the stored shortcuts, each running its control as a request. */
 export const applyStoredShortcuts = ({
   storeManagerService,
   invoke,
 }: AppHandlerVariables) =>
-  applyShortcuts(
+  (lastTaken = applyShortcuts(
     storeManagerService.getSettings().shortcuts,
     (action) => void invoke(APP_EVENTS.CONTROL, { action }),
-  );
+  ));
 
 /** Says which shortcuts another app holds, once a while for the same ones. */
 export function warnTaken(notifier: Notifier, taken: ControlAction[]) {

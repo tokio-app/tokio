@@ -705,6 +705,25 @@ describe("Settings", () => {
       ).not.toBeInTheDocument();
       expect(sent(APP_EVENTS.SET_SHORTCUTS).at(-1)!.shortcuts.pause).toBe("");
     });
+
+    it("marks one another app took at startup, which other saves keep", async () => {
+      await setup(withShortcuts);
+      // The answer to the page's own request
+      await send(APP_EVENTS_RESPONSE.GET_SETTINGS, {
+        ...withShortcuts,
+        taken: ["pause"],
+      });
+      expect(
+        row("Pause everything").getByText("In use by another app"),
+      ).toBeVisible();
+
+      // Another setting's save sends the settings without them
+      await send(APP_EVENTS_RESPONSE.GET_SETTINGS, withShortcuts);
+
+      expect(
+        row("Pause everything").getByText("In use by another app"),
+      ).toBeVisible();
+    });
   });
   describe("Remote control", () => {
     const remote = () => section("Remote control");

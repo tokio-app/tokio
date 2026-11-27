@@ -265,6 +265,8 @@ export interface AppEventsResponseMap {
   // SETTINGS
   [APP_EVENTS_RESPONSE.GET_SETTINGS]: Reply<{
     data?: StoreSchema;
+    // The shortcuts another app holds, only in GET_SETTINGS's own reply
+    taken?: ControlAction[];
   }>;
 
   [APP_EVENTS_RESPONSE.CREATE_PROFILE]: Reply;
