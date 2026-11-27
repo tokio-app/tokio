@@ -535,6 +535,12 @@ const registerConnectorEvents = ({
     if (platform === "youtube" && change === "up") void rates.refresh();
     // LIVE history lists the LIVE under it, even if it sends nothing
     if (change === "up") history.join(platform);
+    // TikTok back in a new room counts its likes from 0, as the session goes on
+    if (platform === "tiktok" && change === "up") {
+      likes = 0;
+      store.updateLiveStats({ likes });
+      sendLikes(likes);
+    }
     const params = { platform: PLATFORM_LABELS[platform] };
     // Apart from the session's own, which can come right after
     const options = { key: `${change}:${platform}` };
