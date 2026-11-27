@@ -9,6 +9,7 @@ export * from "./rows";
 export * from "./samples";
 export * from "./studio";
 export * from "./timer";
+export * from "./youtube";
 
 /** Orders versions as semver does: 0.1.3-beta.2 < 0.1.3-beta.10 < 0.1.3 < 0.1.10 */
 export function compareVersions(a: string, b: string): number {

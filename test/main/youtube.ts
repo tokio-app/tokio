@@ -170,3 +170,42 @@ export const chatAction = (text: string) => ({
     },
   },
 });
+
+// A Gift's chat item from a made-up viewer: "sent Star" or a combo's
+// "comboed x3 Yes for 6 Jewels", its picture named `file`
+export const giftAction = (handle: string, text: string, file: string) => ({
+  addChatItemAction: {
+    item: {
+      giftMessageViewModel: {
+        text: { content: text },
+        authorName: { content: `@${handle} ` },
+        giftImage: {
+          sources: [
+            {
+              url: `//www.gstatic.com/youtube/img/pdg/gift/assets/${file}.png=w480-h480`,
+            },
+          ],
+        },
+      },
+    },
+  },
+});
+
+// The card a Gift shows over the chat, before its chat item, naming its
+// sender's channel
+export const giftCard = (handle: string, channel: string) => ({
+  updateOrAddInteractivityWidgetAction: {
+    widgetRenderer: {
+      interactivityWidgetRenderer: {
+        content: {
+          giftAttributionItemViewModel: {
+            authorName: { content: `@${handle}` },
+          },
+          elementRenderer: {
+            compatibilityOptions: { liveChatAuthorExternalChannelId: channel },
+          },
+        },
+      },
+    },
+  },
+});
