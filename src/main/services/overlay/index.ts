@@ -153,7 +153,8 @@ export class OverlayService extends Service {
    * fix keeps their ID and link, unless their folder is gone.
    */
   public async load(gifts: CustomGift[]): Promise<void> {
-    await this._removeStaging();
+    // Kept stored, so the next start tries their put-back again.
+    const left = await this._removeStaging();
 
     if (this._store.wasRebuilt()) {
       for (const overlay of await findOverlays(this._folder, this._yaml)) {
@@ -169,10 +170,9 @@ export class OverlayService extends Service {
 
       if (!info) {
         // Only a missing folder: one that lost its permissions keeps its entry.
-        const gone = await access(this._dir(overlay.id)).then(
-          () => false,
-          isMissing,
-        );
+        const gone =
+          !left.has(overlay.id) &&
+          (await access(this._dir(overlay.id)).then(() => false, isMissing));
         Logger.warn(
           `<Overlays> Unable to load overlay ${overlay.id}, ${gone ? "its folder is gone. It has been removed." : "it's kept for the next start."}`,
           this._logFile,
@@ -920,8 +920,10 @@ export class OverlayService extends Service {
   /**
    * Deletes the folders an install, update or remove cut short left behind,
    * except an installed version a crash left out of place, which goes back.
+   * Returns the ids it couldn't put back.
    */
-  private async _removeStaging(): Promise<void> {
+  private async _removeStaging(): Promise<Set<string>> {
+    const left = new Set<string>();
     const entries = await readdir(this._folder, { withFileTypes: true }).catch(
       () => [],
     );
@@ -942,6 +944,7 @@ export class OverlayService extends Service {
             this._logFile,
           );
         } catch (error) {
+          left.add(id);
           Logger.error(
             `<Overlays> Unable to put back overlay ${id}, it's left in ${path} -- ${formatError(error)}`,
             this._logFile,
@@ -955,6 +958,7 @@ export class OverlayService extends Service {
         force: true,
       }).catch(() => {});
     }
+    return left;
   }
 
   private _register(overlay: OverlayApp, rebuild: boolean): void {

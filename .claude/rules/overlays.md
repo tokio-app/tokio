@@ -39,6 +39,7 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
   - A failure deletes the staging folder. One a quit leaves behind, `load` deletes.
 - A remove first renames the overlay's folder to `.old-<id>.<uuid>` (a missing folder counts as gone), so a folder another program holds stays whole and stored. Only then does it stop serving it, forget it and delete `.old-*`.
 - `load` renames a `.old-<id>.<uuid>` back to `<id>` when that folder is missing and the id is stored (or the store was rebuilt): a crash between an update's renames leaves the only copy there. It deletes every other `.old-*`. Ids have no dots, so the name gives the id back.
+  - A put-back that fails keeps the overlay stored, so the next start tries again rather than delete the only copy.
 - `YAMLManagerService` logs why it refused an `info.yaml` or `config.yaml` to `overlays.log`. `processOverlay` parses `info.yaml` with `parseFile`, since `loadFile` takes an empty or comment-only file for a missing one and logs nothing.
 - Imports, saves, updates and every start write the settings `config.yaml` holds into the HTML (`processHTML`), only when the HTML changed.
 - At each start `load` checks every stored overlay. One that fails isn't served but stays stored, so fixing it keeps its id and OBS link; only an overlay whose folder is missing (`ENOENT`, not a permission error) is forgotten.

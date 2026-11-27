@@ -416,6 +416,26 @@ describe("OverlayService", () => {
         expect(mount).toHaveBeenCalledOnce();
       });
 
+      it("keeps it, and the overlay, when the put-back fails, so the next start tries again", async () => {
+        await configurable(join(folder, old));
+        stored = [
+          { id: "gift-jar", name: "Title", version: "1.0.0", config: true },
+        ];
+        const broken = Object.assign(new Error("EIO"), { code: "EIO" });
+        vi.mocked(rename).mockRejectedValueOnce(broken);
+
+        await service.load(gifts);
+
+        expect(await readdir(folder)).toEqual([old]);
+        expect(stored.map((o) => o.id)).toEqual(["gift-jar"]);
+        expect(mount).not.toHaveBeenCalled();
+
+        await service.load(gifts);
+
+        expect(await readdir(folder)).toEqual(["gift-jar"]);
+        expect(mount).toHaveBeenCalledOnce();
+      });
+
       it("deletes it when the overlay's folder is there", async () => {
         await configurable(join(folder, "gift-jar"));
         await configurable(join(folder, old));
