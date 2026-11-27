@@ -15,6 +15,7 @@ import {
   ALERTS_PATH,
   formatError,
   goalValue,
+  listInJewels,
   listInUsd,
   listRow,
   MINECRAFT_OVERLAY_PATH,
@@ -50,28 +51,38 @@ type History = Services["historyService"];
 type Tops = {
   gifters: () => ReturnType<History["topByPlatform"]>;
   giftsubs: () => ReturnType<History["topSubGifters"]>;
+  jewels: () => ReturnType<History["topJewelGifters"]>;
 };
 
 const topsOf = (history: History): Tops => {
   let gifters: ReturnType<History["topByPlatform"]> | undefined;
   let giftsubs: ReturnType<History["topSubGifters"]> | undefined;
+  let jewels: ReturnType<History["topJewelGifters"]> | undefined;
   return {
     gifters: () => (gifters ??= history.topByPlatform()),
     giftsubs: () => (giftsubs ??= history.topSubGifters()),
+    jewels: () => (jewels ??= history.topJewelGifters()),
   };
 };
 
 // A top list's rows: who sent the most of the platform's money, with an
-// amount, or who gifted the most subs, apart (the user's call)
+// amount, or who gifted the most subs, apart (the user's call), or who sent
+// YouTube's Gifts, by their Jewels
 const topOf = (
   tops: Tops,
-  { source, platform }: Pick<StudioElementOf<"list">, "source" | "platform">,
-): StudioListEntry[] =>
-  source === "giftsubs"
-    ? (tops.giftsubs()[platform] ?? []).map((g) => topRow(g, g.giftSubs))
-    : (tops.gifters()[platform] ?? [])
-        .filter((g) => g.coins > 0)
-        .map((g) => topRow(g, g.coins));
+  list: Pick<StudioElementOf<"list">, "source" | "platform" | "rank">,
+): StudioListEntry[] => {
+  const { source, platform } = list;
+  if (source === "giftsubs") {
+    return (tops.giftsubs()[platform] ?? []).map((g) => topRow(g, g.giftSubs));
+  }
+  if (listInJewels(list)) {
+    return (tops.jewels()[platform] ?? []).map((g) => topRow(g, g.jewels ?? 0));
+  }
+  return (tops.gifters()[platform] ?? [])
+    .filter((g) => g.coins > 0)
+    .map((g) => topRow(g, g.coins));
+};
 
 const topRow = (gifter: Gifter, value: number): StudioListEntry => ({
   picture: gifter.picture,
@@ -103,6 +114,7 @@ export function liveNumbers(
     followers: live ? totals.followers : 0,
     shares: live ? totals.shares : 0,
     coins: live ? totals.coins : 0,
+    jewels: live ? totals.jewels : 0,
     kicks: live ? totals.kicks : 0,
     bits: live ? totals.bits : 0,
     superchats: live ? session.usd : 0,

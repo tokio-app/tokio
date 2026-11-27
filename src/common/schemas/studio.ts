@@ -103,6 +103,10 @@ export const STUDIO_LIST_SOURCES = [
   "chat",
 ] as const;
 
+// What YouTube's top gifters rank by: its money, the Super Chats' US
+// dollars, or its Gifts' Jewels. Other platforms have one currency.
+export const STUDIO_LIST_RANKS = ["money", "jewels"] as const;
+
 // The most groups an overlay holds
 export const STUDIO_MAX_GROUPS = 100;
 // The most elements an overlay holds, in groups or on their own: each
@@ -415,6 +419,9 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
     // Whose top gifters or sub gifters the list shows: each platform's
     // currency is counted apart, and older overlays showed TikTok's
     platform: z.enum(PLATFORMS).default("tiktok"),
+    // Apart from source, since an older Tokio fails on an unknown source
+    // but drops an unknown field; an unknown rank reads as money
+    rank: z.enum(STUDIO_LIST_RANKS).default("money").catch("money"),
     // How many it shows at most
     rows: z.number().int().min(1).max(STUDIO_MAX_LIST_ROWS).default(5),
     // As a text's: a font installed where the streaming app runs, Archivo
