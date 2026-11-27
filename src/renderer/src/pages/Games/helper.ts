@@ -177,7 +177,9 @@ function idIn(
   if (Object.hasOwn(names, id)) return id;
   const renamed = RENAMED.get(id);
   if (renamed && Object.hasOwn(names, renamed)) return renamed;
-  const name = MINECRAFT_NAMES[from][kind][id]?.toLowerCase();
+  const known = MINECRAFT_NAMES[from][kind];
+  // hasOwn: an id like "constructor" is on every object
+  const name = Object.hasOwn(known, id) ? known[id].toLowerCase() : undefined;
   const same = Object.keys(names).find(
     (other) => names[other].toLowerCase() === name,
   );

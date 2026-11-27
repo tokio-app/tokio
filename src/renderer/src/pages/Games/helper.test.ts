@@ -67,6 +67,18 @@ describe("Games helper", () => {
     expect(withEdition(action, "bedrock")).toBe(action);
   });
 
+  it("falls back on an id that every object has as a property", () => {
+    const action = {
+      ...createAction("bedrock"),
+      steps: [spawn("constructor"), give("toString")],
+    };
+
+    expect(withEdition(action, "java").steps).toEqual([
+      spawn("zombie"),
+      give("diamond"),
+    ]);
+  });
+
   it("renames the mobs and items Java calls differently, both ways", () => {
     const action = {
       ...createAction("bedrock"),
