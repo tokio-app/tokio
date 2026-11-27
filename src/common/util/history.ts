@@ -31,6 +31,11 @@ export const platformParts = (
 export const bySubs = (a: Gifter, b: Gifter) =>
   b.giftSubs - a.giftSubs || a.giftedAt - b.giftedAt;
 
+// A top of YouTube's Gifts' order: the most Jewels first, ties to whoever
+// got there first
+export const byJewels = (a: Gifter, b: Gifter) =>
+  (b.jewels ?? 0) - (a.jewels ?? 0) || a.giftedAt - b.giftedAt;
+
 type Viewer = { username: string; handle: string };
 
 // A viewer search: trimmed, in any case, in their name or @handle. "@kai"

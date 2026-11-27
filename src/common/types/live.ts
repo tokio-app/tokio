@@ -169,10 +169,11 @@ export type LiveRecord = LiveSummary & {
 export type RankedGifter = Gifter & { rank: number };
 
 // For LIVE history: the finished LIVEs, newest first, and all time's top
-// gifters: by amount those who sent some, and by gifted subs those who
-// gifted some
+// gifters: by amount those who sent some, by gifted subs those who gifted
+// some, and by Jewels those who sent YouTube's Gifts (main always sends it)
 export type LiveHistory = {
   lives: LiveSummary[];
   gifters: Gifter[];
   subGifters: Gifter[];
+  jewelGifters?: Gifter[];
 };

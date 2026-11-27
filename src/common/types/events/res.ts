@@ -414,7 +414,7 @@ export interface AppEventsResponseMap {
   }>;
   // The range and query it was asked for, failures included. Dates without a
   // query get their totals first, then again with the gifters: by amount in
-  // data, by gifted subs in subGifters.
+  // data, by gifted subs in subGifters, by Jewels in jewelGifters.
   [APP_EVENTS_RESPONSE.GIFTERS]: Reply<{
     from?: number;
     to?: number;
@@ -422,6 +422,7 @@ export interface AppEventsResponseMap {
     totals?: Pick<LiveSummary, "coins" | "gifts" | "platforms">;
     data?: RankedGifter[];
     subGifters?: RankedGifter[];
+    jewelGifters?: RankedGifter[];
   }>;
 
   // OVERLAYS

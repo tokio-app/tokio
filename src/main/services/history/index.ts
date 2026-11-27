@@ -16,12 +16,14 @@ import {
 import { knownPlatforms } from "@/common/schemas";
 import {
   allInRange,
+  byJewels,
   bySubs,
   DateRange,
   formatError,
   GIFT_CURRENCY,
   inRange,
   idPlatform,
+  PLATFORM_CURRENCY,
   placer,
   platformOf,
   topOfEach,
@@ -71,6 +73,8 @@ const GifterSchema: z.ZodType<Gifter> = z.object({
   gifts: z.number(),
   // Gifted subs, since Twitch, YouTube and Kick came; older ones had none
   giftSubs: z.number().default(0),
+  // YouTube's Gifts' Jewels; older ones and other platforms' have none
+  jewels: z.number().optional(),
   giftedAt: z.number(),
   // One a newer Tokio saved that this one doesn't know reads as TikTok
   platform: z.enum(PLATFORMS).optional().catch(undefined),
@@ -95,6 +99,7 @@ const LiveSummarySchema = z.object({
           amount: z.number(),
           gifts: z.number(),
           giftSubs: z.number(),
+          jewels: z.number().optional(),
         }),
       ),
     )
@@ -103,10 +108,20 @@ const LiveSummarySchema = z.object({
 
 const GiftMinuteSchema = z.object({
   minute: z.number(),
-  // Entries saved before gifted subs counted have two numbers
+  // Entries saved before gifted subs counted have two numbers, before
+  // Jewels three. A newer Tokio's extra numbers are dropped: a tuple refuses
+  // them, and the whole LIVE wouldn't load.
   gifters: z.record(
     z.string(),
-    z.tuple([z.number(), z.number(), z.number().default(0)]),
+    z.preprocess(
+      (value) => (Array.isArray(value) ? value.slice(0, 4) : value),
+      z.tuple([
+        z.number(),
+        z.number(),
+        z.number().default(0),
+        z.number().optional(),
+      ]),
+    ),
   ),
 }) satisfies z.ZodType<GiftMinute>;
 
@@ -149,10 +164,19 @@ const byAmount = (a: Gifter, b: Gifter) =>
 const byCoins = (a: Gifter, b: Gifter) =>
   b.coins - a.coins || a.giftedAt - b.giftedAt;
 
-// The gifters overlays get: TikTok's who sent coins. The other platforms'
-// money isn't gifts (Kick's Kicks, Twitch's Bits) or has no price.
-const overlaid = (gifter: Gifter) =>
-  gifter.coins > 0 && GIFT_CURRENCY[platformOf(gifter)] !== null;
+// The gifters overlays get: TikTok's who sent coins, the one platform whose
+// money is its gifts' currency. Kick's Kicks and Twitch's Bits aren't gifts,
+// and YouTube's Super Chats aren't its Gifts' Jewels.
+const overlaid = (gifter: Gifter) => {
+  const platform = platformOf(gifter);
+  return (
+    gifter.coins > 0 && GIFT_CURRENCY[platform] === PLATFORM_CURRENCY[platform]
+  );
+};
+
+// Jewels kept only when there are some, so other platforms' records stay as
+// they were
+const jewelsOf = (jewels: number) => (jewels > 0 ? { jewels } : {});
 
 // Adds a gifter's totals to the map's entry for them, keeping a picture
 const addGifter = (map: Map<string, Gifter>, gifter: Gifter) => {
@@ -163,6 +187,7 @@ const addGifter = (map: Map<string, Gifter>, gifter: Gifter) => {
     coins: (past?.coins ?? 0) + gifter.coins,
     gifts: (past?.gifts ?? 0) + gifter.gifts,
     giftSubs: (past?.giftSubs ?? 0) + gifter.giftSubs,
+    ...jewelsOf((past?.jewels ?? 0) + (gifter.jewels ?? 0)),
   });
 };
 
@@ -171,19 +196,23 @@ const noPart = (): HistoryTotals => ({ amount: 0, gifts: 0, giftSubs: 0 });
 const addPart = (
   parts: Partial<Record<Platform, HistoryTotals>>,
   platform: Platform,
-  { amount, gifts, giftSubs }: HistoryTotals,
+  { amount, gifts, giftSubs, jewels = 0 }: HistoryTotals,
 ) => {
   const part = (parts[platform] ??= noPart());
   part.amount += amount;
   part.gifts += gifts;
   part.giftSubs += giftSubs;
+  // Only on a part with some, so the others stay as they were
+  if (jewels > 0) part.jewels = (part.jewels ?? 0) + jewels;
 };
 
-// The two rankings LIVE history shows: who sent an amount, in byAmount
-// order (which `sorted` is), and who gifted subs, the most first
+// The rankings LIVE history shows: who sent an amount, in byAmount order
+// (which `sorted` is), who gifted subs, the most first, and who sent
+// YouTube's Gifts, by their Jewels
 const rankings = (sorted: Gifter[]) => ({
   gifters: sorted.filter((g) => g.coins > 0),
   subGifters: sorted.filter((g) => g.giftSubs > 0).sort(bySubs),
+  jewelGifters: sorted.filter((g) => (g.jewels ?? 0) > 0).sort(byJewels),
 });
 
 // Each gifter with their place in the list among their platform's, the
@@ -220,7 +249,9 @@ const giftersIn = (record: LiveRecord, range: DateRange): Gifter[] => {
   const known = new Map(record.gifters.map((g) => [g.userId, g]));
   const sent = new Map<string, Gifter>();
   for (const { at, gifters } of minutesIn(record, range)) {
-    for (const [userId, [coins, gifts, giftSubs]] of Object.entries(gifters)) {
+    for (const [userId, [coins, gifts, giftSubs, jewels = 0]] of Object.entries(
+      gifters,
+    )) {
       const gifter = known.get(userId);
       if (!gifter) continue;
       const past = sent.get(userId);
@@ -229,6 +260,7 @@ const giftersIn = (record: LiveRecord, range: DateRange): Gifter[] => {
         coins: (past?.coins ?? 0) + coins,
         gifts: (past?.gifts ?? 0) + gifts,
         giftSubs: (past?.giftSubs ?? 0) + giftSubs,
+        jewels: (past?.jewels ?? 0) + jewels,
         // Their last gift in them, to the minute
         giftedAt: at,
       });
@@ -282,10 +314,16 @@ export class HistoryService extends Service {
       const { added } = this._streaks.add(event);
       if (added <= 0) return;
       const { user, gift } = event;
-      // Only TikTok's gifts have a price: YouTube's Gifts have none
-      const priced = GIFT_CURRENCY[platformOf(user)] !== null;
-      const amount = priced ? added * Math.max(0, gift.coins) : 0;
-      this._count(live, user, { amount, gifts: added, giftSubs: 0 });
+      const price = added * Math.max(0, gift.coins);
+      // YouTube's Gifts cost Jewels, apart from its Super Chats' dollars. One
+      // with no known price comes with 0.
+      const jewels = GIFT_CURRENCY[platformOf(user)] === "jewels";
+      this._count(live, user, {
+        amount: jewels ? 0 : price,
+        gifts: added,
+        giftSubs: 0,
+        ...(jewels && { jewels: price }),
+      });
     },
     [TOKIO_EVENTS.CHEER]: (live, { user, bits }) => {
       this._count(live, user, { amount: bits, gifts: 0, giftSubs: 0 });
@@ -512,10 +550,7 @@ export class HistoryService extends Service {
     return this._tops(
       [...this._liveGifters.values()]
         .filter((g) => (g.jewels ?? 0) > 0)
-        .sort(
-          (a, b) =>
-            (b.jewels ?? 0) - (a.jewels ?? 0) || a.giftedAt - b.giftedAt,
-        ),
+        .sort(byJewels),
     );
   }
 
@@ -532,15 +567,17 @@ export class HistoryService extends Service {
 
   /**
    * The finished LIVEs, newest first, and each platform's top gifters of all
-   * time, in one list in byAmount order of those who sent an amount, and in
-   * another by gifted subs of those who gifted some.
+   * time, in one list in byAmount order of those who sent an amount, in
+   * another by gifted subs of those who gifted some, and in a third by
+   * Jewels of those who sent YouTube's Gifts.
    */
   public getHistory(): LiveHistory {
-    const { gifters, subGifters } = rankings([...this._gifters.values()]);
+    const lists = rankings([...this._gifters.values()]);
     return {
       lives: [...this._lives].reverse(),
-      gifters: topOfEach(gifters, SHOWN_GIFTERS),
-      subGifters: topOfEach(subGifters, SHOWN_GIFTERS),
+      gifters: topOfEach(lists.gifters, SHOWN_GIFTERS),
+      subGifters: topOfEach(lists.subGifters, SHOWN_GIFTERS),
+      jewelGifters: topOfEach(lists.jewelGifters, SHOWN_GIFTERS),
     };
   }
 
@@ -583,12 +620,17 @@ export class HistoryService extends Service {
       }
       const record = await this._readLive(dir, live.startedAt);
       for (const { gifters } of minutesIn(record, range)) {
-        for (const [key, [amount, gifts, giftSubs]] of Object.entries(
+        for (const [key, [amount, gifts, giftSubs, jewels]] of Object.entries(
           gifters,
         )) {
           // Bare ids, "" included, are TikTok's
           const platform = idPlatform(key);
-          addPart(totals.platforms, platform, { amount, gifts, giftSubs });
+          addPart(totals.platforms, platform, {
+            amount,
+            gifts,
+            giftSubs,
+            jewels,
+          });
           if (platform === "tiktok") totals.coins += amount;
           totals.gifts += gifts;
         }
@@ -600,8 +642,8 @@ export class HistoryService extends Service {
   /**
    * Each platform's top SHOWN_GIFTERS of the finished LIVEs in some dates,
    * counting only the gifts in them of a LIVE they cut: in one list in
-   * byAmount order of those who sent an amount, and in another by gifted
-   * subs of those who gifted some. Each has their place in their list among
+   * byAmount order of those who sent an amount, in another by gifted subs of
+   * those who gifted some, and in a third by Jewels. Each has their place in their list among
    * their platform's, and with a query only the ones whose name or @handle
    * has it are there. Every LIVE whole is
    * all time's list; other dates are added up from the LIVEs' files, leaving
@@ -619,9 +661,10 @@ export class HistoryService extends Service {
   }): Promise<{
     gifters: RankedGifter[];
     subGifters: RankedGifter[];
+    jewelGifters: RankedGifter[];
   } | null> {
     const dir = this._dir;
-    if (dir === null) return { gifters: [], subGifters: [] };
+    if (dir === null) return { gifters: [], subGifters: [], jewelGifters: [] };
     const range = { from, to };
     const lives = this._lives.filter((l) => inRange(l, range));
     // Kept in byAmount order, and read from no file
@@ -651,6 +694,7 @@ export class HistoryService extends Service {
     return {
       gifters: ranked(lists.gifters, named),
       subGifters: ranked(lists.subGifters, named),
+      jewelGifters: ranked(lists.jewelGifters, named),
     };
   }
 
@@ -834,21 +878,27 @@ export class HistoryService extends Service {
     // As Tokio kept them before other platforms
     if (platform === "tiktok") live.coins += sent.amount;
     const last = user.userId ? this._liveGifters.get(user.userId) : undefined;
-    // A viewer gets a record with an amount or gifted subs. A gift without a
-    // price (YouTube's Gifts) adds only to one they have.
+    const sentJewels = sent.jewels ?? 0;
+    // A viewer gets a record with an amount, gifted subs or Jewels. A gift
+    // without a price (a YouTube Gift Tokio has none for) adds only to one
+    // they have.
     const gifter =
-      user.userId && (last || sent.amount > 0 || sent.giftSubs > 0)
+      user.userId &&
+      (last || sent.amount > 0 || sent.giftSubs > 0 || sentJewels > 0)
         ? user.userId
         : "";
     // Without one, in the platform's own: "" for TikTok, "kick:" for Kick
     const id = gifter || (platform === "tiktok" ? "" : `${platform}:`);
     const { gifters } = this._minute(live, at);
-    const [amount, gifts, giftSubs] = gifters[id] ?? [0, 0, 0];
-    gifters[id] = [
+    const [amount, gifts, giftSubs, jewels = 0] = gifters[id] ?? [0, 0, 0];
+    const counted: GiftMinute["gifters"][string] = [
       amount + sent.amount,
       gifts + sent.gifts,
       giftSubs + sent.giftSubs,
     ];
+    // A 4th number only with Jewels: an older Tokio refuses one
+    if (jewels + sentJewels > 0) counted[3] = jewels + sentJewels;
+    gifters[id] = counted;
     if (gifter) {
       this._liveGifters.set(gifter, {
         userId: gifter,
@@ -858,6 +908,7 @@ export class HistoryService extends Service {
         coins: (last?.coins ?? 0) + sent.amount,
         gifts: (last?.gifts ?? 0) + sent.gifts,
         giftSubs: (last?.giftSubs ?? 0) + sent.giftSubs,
+        ...jewelsOf((last?.jewels ?? 0) + sentJewels),
         giftedAt: Math.max(at, last?.giftedAt ?? at),
         ...(user.platform && { platform: user.platform }),
       });
@@ -916,7 +967,13 @@ export class HistoryService extends Service {
         );
         return;
       }
-      for (const { userId, coins, gifts, giftSubs } of record.gifters) {
+      for (const {
+        userId,
+        coins,
+        gifts,
+        giftSubs,
+        jewels = 0,
+      } of record.gifters) {
         // Gone when the cap dropped them. Below this LIVE's numbers, the cap
         // dropped them and later gifts brought them back without it.
         // shortcut: one whose later gifts reach this LIVE's still loses this
@@ -927,16 +984,24 @@ export class HistoryService extends Service {
           !gifter ||
           gifter.coins < coins ||
           gifter.gifts < gifts ||
-          gifter.giftSubs < giftSubs
+          gifter.giftSubs < giftSubs ||
+          (gifter.jewels ?? 0) < jewels
         )
           continue;
+        const { jewels: had = 0, ...rest } = gifter;
         const left = {
-          ...gifter,
+          ...rest,
           coins: gifter.coins - coins,
           gifts: gifter.gifts - gifts,
           giftSubs: gifter.giftSubs - giftSubs,
+          ...jewelsOf(had - jewels),
         };
-        if (left.coins <= 0 && left.gifts <= 0 && left.giftSubs <= 0)
+        if (
+          left.coins <= 0 &&
+          left.gifts <= 0 &&
+          left.giftSubs <= 0 &&
+          !left.jewels
+        )
           this._gifters.delete(userId);
         else this._gifters.set(userId, left);
       }
@@ -963,13 +1028,14 @@ export class HistoryService extends Service {
   // Sorts all time and caps each platform's, after it changes
   private _rank() {
     let kept = [...this._gifters.values()];
-    // Past the cap, the fewest go first, then the fewest gifted subs, then
-    // the oldest last gift
+    // Past the cap, the fewest go first (YouTube's by dollars, then
+    // Jewels), then the fewest gifted subs, then the oldest last gift
     if (kept.length > MAX_GIFTERS)
       kept = topOfEach(
         kept.sort(
           (a, b) =>
             b.coins - a.coins ||
+            (b.jewels ?? 0) - (a.jewels ?? 0) ||
             b.giftSubs - a.giftSubs ||
             b.giftedAt - a.giftedAt,
         ),
