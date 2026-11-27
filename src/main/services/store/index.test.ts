@@ -682,10 +682,31 @@ describe("StoreManagerService", () => {
       vi.spyOn(safeStorage, "decryptStringAsync").mockRejectedValue(
         new Error("Decryption failed"),
       );
+      const warn = vi.spyOn(Logger, "warn");
 
       const store = await init();
 
       expect(store.getSettings().activeConnProvider.key).toBe("");
+      expect(warn.mock.calls.map(([line]) => line)).toEqual([
+        expect.stringContaining("couldn't be decrypted -- Decryption failed"),
+      ]);
+    });
+
+    it("saves a key it can't encrypt as it is, and logs it without the key", async () => {
+      const store = await init();
+      vi.spyOn(safeStorage, "encryptStringAsync").mockRejectedValue(
+        new Error("Keychain denied"),
+      );
+      const warn = vi.spyOn(Logger, "warn");
+
+      expect(await store.updateProvider("Default", "euler-key")).toBe(true);
+
+      expect((await readJSON(storeFile)).settings.activeConnProvider.key).toBe(
+        "euler-key",
+      );
+      expect(warn.mock.calls.map(([line]) => line)).toEqual([
+        "<System> Saving the Default key unencrypted: Keychain denied",
+      ]);
     });
 
     it("reads keys saved without encryption as they are", async () => {
@@ -708,10 +729,14 @@ describe("StoreManagerService", () => {
       vi.spyOn(safeStorage, "isAsyncEncryptionAvailable").mockResolvedValue(
         false,
       );
+      const warn = vi.spyOn(Logger, "warn");
 
       const store = await init();
 
       expect(store.getSettings().activeConnProvider.key).toBe("");
+      expect(warn.mock.calls.map(([line]) => line)).toEqual([
+        expect.stringContaining("read as empty: encryption is unavailable"),
+      ]);
     });
 
     // On macOS it can ask for the Keychain

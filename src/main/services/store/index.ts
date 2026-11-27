@@ -1510,16 +1510,25 @@ export class StoreManagerService extends Service {
   private async _encryptProviderKey(
     provider: AppProvider,
   ): Promise<AppProvider> {
-    if (!provider.key || !(await safeStorage?.isAsyncEncryptionAvailable())) {
+    if (!provider.key) return provider;
+    // Never the key itself in the logs
+    const plain = (why: string) => {
+      Logger.warn(
+        `<System> Saving the ${provider.name} key unencrypted: ${why}`,
+        this._logFile,
+      );
       return provider;
+    };
+    if (!(await safeStorage?.isAsyncEncryptionAvailable())) {
+      return plain("encryption is unavailable");
     }
     try {
       const encrypted = await safeStorage.encryptStringAsync(provider.key);
       const key = encrypted.toString("base64");
       this._keys.set(key, provider.key);
       return { ...provider, key };
-    } catch {
-      return provider;
+    } catch (error) {
+      return plain(formatError(error));
     }
   }
 
@@ -1540,7 +1549,12 @@ export class StoreManagerService extends Service {
         .map((p) => p.key)
         .filter(isEncrypted),
     );
-    if (!encrypted.size || !(await safeStorage?.isAsyncEncryptionAvailable())) {
+    if (!encrypted.size) return;
+    if (!(await safeStorage?.isAsyncEncryptionAvailable())) {
+      Logger.warn(
+        `<System> ${encrypted.size} saved keys read as empty: encryption is unavailable`,
+        this._logFile,
+      );
       return;
     }
     await Promise.all(
@@ -1550,8 +1564,12 @@ export class StoreManagerService extends Service {
             Buffer.from(key, "base64"),
           );
           this._keys.set(key, result);
-        } catch {
+        } catch (error) {
           // Left out, so _withKey reads it as ""
+          Logger.warn(
+            `<System> A saved key reads as empty, it couldn't be decrypted -- ${formatError(error)}`,
+            this._logFile,
+          );
         }
       }),
     );
