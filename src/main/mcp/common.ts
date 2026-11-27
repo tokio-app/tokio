@@ -299,7 +299,11 @@ export async function invokeOk<
   if (isRecord(res) && res.success === false) {
     const message = isRecord(res.error) ? res.error.message : undefined;
     return {
-      error: fail(typeof message === "string" ? message : `${event} failed.`),
+      error: fail(
+        typeof message === "string"
+          ? message
+          : "It didn't work: Tokio's notices say why.",
+      ),
     };
   }
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the channel ties it to R
