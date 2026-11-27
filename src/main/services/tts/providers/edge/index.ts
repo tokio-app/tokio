@@ -30,7 +30,8 @@ export class EdgeTTS extends TTSProvider {
   public readonly label = "Edge";
   private _config: EdgeConfig;
   private _voices: { list: ProviderVoice[]; fetchedAt: number } | null = null;
-  private _listing?: Promise<unknown>;
+  // Shared by every voice picker and message waiting for the list
+  private _listing?: Promise<ProviderVoice[]>;
 
   constructor(overrides?: EdgeConfigOverrides) {
     super();
@@ -45,19 +46,34 @@ export class EdgeTTS extends TTSProvider {
 
   public async getVoices(): Promise<ProviderVoice[]> {
     const cached = this._voices;
-    if (cached && Date.now() - cached.fetchedAt < this._config.VOICES_TTL_MS) {
+    // Not Date.now(), so a clock change can't keep the list for days
+    if (
+      cached &&
+      performance.now() - cached.fetchedAt < this._config.VOICES_TTL_MS
+    ) {
       return cached.list;
     }
+    return (this._listing ??= this._fetchVoices(cached).finally(() => {
+      this._listing = undefined;
+    }));
+  }
+
+  private async _fetchVoices(
+    cached: EdgeTTS["_voices"],
+  ): Promise<ProviderVoice[]> {
     try {
       const list = (await listVoices(this._config)).map((v) => ({
         lang: v.Locale,
         name: edgeDisplayName(v),
       }));
-      this._voices = { list, fetchedAt: Date.now() };
+      this._voices = { list, fetchedAt: performance.now() };
       return list;
     } catch (error) {
-      if (cached) return cached.list; // Stale is better than nothing.
-      throw error;
+      if (!cached) throw error;
+      // Stale is better than nothing, and the next try waits as long, so
+      // each picker doesn't wait for Edge again
+      this._voices = { list: cached.list, fetchedAt: performance.now() };
+      return cached.list;
     }
   }
 
@@ -79,11 +95,7 @@ export class EdgeTTS extends TTSProvider {
     voice?: string,
   ): Promise<GenerationResponse> {
     // The fallback needs the list; a failed fetch speaks as given and the next message tries again
-    if (!this._voices) {
-      await (this._listing ??= this.getVoices().catch(() => {
-        this._listing = undefined;
-      }));
-    }
+    if (!this._voices) await this.getVoices().catch(() => {});
     try {
       const buffer = await synthesize(
         this._config,

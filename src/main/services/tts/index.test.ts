@@ -1,6 +1,7 @@
 import { Profile } from "@/common/schemas";
 import { ChatEvent, UserData } from "@/common/types";
 import { defaultProfile } from "@/common/util";
+import { REPEAT_NOTICE_MS } from "@/helper/feedback";
 import Logger from "@/logger";
 import {
   afterEach,
@@ -138,6 +139,23 @@ describe("TTSService", () => {
         undefined,
         expect.any(Error),
       );
+    });
+
+    it("logs an engine's failure once per window, as every picker lists", async () => {
+      const error = vi.spyOn(Logger, "error");
+      const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+      vi.spyOn(engine("Edge"), "getVoices").mockRejectedValue(
+        new Error("offline"),
+      );
+
+      await service.getVoices();
+      now.mockReturnValue(1000 + REPEAT_NOTICE_MS - 1);
+      await service.getVoices();
+      expect(error).toHaveBeenCalledOnce();
+
+      now.mockReturnValue(1000 + REPEAT_NOTICE_MS);
+      await service.getVoices();
+      expect(error).toHaveBeenCalledTimes(2);
     });
 
     it("returns no voices when every engine fails", async () => {

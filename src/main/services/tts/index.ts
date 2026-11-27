@@ -15,6 +15,7 @@ import {
   startsWithTrigger,
   wholeWord,
 } from "@/helper/chat";
+import { REPEAT_NOTICE_MS } from "@/helper/feedback";
 import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
 import { ProviderService } from "../shared";
@@ -84,6 +85,8 @@ export class TTSService extends ProviderService<TTSProvider> {
   private _held = new Set<number>();
   // Engines paused until then, with the error that paused them
   private _paused = new Map<TTSProvider, { until: number; error?: Error }>();
+  // When each engine's failure to list was last logged
+  private _voicesLogged = new Map<string, number>();
 
   constructor() {
     super();
@@ -145,7 +148,13 @@ export class TTSService extends ProviderService<TTSProvider> {
     });
   }
 
+  // Once per REPEAT_NOTICE_MS for each engine, since every voice picker
+  // lists the voices
   public logVoicesFailure(engine: string, error: unknown) {
+    const now = performance.now();
+    const last = this._voicesLogged.get(engine);
+    if (last !== undefined && now - last < REPEAT_NOTICE_MS) return;
+    this._voicesLogged.set(engine, now);
     Logger.error(
       `<TTS> Unable to get the ${engine} voices - ${formatError(error)}`,
       this._logFile,

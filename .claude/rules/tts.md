@@ -21,7 +21,7 @@ paths:
 - `windows` drives SAPI and OneCore voices through a long-lived 32-bit PowerShell helper, so 32-bit-only voices such as Loquendo show. Its script (`common/script.ts`) must not contain backticks.
 - The helper starts on the first request and exits `IDLE_TIMEOUT_MS` after the last, so it doesn't hold memory between uses. `getVoices` lists the voices once a run; a failed or empty list isn't kept, and a voice installed meanwhile shows after a restart.
 - `common/script.test.ts` runs that script in a real PowerShell on Windows (CI's Windows job) with whatever voices are installed, with a raised `START_TIMEOUT_MS`, since a busy runner is slow to start the host.
-- `edge` uses Microsoft's unofficial Read Aloud protocol. Read `providers/edge/README.md` before changing it. Volatile values live in its `config/index.ts`. It fetches the voice list before its first message (one shared fetch), so the default-voice fallback for a retired voice works without the TTS page.
+- `edge` uses Microsoft's unofficial Read Aloud protocol. Read `providers/edge/README.md` before changing it. Volatile values live in its `config/index.ts`. It fetches the voice list before its first message, so the default-voice fallback for a retired voice works without the TTS page. The list is kept `VOICES_TTL_MS` on `performance.now()`, a failed refresh keeps the old list as long again, and pickers and messages asking at once share one fetch. Windows shares its listing the same way.
 
 ## Keyed engines
 
@@ -37,7 +37,7 @@ paths:
   - Older ElevenLabs errors send an empty quota as a 401, and an ElevenLabs key without a permission gets a 401 "unauthorized" that only its message tells apart from a wrong key, so the provider makes that code `missing_permissions`.
   - Cartesia's free plan gets a 402 that only its message tells apart from no credits, so the provider makes that code `plan_required` (`notAllowed`).
   - The other engines' codes are their HTTP statuses, and a clone they refuse after a 200 (Fish Audio's failed training, Inworld's reply without a voice) is a 422, so it reads as unusable samples.
-- `GET_VOICES` warns when an engine with a saved key fails to list (`tts:voices:<engine>`), so a wrong key shows. Engines without a key fail quietly.
+- `GET_VOICES` warns when an engine with a saved key fails to list (`tts:voices:<engine>`), so a wrong key shows. Engines without a key fail quietly. `logVoicesFailure` logs each engine's failure once per `REPEAT_NOTICE_MS`, since every picker lists.
 
 ## Voice cloning
 

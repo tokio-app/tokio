@@ -8,12 +8,20 @@ export class WindowsTTS extends TTSProvider {
   public readonly label = "Windows";
   private _host = new SapiHost();
   private _voices: SapiVoice[] | null = null;
+  // Shared by every voice picker and message waiting for the list
+  private _listing?: Promise<SapiVoice[]>;
 
-  private async _fetchVoices(): Promise<SapiVoice[]> {
-    const voices = await this._host.request({ type: "voices" });
-    // An empty list is asked for again, like a failed one
-    if (voices.length > 0) this._voices = voices;
-    return voices;
+  private _fetchVoices(): Promise<SapiVoice[]> {
+    return (this._listing ??= this._host
+      .request({ type: "voices" })
+      .then((voices) => {
+        // An empty list is asked for again, like a failed one
+        if (voices.length > 0) this._voices = voices;
+        return voices;
+      })
+      .finally(() => {
+        this._listing = undefined;
+      }));
   }
 
   public setKey(_key: string) {}
