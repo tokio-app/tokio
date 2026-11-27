@@ -12,12 +12,7 @@ import {
   StudioOverlaySchema,
   StudioTriggerSchema,
 } from "@/common/schemas";
-import {
-  APP_EVENTS,
-  APP_EVENTS_RESPONSE,
-  AppEventsMap,
-  type Platform,
-} from "@/common/types";
+import { APP_EVENTS, APP_EVENTS_RESPONSE, type Platform } from "@/common/types";
 import {
   ALERT_MESSAGE_VARIABLES,
   catalogState,
@@ -34,7 +29,6 @@ import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import {
   activeProfile,
-  type CallToolResult,
   deepMerge,
   fail,
   invalid,
@@ -155,21 +149,6 @@ function newStudioName({ storeManagerService }: Handler) {
   while (taken.has(t("studio.newName", { number }))) number++;
   return t("studio.newName", { number });
 }
-
-// Studio's handlers reply STUDIO to the window, failures included: only
-// invoke's error matters here
-const studioInvoke = async <
-  K extends
-    | APP_EVENTS.ADD_STUDIO_OVERLAY
-    | APP_EVENTS.SAVE_STUDIO_OVERLAY
-    | APP_EVENTS.REMOVE_STUDIO_OVERLAY
-    | APP_EVENTS.TEST_STUDIO_OVERLAY,
->(
-  handler: Handler,
-  event: K,
-  data: AppEventsMap[K],
-): Promise<CallToolResult | undefined> =>
-  (await invokeOk(handler, event, data)).error;
 
 const TRIGGER_VARIABLES = ALERT_TRIGGERS.map((trigger) => {
   const names = countedVariables(trigger).map((n) => `{${n}}`);
@@ -335,14 +314,14 @@ export const kinds: Kinds = {
       if (problem) return fail(`${problem} Nothing was saved.`);
 
       if (id === undefined) {
-        const error = await studioInvoke(
+        const { error } = await invokeOk(
           handler,
           APP_EVENTS.ADD_STUDIO_OVERLAY,
           { id: overlay.id, name: overlay.name },
         );
         if (error) return error;
       }
-      const error = await studioInvoke(
+      const { error } = await invokeOk(
         handler,
         APP_EVENTS.SAVE_STUDIO_OVERLAY,
         { overlay },
@@ -358,20 +337,22 @@ export const kinds: Kinds = {
     },
     remove: async (handler, id) => {
       if (!findStudio(handler, id)) return fail(`No studio overlay ${id}.`);
-      return (
-        (await studioInvoke(handler, APP_EVENTS.REMOVE_STUDIO_OVERLAY, {
-          id,
-        })) ?? ok("Removed.")
+      const { error } = await invokeOk(
+        handler,
+        APP_EVENTS.REMOVE_STUDIO_OVERLAY,
+        { id },
       );
+      return error ?? ok("Removed.");
     },
     test: async (handler, id) => {
       if (id === undefined) return needsId("studio overlay");
       if (!findStudio(handler, id)) return fail(`No studio overlay ${id}.`);
-      return (
-        (await studioInvoke(handler, APP_EVENTS.TEST_STUDIO_OVERLAY, {
-          id,
-        })) ?? ok("Played on its browser sources.")
+      const { error } = await invokeOk(
+        handler,
+        APP_EVENTS.TEST_STUDIO_OVERLAY,
+        { id },
       );
+      return error ?? ok("Played on its browser sources.");
     },
   }),
 
@@ -765,7 +746,7 @@ export const tools: ToolDef<any>[] = [
       }
       const parsed = StudioOverlaySchema.safeParse({ ...stored, items });
       if (!parsed.success) return invalid(parsed.error);
-      const error = await studioInvoke(
+      const { error } = await invokeOk(
         handler,
         APP_EVENTS.SAVE_STUDIO_OVERLAY,
         { overlay: parsed.data },
