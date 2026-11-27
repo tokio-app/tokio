@@ -42,7 +42,6 @@ import {
 } from "./alerts";
 import { formatDuration, formatMoney, formatStat, NO_MONEY } from "./format";
 import {
-  GIFT_CURRENCY,
   giftCurrencies,
   newRowTrigger,
   PLATFORM_CURRENCY,
@@ -63,7 +62,6 @@ export const STUDIO_NUMBERS: (keyof StudioNumbers)[] = [
   "followers",
   "shares",
   "coins",
-  "jewels",
   "kicks",
   "bits",
   "superchats",
@@ -88,7 +86,6 @@ export function studioNumbersFor(
     followers: sent.includes(TOKIO_EVENTS.FOLLOW),
     shares: sent.includes(TOKIO_EVENTS.SHARE),
     coins: currencies.includes("coins"),
-    jewels: currencies.includes("jewels"),
     kicks: sent.includes(TOKIO_EVENTS.KICKS),
     bits: sent.includes(TOKIO_EVENTS.CHEER),
     superchats: sent.includes(TOKIO_EVENTS.SUPER_CHAT),
@@ -106,7 +103,6 @@ export const SAMPLE_NUMBERS: StudioNumbers = {
   followers: 58,
   shares: 17,
   coins: 4_210,
-  jewels: 1_340,
   kicks: 1_850,
   bits: 2_500,
   superchats: 86.5,
@@ -585,23 +581,12 @@ export const listRow = (
       : `${entry.icon ? "×" : ""}${(usd ? formatMoney : formatStat)(value, language).short}`,
 });
 
-type ListRanking = Pick<
-  StudioElementOf<"list">,
-  "source" | "platform" | "rank"
->;
-
-// Whether a list ranks YouTube's top gifters by their Gifts' Jewels, not
-// their Super Chats
-export const listInJewels = ({ source, platform, rank }: ListRanking) =>
-  source === "gifters" &&
-  rank === "jewels" &&
-  GIFT_CURRENCY[platform] === "jewels";
-
-// Whether a list's values are US dollars: YouTube's top gifters by Super Chats
-export const listInUsd = (list: ListRanking) =>
-  list.source === "gifters" &&
-  PLATFORM_CURRENCY[list.platform] === "usd" &&
-  !listInJewels(list);
+// Whether a list's values are US dollars: YouTube's top gifters
+export const listInUsd = ({
+  source,
+  platform,
+}: Pick<StudioElementOf<"list">, "source" | "platform">) =>
+  source === "gifters" && PLATFORM_CURRENCY[platform] === "usd";
 
 // What a platform's gifters spend, whose senders a gifters list ranks
 const SPENT = {
@@ -618,13 +603,11 @@ const LISTED = {
   chat: TOKIO_EVENTS.CHAT,
 } as const;
 
-// A made-up row of the source from the platform, the index-th from the top,
-// a top of YouTube's gifters by Jewels with jewels
+// A made-up row of the source from the platform, the index-th from the top
 function sampleEntry(
   source: StudioListSource,
   index: number,
   platform?: Platform,
-  jewels = false,
 ): StudioListEntry {
   const row = (
     { profilePictures, username, handle }: UserData,
@@ -656,14 +639,11 @@ function sampleEntry(
     });
   }
   const spends = platform ?? "tiktok";
-  const { user } = generateEventSample(
-    jewels ? TOKIO_EVENTS.GIFT : SPENT[spends],
-    spends,
-  ).data;
+  const { user } = generateEventSample(SPENT[spends], spends).data;
   // A leaderboard's falling amounts: 12.4K, 4.4K, 2.4K…, or $124, $43.84…
   const value = Math.round(12_400 / (index + 1) ** 1.5);
   return row(user, {
-    value: PLATFORM_CURRENCY[spends] === "usd" && !jewels ? value / 100 : value,
+    value: PLATFORM_CURRENCY[spends] === "usd" ? value / 100 : value,
   });
 }
 
@@ -696,20 +676,19 @@ export class Samples {
    * The most rows a list shows, made up: a gifters list's from its
    * platform, the others' from each of the profile's that sends them.
    */
-  list(list: ListRanking) {
-    const { source, platform } = list;
+  list({
+    source,
+    platform,
+  }: Pick<StudioElementOf<"list">, "source" | "platform">) {
     const top = source === "gifters" || source === "giftsubs";
-    const jewels = listInJewels(list);
-    const key = top
-      ? `${source} ${platform}${jewels ? " jewels" : ""}`
-      : source;
+    const key = top ? `${source} ${platform}` : source;
     let entries = this.lists.get(key);
     if (!entries) {
       const from = top
         ? [platform]
         : rowPlatforms({ type: LISTED[source] }, this.platforms);
       entries = Array.from({ length: STUDIO_MAX_LIST_ROWS }, (_, i) =>
-        sampleEntry(source, i, from[i % from.length], jewels),
+        sampleEntry(source, i, from[i % from.length]),
       );
       this.lists.set(key, entries);
     }

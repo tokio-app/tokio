@@ -30,7 +30,7 @@ export function SummarySection({ title, lines, action, stats }: Props) {
     >
       <div
         className={styles.readout}
-        // All's money in a row of its own when it has four or five currencies
+        // All's money in a row of its own when it has four currencies
         style={{
           gridTemplateColumns: `repeat(${Math.max(3, stats.filter((s) => s.currency).length)}, minmax(0, 1fr))`,
         }}

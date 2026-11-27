@@ -16,7 +16,6 @@ import {
   samplePlatform,
 } from ".";
 import { PLATFORM_TRIGGERS, platformOf } from "../platforms";
-import { jewelsOf } from "../youtube";
 
 // Twenty test LIVEs of twenty presses each, as each one picks at random,
 // on every platform
@@ -53,17 +52,6 @@ describe("createTestLive", () => {
       expect([...new Set(types.slice(0, -2))].sort()).toEqual(live);
       expect(types.slice(-2)).toEqual(["tokio:gifters", "tokio:fans"]);
     }
-  });
-
-  it("prices YouTube's Gifts in Jewels", () => {
-    const gifts = lives
-      .flat(2)
-      .filter((p) => p.type === TOKIO_EVENTS.GIFT)
-      .map((p) => p.data)
-      .filter(({ user }) => platformOf(user) === "youtube");
-
-    expect(gifts.length).toBeGreaterThan(0);
-    for (const { gift } of gifts) expect(gift.coins).toBeGreaterThan(0);
   });
 
   it("sends emotes alone in some of the other platforms' chat, as they do", () => {
@@ -396,27 +384,21 @@ describe("generateEventSample", () => {
         expect(emote.emoteID).toMatch(/^youtube:/);
       }
     }
-    const gifts = many(
-      () => generateEventSample(TOKIO_EVENTS.GIFT, "youtube").data,
-    );
-    for (const { user, gift } of gifts) {
-      expect(user).not.toHaveProperty("moderator");
-      const key = gift.id.replace(/^youtube:/, "");
-      expect(gift).toEqual({
-        id: `youtube:${key}`,
-        name: expect.any(String),
-        image: `https://www.gstatic.com/youtube/img/pdg/gift/assets/${key}.png=w640-h640`,
-        coins: jewelsOf(key),
-        type: 0,
-        comboCount: expect.any(Number),
-        repeatEnd: true,
-      });
-      expect(gift.comboCount).toBeGreaterThanOrEqual(1);
-      expect(gift.comboCount).toBeLessThanOrEqual(5);
-    }
-    // Most are single gifts, some are combos
-    expect(gifts.some(({ gift }) => gift.comboCount === 1)).toBe(true);
-    expect(gifts.some(({ gift }) => gift.comboCount > 1)).toBe(true);
+    const { user, gift } = generateEventSample(
+      TOKIO_EVENTS.GIFT,
+      "youtube",
+    ).data;
+    expect(user).not.toHaveProperty("moderator");
+    expect(gift).toEqual({
+      id: "youtube:vicecity_heart_v2",
+      name: "Vice City heart",
+      image:
+        "https://www.gstatic.com/youtube/img/pdg/gift/assets/vicecity_heart_v2.png=w640-h640",
+      coins: 0,
+      type: 0,
+      comboCount: 1,
+      repeatEnd: true,
+    });
     for (const type of [
       TOKIO_EVENTS.SUBSCRIBE,
       TOKIO_EVENTS.GIFT_SUB,

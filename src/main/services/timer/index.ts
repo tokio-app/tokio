@@ -87,12 +87,9 @@ export class TimerService extends Service {
   private readonly _triggers: Triggers = {
     [TOKIO_EVENTS.GIFT]: (event) => {
       const { added } = this._streaks.add(event);
-      // Per coin of TikTok's gifts, per Jewel of YouTube's
-      const currency = GIFT_CURRENCY[platformOf(event.user)];
-      if (!currency) return 0;
-      const { coin, jewel } = this._seconds();
-      const per = currency === "jewels" ? jewel : coin;
-      return added * Math.max(0, event.gift.coins) * per;
+      // Only TikTok's gifts have a price: YouTube's add nothing
+      if (!GIFT_CURRENCY[platformOf(event.user)]) return 0;
+      return added * Math.max(0, event.gift.coins) * this._seconds().coin;
     },
     [TOKIO_EVENTS.LIKE]: ({ likeCount }) => {
       const { likes, likes_every } = this._seconds();

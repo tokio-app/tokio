@@ -113,11 +113,10 @@ export const coinUnit = (coins: number, language: string) =>
 export const coinsLabel = (coins: number, language: string) =>
   translate(language, "gifts.coins", { count: coins });
 
-// "500 coins", "20 Jewels", "200 Kicks", "2,500 Bits", "$57.40": an amount
-// in the currency it was paid in
+// "500 coins", "200 Kicks", "2,500 Bits", "$57.40": an amount in the
+// currency it was paid in
 const AMOUNT_KEYS = {
   coins: "gifts.coins",
-  jewels: "gifts.jewels",
   kicks: "gifts.kicks",
   bits: "gifts.bits",
 } as const;

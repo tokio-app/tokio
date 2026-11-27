@@ -453,7 +453,6 @@ describe("studio events", () => {
         followers: 0,
         shares: 0,
         coins: 0,
-        jewels: 0,
         kicks: 0,
         bits: 0,
         superchats: 0,

@@ -352,14 +352,7 @@ describe("live MCP tools", () => {
         id: 5,
         type: "gift",
         user: { ...user("yu"), platform: "youtube" },
-        gift: { name: "Heart", image: "", count: 3, coins: 30 },
-      },
-      {
-        id: 8,
-        type: "gift",
-        user: { ...user("yu"), platform: "youtube" },
-        // A regional Gift without a known price
-        gift: { name: "Elote", image: "", count: 1, coins: 0 },
+        gift: { name: "Jewels", image: "", count: 1, coins: 0 },
       },
       {
         id: 7,
@@ -423,22 +416,6 @@ describe("live MCP tools", () => {
               },
             ],
           }),
-          topJewelGifters: () => ({
-            youtube: [
-              {
-                userId: "youtube:UC5",
-                username: "Yu",
-                handle: "yu",
-                picture: "",
-                coins: 0,
-                jewels: 30,
-                gifts: 4,
-                giftSubs: 0,
-                giftedAt: 4,
-                platform: "youtube",
-              },
-            ],
-          }),
         },
       });
 
@@ -480,16 +457,7 @@ describe("live MCP tools", () => {
             type: "gift",
             handle: "yu",
             nickname: "yu name",
-            giftName: "Heart",
-            count: 3,
-            jewels: 30,
-          },
-          {
-            id: 8,
-            type: "gift",
-            handle: "yu",
-            nickname: "yu name",
-            giftName: "Elote",
+            giftName: "Jewels",
             count: 1,
           },
           {
@@ -523,10 +491,6 @@ describe("live MCP tools", () => {
               giftSubs: 0,
             },
           ],
-        },
-        // Apart from YouTube's Super Chats, never added to them
-        topJewelGifters: {
-          youtube: [{ handle: "yu", nickname: "Yu", jewels: 30, gifts: 4 }],
         },
       });
       expect(res.text).not.toContain("p.example");

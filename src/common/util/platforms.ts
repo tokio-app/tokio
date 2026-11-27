@@ -74,24 +74,23 @@ export const PLATFORM_INPUT: Record<Platform, "channel" | "account"> = {
 };
 
 // The currencies gifts are priced in
-const GIFT_CURRENCIES = ["coins", "jewels"] as const;
+const GIFT_CURRENCIES = ["coins"] as const;
 export type GiftCurrency = (typeof GIFT_CURRENCIES)[number];
 
-// What each platform's gifts cost in: TikTok's coins and YouTube's Jewels.
-// Twitch and Kick send none: their Bits and Kicks are events of their own
-// (the user's call).
+// What each platform's gifts cost in: TikTok's coins. YouTube's Gifts say no
+// price, and Twitch and Kick send none: their Bits and Kicks are events of
+// their own (the user's call).
 export const GIFT_CURRENCY: Record<Platform, GiftCurrency | null> = {
   tiktok: "coins",
   twitch: null,
-  youtube: "jewels",
+  youtube: null,
   kick: null,
 };
 
 // What viewers spend on each platform, each counted on its own and never
 // added to another (the user's call): TikTok's coins (its gifts' prices),
 // Kick's Kicks, Twitch's Bits (cheers) and YouTube's Super Chats in US
-// dollars. YouTube's Gifts are priced in Jewels apart (GIFT_CURRENCY), so
-// YouTube has two, never added together either.
+// dollars
 export type Currency = GiftCurrency | "kicks" | "bits" | "usd";
 export const PLATFORM_CURRENCY: Record<Platform, Currency> = {
   tiktok: "coins",

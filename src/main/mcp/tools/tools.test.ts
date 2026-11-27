@@ -219,22 +219,10 @@ describe("tools MCP tools", () => {
       giftSubs: 5,
       platform: "twitch",
     };
-    // YouTube's Gifts in Jewels, apart from its Super Chats' dollars
-    const tuber: Gifter = {
-      ...gifter,
-      userId: "youtube:UC4",
-      username: "Yui",
-      handle: "yui",
-      coins: 0,
-      gifts: 2,
-      jewels: 20,
-      platform: "youtube",
-    };
     const parts = {
       tiktok: { amount: 500, gifts: 3, giftSubs: 0 },
       kick: { amount: 200, gifts: 1, giftSubs: 0 },
       twitch: { amount: 100, gifts: 0, giftSubs: 5 },
-      youtube: { amount: 0, gifts: 2, giftSubs: 0, jewels: 20 },
     };
     const live = {
       username: "streamer",
@@ -242,14 +230,13 @@ describe("tools MCP tools", () => {
       endedAt: 61_000,
       coins: 500,
       kicks: 200,
-      gifts: 6,
+      gifts: 4,
       platforms: parts,
     };
     // Each amount named after its currency
     const named = {
       tiktok: { coins: 500, gifts: 3, giftSubs: 0 },
       twitch: { bits: 100, gifts: 0, giftSubs: 5 },
-      youtube: { usd: 0, jewels: 20, gifts: 2, giftSubs: 0 },
       kick: { kicks: 200, gifts: 1, giftSubs: 0 },
     };
     const setup = () => {
@@ -257,17 +244,12 @@ describe("tools MCP tools", () => {
         lives: [live],
         gifters: [gifter, kicker, twitcher],
         subGifters: [twitcher],
-        jewelGifters: [tuber],
       };
       const historyService = {
         getHistory: () => history,
         getLive: vi.fn(async (startedAt: number) =>
           startedAt === live.startedAt
-            ? {
-                ...live,
-                gifters: [gifter, kicker, twitcher, tuber],
-                minutes: [],
-              }
+            ? { ...live, gifters: [gifter, kicker, twitcher], minutes: [] }
             : null,
         ),
         deleteLive: vi.fn(async () => {
@@ -289,7 +271,6 @@ describe("tools MCP tools", () => {
             { ...twitcher, rank: 1 },
           ],
           subGifters: [{ ...twitcher, rank: 1 }],
-          jewelGifters: [{ ...tuber, rank: 1 }],
         })),
       };
       const h = createHandler({ historyService }, { stack: lives });
@@ -319,15 +300,6 @@ describe("tools MCP tools", () => {
       giftSubs: 5,
       lastGiftAt: "1970-01-01T00:00:01.000Z",
     };
-    const youtubeRow = {
-      nickname: "Yui",
-      handle: "yui",
-      usd: 0,
-      jewels: 20,
-      gifts: 2,
-      giftSubs: 0,
-      lastGiftAt: "1970-01-01T00:00:01.000Z",
-    };
 
     it("lists them and reads one", async () => {
       const { h } = setup();
@@ -341,7 +313,7 @@ describe("tools MCP tools", () => {
             username: "streamer",
             startedAt: "1970-01-01T00:00:01.000Z",
             endedAt: "1970-01-01T00:01:01.000Z",
-            gifts: 6,
+            gifts: 4,
             platforms: named,
           },
         ],
@@ -349,23 +321,12 @@ describe("tools MCP tools", () => {
       expect(
         (await call("get", { kind: "lives", id: "1000" })).value,
       ).toMatchObject({
-        gifts: 6,
+        gifts: 4,
         platforms: named,
-        totalGifters: 4,
-        gifters: {
-          tiktok: [row],
-          twitch: [twitchRow],
-          youtube: [],
-          kick: [kickRow],
-        },
+        totalGifters: 3,
+        gifters: { tiktok: [row], twitch: [twitchRow], kick: [kickRow] },
         // Only who gifted some
-        subGifters: { tiktok: [], twitch: [twitchRow], youtube: [], kick: [] },
-        jewelGifters: {
-          tiktok: [],
-          twitch: [],
-          youtube: [youtubeRow],
-          kick: [],
-        },
+        subGifters: { tiktok: [], twitch: [twitchRow], kick: [] },
       });
       expect((await call("get", { kind: "lives", id: "5" })).isError).toBe(
         true,
@@ -427,10 +388,6 @@ describe("tools MCP tools", () => {
       expect(
         (await call("get_gifters", { platform: "kick", by: "subs" })).value,
       ).toMatchObject({ gifters: [] });
-      expect(
-        (await call("get_gifters", { platform: "youtube", by: "jewels" }))
-          .value,
-      ).toMatchObject({ by: "jewels", gifters: [{ rank: 1, ...youtubeRow }] });
       expect(historyService.getTotals).toHaveBeenCalledWith({ from, to });
       expect(historyService.getGifters).toHaveBeenCalledWith({
         from,

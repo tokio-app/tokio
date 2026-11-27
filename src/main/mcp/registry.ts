@@ -105,10 +105,8 @@ const getStatus = ({
       shares: totals.shares,
       gifts: totals.gifts,
       // Each platform's currency apart, never added up: TikTok's coins,
-      // YouTube's Gifts in Jewels, Kick's Kicks, Twitch's Bits, YouTube's
-      // Super Chats in US dollars
+      // Kick's Kicks, Twitch's Bits, YouTube's Super Chats in US dollars
       coins: totals.coins,
-      jewels: totals.jewels,
       kicks: totals.kicks,
       bits: totals.bits,
       superChats: {
@@ -170,7 +168,7 @@ function toolDefs({ sections, kinds, tools }: Registry): ToolDef<any>[] {
       name: "get_status",
       title: "Status",
       description:
-        "What Tokio is doing now: the LIVE connection and its stats, the features on, whether reactions are paused, the active profile, the music queue, Minecraft, the countdown timer, the overlay server and app updates. live.connected is also true while connecting, while reconnecting after a drop (live.reconnecting), and for 2 minutes after the LIVE stopped on its own, while Tokio looks for it again (live.waiting, with no startedAt). A LIVE can span the profile's platforms (TikTok, Twitch, YouTube, Kick): live.platforms says how each one that's on is doing, live.username names the one that started it, and live.twitch whether Tokio is signed in to Twitch. Each platform's currency is counted apart, never added up: live.coins is TikTok's coins, live.jewels YouTube's Gifts in Jewels, live.kicks Kick's Kicks, live.bits Twitch's Bits, and live.superChats YouTube's Super Chats, their count and their total in US dollars (null until the exchange rates load). live.giftSubs counts the subs gifted on Twitch, YouTube (gifted memberships) and Kick.",
+        "What Tokio is doing now: the LIVE connection and its stats, the features on, whether reactions are paused, the active profile, the music queue, Minecraft, the countdown timer, the overlay server and app updates. live.connected is also true while connecting, while reconnecting after a drop (live.reconnecting), and for 2 minutes after the LIVE stopped on its own, while Tokio looks for it again (live.waiting, with no startedAt). A LIVE can span the profile's platforms (TikTok, Twitch, YouTube, Kick): live.platforms says how each one that's on is doing, live.username names the one that started it, and live.twitch whether Tokio is signed in to Twitch. Each platform's currency is counted apart, never added up: live.coins is TikTok's coins, live.kicks Kick's Kicks, live.bits Twitch's Bits, and live.superChats YouTube's Super Chats, their count and their total in US dollars (null until the exchange rates load). live.giftSubs counts the subs gifted on Twitch, YouTube (gifted memberships) and Kick.",
       input: z.object({}).strict(),
       annotations: READ,
       run: getStatus,

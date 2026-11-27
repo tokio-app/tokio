@@ -198,33 +198,4 @@ describe("matchesTrigger", () => {
       true,
     );
   });
-
-  it("holds a YouTube Gift to its minimum in Jewels, a combo as one", () => {
-    // "comboed x3 Yes for 6 Jewels": 2 Jewels each, in one event
-    const combo: GiftEvent = {
-      user: { ...follow("youtube").user, userId: "youtube:UC1" },
-      gift: {
-        id: "youtube:yes_jp",
-        name: "Yes",
-        coins: 2,
-        repeatEnd: true,
-        type: 1,
-        comboCount: 3,
-        image: "yes.png",
-      },
-    };
-    const youtube = (min_coins: number) =>
-      trigger(TOKIO_EVENTS.GIFT, { platform: "youtube", min_coins });
-    const { added, total } = new GiftStreaks().add(combo);
-    expect({ added, total }).toEqual({ added: 3, total: 3 });
-
-    const run = (t: Trigger) =>
-      matchesTrigger(t, TOKIO_EVENTS.GIFT, combo, added, total);
-    expect(run(youtube(6))).toBe(true);
-    expect(run(youtube(7))).toBe(false);
-    // A row for any platform compares the same number in each one's currency
-    expect(run(trigger(TOKIO_EVENTS.GIFT, { min_coins: 6 }))).toBe(true);
-    // Each gift's worth with every_gift
-    expect(run({ ...youtube(3), every_gift: true })).toBe(false);
-  });
 });

@@ -7,7 +7,6 @@ import {
   TokioEventMap,
   UserData,
 } from "@/common/types";
-import { jewelsOf } from "@/common/util/youtube";
 
 type Thumbnail = { url: string; width?: number; height?: number };
 type Thumbnails = { thumbnails?: Thumbnail[] };
@@ -228,17 +227,17 @@ function fromGiftPurchase(e: GiftPurchase): Mapped {
 // A Gift's handle, "@name " in its chat item, "@name" in its card
 const handleOf = (name?: string) => (name ?? "").trim().replace(/^@/, "");
 
-// "comboed x3 Yes for 6 Jewels": the count, the name, all of them's Jewels.
+// "comboed x3 Yes for 6 Jewels": the count, then the name.
 // shortcut: a combo counts its own count, though no LIVE has shown yet
 // whether YouTube also sends each of its gifts as a "sent Yes"; on a LIVE
 // with combos, check that a "comboed x3" doesn't follow three of those, or
 // they'd count twice
-const COMBO = /^comboed x(\d[\d,]*) (.+) for (\d[\d,]*) Jewels?$/i;
-const count = (digits = "") => Number(digits.replace(/,/g, ""));
+const COMBO = /^comboed x(\d[\d,]*) (.+) for [\d,]+ Jewels?$/i;
 
-// A YouTube Gift, bought with Jewels: a single one ("sent Star") at the
-// list's price, or a combo at the price it states. Its author has no channel
-// id, so the handle is the id until the provider knows it.
+// A YouTube Gift, bought with Jewels: one ("sent Star"), or a combo of the
+// same one. YouTube doesn't say what a single Gift costs, so it counts no
+// coins. Its author has no channel id, so the handle is the id until the
+// provider knows it.
 function fromGiftMessage(e: GiftMessage): Mapped {
   const handle = handleOf(e.authorName?.content);
   const picture = largest(e.authorAvatar?.avatarViewModel?.image?.sources);
@@ -246,17 +245,15 @@ function fromGiftMessage(e: GiftMessage): Mapped {
   // ".../gift/assets/vicecity_heart_v2.png=w640-h640" is vicecity_heart_v2
   const file = image.split("/").pop()?.split(/[.=]/)[0] ?? "";
   const text = (e.text?.content ?? "").trim();
-  const [, digits, comboName, total] = text.match(COMBO) ?? [];
-  const size = count(digits);
+  const [, digits = "", comboName] = text.match(COMBO) ?? [];
+  // A combo it can't read is one gift
+  const comboCount = Number(digits.replace(/,/g, "")) || 1;
   // "@handle sent a gift, Yes", a combo's too
   const name = (
     e.giftImageA11yLabel?.split(" sent a gift, ")[1] ??
     comboName ??
     text.replace(/^sent /i, "")
   ).trim();
-  // A combo it can't read is a single gift
-  const [comboCount, coins] =
-    size > 0 ? [size, count(total) / size] : [1, jewelsOf(file, name) ?? 0];
   return {
     event: TOKIO_EVENTS.GIFT,
     data: {
@@ -272,8 +269,7 @@ function fromGiftMessage(e: GiftMessage): Mapped {
         id: `youtube:${file}`,
         name,
         image,
-        // Each gift's, as TikTok's coins are
-        coins,
+        coins: 0,
         type: 0,
         comboCount,
         repeatEnd: true,

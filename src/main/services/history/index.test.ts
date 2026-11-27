@@ -22,7 +22,6 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { z } from "zod";
 import { HistoryService, MAX_GIFTERS, MAX_LIVES, TOP_GIFTERS } from "./index";
 
 // A test can make a removal fail
@@ -168,7 +167,6 @@ describe("HistoryService", () => {
         },
       ],
       subGifters: [],
-      jewelGifters: [],
     });
   });
 
@@ -185,7 +183,6 @@ describe("HistoryService", () => {
       lives: [],
       gifters: [],
       subGifters: [],
-      jewelGifters: [],
     });
   });
 
@@ -970,7 +967,6 @@ describe("HistoryService", () => {
     expect(await service().getGifters(range)).toEqual({
       gifters: [],
       subGifters: [],
-      jewelGifters: [],
     });
   });
 
@@ -1167,7 +1163,6 @@ describe("HistoryService", () => {
           expect.objectContaining({ userId: "a", coins: 50, gifts: 1 }),
         ],
         subGifters: [],
-        jewelGifters: [],
       });
       expect(existsSync(join(dir, "a", "1000.json"))).toBe(false);
       expect(await read<unknown>("index.json")).toEqual({
@@ -1292,7 +1287,6 @@ describe("HistoryService", () => {
       lives: [],
       gifters: [],
       subGifters: [],
-      jewelGifters: [],
     });
     expect(history.top().allTime.map((g) => g.userId)).toEqual(["b"]);
     expect(await readdir(dir)).toEqual(["a"]);
@@ -1434,192 +1428,6 @@ describe("HistoryService", () => {
       });
     });
 
-    it("counts YouTube's Gifts in Jewels, apart from its Super Chats' dollars", async () => {
-      const history = await loaded();
-      history.start("kai", 0);
-      const yui = tuber("youtube:UC1");
-      const leo = tuber("youtube:UC2");
-      // A combo of 3 Gifts of 2 Jewels each; Leo sends Jewels alone, which
-      // gives him a record
-      gifts(history, [1000, gift(yui, 2, 3)]);
-      history.record(TOKIO_EVENTS.SUPER_CHAT, superChat(yui, "$5.00", 5));
-      // A Gift Tokio has no price for counts as a gift only
-      gifts(history, [MINUTE, gift(leo, 10)], [MINUTE + 1, gift(leo, 0)]);
-
-      expect(history.topJewelGifters()).toEqual({
-        youtube: [
-          expect.objectContaining({ userId: "youtube:UC2", jewels: 10 }),
-          expect.objectContaining({ userId: "youtube:UC1", jewels: 6 }),
-        ],
-      });
-      expect(history.top()).toEqual({ live: [], allTime: [] });
-      history.end(2 * MINUTE);
-      await history.save();
-
-      const { lives, gifters, subGifters, jewelGifters } = history.getHistory();
-      expect(lives).toMatchObject([
-        {
-          coins: 0,
-          gifts: 5,
-          platforms: { youtube: { amount: 5, gifts: 5, jewels: 16 } },
-        },
-      ]);
-      expect(gifters.map((g) => [g.userId, g.coins])).toEqual([
-        ["youtube:UC1", 5],
-      ]);
-      expect(subGifters).toEqual([]);
-      expect(jewelGifters?.map((g) => [g.userId, g.jewels])).toEqual([
-        ["youtube:UC2", 10],
-        ["youtube:UC1", 6],
-      ]);
-      // Jewels in a record of their own, by the same keys
-      const { minutes } = await read<LiveRecord>("0.json");
-      expect(minutes).toEqual([
-        {
-          minute: 0,
-          gifters: { "youtube:UC1": [5, 3, 0] },
-          jewels: { "youtube:UC1": 6 },
-        },
-        {
-          minute: 1,
-          gifters: { "youtube:UC2": [0, 2, 0] },
-          jewels: { "youtube:UC2": 10 },
-        },
-      ]);
-      // An older Tokio's minutes, which refuse a 4th number, still load
-      // them, dropping the Jewels
-      const older = z.object({
-        minute: z.number(),
-        gifters: z.record(
-          z.string(),
-          z.tuple([z.number(), z.number(), z.number().default(0)]),
-        ),
-      });
-      expect(z.array(older).parse(minutes)).toEqual([
-        { minute: 0, gifters: { "youtube:UC1": [5, 3, 0] } },
-        { minute: 1, gifters: { "youtube:UC2": [0, 2, 0] } },
-      ]);
-
-      // Dates that cut the LIVE count the Jewels in them
-      expect((await history.getTotals({ from: MINUTE }))?.platforms).toEqual({
-        youtube: { amount: 0, gifts: 2, giftSubs: 0, jewels: 10 },
-      });
-      const cut = await history.getGifters({ from: MINUTE });
-      expect(cut?.gifters).toEqual([]);
-      expect(cut?.jewelGifters).toEqual([
-        expect.objectContaining({ userId: "youtube:UC2", jewels: 10, rank: 1 }),
-      ]);
-      const found = await history.getGifters({ query: "UC1" });
-      expect(found?.jewelGifters).toEqual([
-        expect.objectContaining({ userId: "youtube:UC1", jewels: 6, rank: 2 }),
-      ]);
-    });
-
-    it("adds a viewer's Jewels up across LIVEs, and a delete takes them off", async () => {
-      const history = await loaded();
-      const yui = tuber("youtube:UC1");
-      history.start("kai", 0);
-      gifts(history, [1, gift(yui, 10)]);
-      history.end(10);
-      history.start("kai", 20);
-      gifts(history, [21, gift(yui, 5)]);
-      vi.setSystemTime(20 + MINUTE);
-      history.record(TOKIO_EVENTS.SUPER_CHAT, superChat(yui, "$2.00", 2));
-      history.end(30 + MINUTE);
-
-      const jewels = () =>
-        history.getHistory().jewelGifters?.map((g) => g.jewels);
-      expect(jewels()).toEqual([15]);
-      expect((await history.getGifters({ from: 20 }))?.jewelGifters).toEqual([
-        expect.objectContaining({ jewels: 5 }),
-      ]);
-      // Dates that cut the LIVE take only what came in them: dollars alone
-      const cut = await history.getGifters({ from: 20 + MINUTE });
-      expect(cut?.gifters).toEqual([
-        expect.objectContaining({ coins: 2, jewels: 0 }),
-      ]);
-      expect(cut?.jewelGifters).toEqual([]);
-      await history.deleteLive(0);
-      expect(jewels()).toEqual([5]);
-      await history.deleteLive(20);
-      expect(history.getHistory().jewelGifters).toEqual([]);
-    });
-
-    it("reads a part, a minute and a gifter without Jewels as none, and drops a newer Tokio's numbers", async () => {
-      await mkdir(join(dir, "a"), { recursive: true });
-      const live = {
-        username: "kai",
-        startedAt: 0,
-        endedAt: 2 * MINUTE,
-        coins: 0,
-        gifts: 2,
-        platforms: { youtube: { amount: 5, gifts: 2, giftSubs: 0 } },
-      };
-      const gifter = {
-        userId: "youtube:UC1",
-        username: "yui",
-        handle: "yui",
-        picture: "",
-        coins: 5,
-        gifts: 2,
-        giftSubs: 0,
-        giftedAt: MINUTE,
-        platform: "youtube",
-      };
-      await writeFile(
-        join(dir, "a", "index.json"),
-        JSON.stringify({ lives: [live], gifters: [gifter], newest: 0 }),
-      );
-      await writeFile(
-        join(dir, "a", "0.json"),
-        JSON.stringify({
-          ...live,
-          gifters: [gifter],
-          minutes: [
-            { minute: 0, gifters: { "youtube:UC1": [5, 1, 0] } },
-            { minute: 1, gifters: { "youtube:UC1": [0, 1, 0, 9] } },
-          ],
-        }),
-      );
-
-      const history = await loaded();
-
-      expect(history.getHistory().jewelGifters).toEqual([]);
-      expect((await history.getLive(0))?.minutes).toEqual([
-        { minute: 0, gifters: { "youtube:UC1": [5, 1, 0] } },
-        { minute: 1, gifters: { "youtube:UC1": [0, 1, 0] } },
-      ]);
-      expect((await history.getTotals({ from: MINUTE }))?.platforms).toEqual({
-        youtube: { amount: 0, gifts: 1, giftSubs: 0 },
-      });
-      expect(
-        (await history.getGifters({ from: MINUTE }))?.jewelGifters,
-      ).toEqual([]);
-    });
-
-    it(`keeps ${MAX_GIFTERS} of YouTube's in all time, by dollars, then Jewels`, async () => {
-      const history = await loaded();
-      history.start("kai", 0);
-      for (let i = 1; i < MAX_GIFTERS; i++)
-        gifts(history, [10, gift(tuber(`youtube:${i}`), 5)]);
-      // The newest, but with the fewest Jewels
-      gifts(history, [20, gift(tuber("youtube:few"), 1)]);
-      history.record(
-        TOKIO_EVENTS.SUPER_CHAT,
-        superChat(tuber("youtube:chat"), "$1.00", 1),
-      );
-      history.end(100);
-
-      expect(history.getHistory().gifters.map((g) => g.userId)).toEqual([
-        "youtube:chat",
-      ]);
-      // The search looks past the ones shown
-      const found = async (query: string) =>
-        (await history.getGifters({ query }))?.jewelGifters.map((g) => g.rank);
-      expect(await found("youtube:few")).toEqual([]);
-      expect(await found("youtube:9999")).toEqual([MAX_GIFTERS - 1]);
-    });
-
     it("counts a Super Chat that came before the rates once they load, in its minute", async () => {
       const history = await loaded();
       const r = rates();
@@ -1646,33 +1454,6 @@ describe("HistoryService", () => {
       expect((await read<LiveRecord>("0.json")).minutes).toEqual([
         { minute: 0, gifters: { "youtube:UC1": [5, 0, 0] } },
         { minute: 2, gifters: { "youtube:UC1": [1, 0, 0] } },
-      ]);
-    });
-
-    it("keeps a minute's Jewels when a Super Chat that waited goes back to it", async () => {
-      const history = await loaded();
-      const r = rates();
-      history.setRates(r);
-      history.start("kai", 0);
-      const yui = tuber("youtube:UC1");
-      gifts(history, [1000, gift(yui, 10)]);
-      history.record(TOKIO_EVENTS.SUPER_CHAT, superChat(yui, "$1.00", null));
-      gifts(history, [2 * MINUTE, gift(yui, 5)]);
-      r.load();
-      history.end(3 * MINUTE);
-      await history.save();
-
-      expect((await read<LiveRecord>("0.json")).minutes).toEqual([
-        {
-          minute: 0,
-          gifters: { "youtube:UC1": [1, 1, 0] },
-          jewels: { "youtube:UC1": 10 },
-        },
-        {
-          minute: 2,
-          gifters: { "youtube:UC1": [0, 1, 0] },
-          jewels: { "youtube:UC1": 5 },
-        },
       ]);
     });
 
@@ -1834,8 +1615,6 @@ describe("HistoryService", () => {
         TOKIO_EVENTS.SUPER_CHAT,
         superChat(tuber("youtube:1"), "$50.00", 50),
       );
-      // YouTube's Gifts are priced in Jewels, not coins
-      gifts(history, [3, gift(tuber("youtube:2"), 100)]);
 
       const ids = () => {
         const { live, allTime } = history.top();

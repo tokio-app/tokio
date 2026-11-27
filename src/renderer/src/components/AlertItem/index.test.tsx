@@ -552,17 +552,16 @@ describe("gift rows on each platform", () => {
 
   it("takes the minimum in the row's currency", () => {
     expect(minUnit(row(), ["tiktok"])).toBe("coins");
-    // Kick sends no gifts; YouTube's are priced in Jewels
-    expect(minUnit(row(), ["kick", "youtube"])).toBe("jewels");
+    // Kick sends no gifts, and YouTube's have no price
+    expect(minUnit(row(), ["kick", "youtube"])).toBeNull();
     expect(minUnit(row(), ["tiktok", "kick"])).toBe("coins");
-    // Each gift in its own currency on a row for both
-    expect(minUnit(row(), ["tiktok", "youtube"])).toBe("coinsOrJewels");
     // A row for one platform, whatever the profile has
     expect(minUnit(row({ platform: "tiktok" }), ["youtube"])).toBe("coins");
-    expect(minUnit(row({ platform: "youtube" }), ["tiktok"])).toBe("jewels");
-    // None where no gifts come, but a minimum saved stays to fix
-    expect(minUnit(row(), ["kick"])).toBeNull();
-    expect(minUnit(row({ min_coins: 5 }), ["kick"])).toBe("coins");
+    expect(minUnit(row({ platform: "youtube" }), ["tiktok"])).toBeNull();
+    // A minimum saved where gifts have no price stays to fix
+    expect(minUnit(row({ platform: "youtube", min_coins: 5 }), [])).toBe(
+      "coins",
+    );
   });
 
   it("sums up the minimum in it", () => {
@@ -578,12 +577,6 @@ describe("gift rows on each platform", () => {
 
     expect(sum({}, ["tiktok", "kick"])).toBe(
       "Any gift, when the streak ends, worth 100+ coins",
-    );
-    expect(sum({ platform: "youtube" }, ["tiktok", "youtube"])).toBe(
-      "Any gift, worth 100+ Jewels",
-    );
-    expect(sum({}, ["tiktok", "youtube"])).toBe(
-      "Any gift, when the streak ends, worth 100+ coins or Jewels",
     );
   });
 
@@ -671,7 +664,7 @@ describe("rows on their platforms", () => {
     ]);
   });
 
-  it("has no streak choice where gifts come whole", () => {
+  it("has no streak choice where gifts come one at a time", () => {
     const giftRow = (patch: Partial<Alert["trigger"]> = {}) =>
       alert({}, { type: TOKIO_EVENTS.GIFT, ...patch }).trigger;
     const plays = (trigger: Alert["trigger"], platforms: Platform[]) => {
@@ -684,7 +677,7 @@ describe("rows on their platforms", () => {
 
     expect(plays(giftRow({ platform: "tiktok" }), ALL)).toBe(true);
     expect(plays(giftRow(), ["tiktok", "kick"])).toBe(true);
-    // Kick sends no gifts, and YouTube's come whole
+    // Kick's and YouTube's gifts come one at a time
     expect(plays(giftRow({ platform: "kick" }), ALL)).toBe(false);
     expect(plays(giftRow(), ["youtube", "kick"])).toBe(false);
     // With nothing to pick, nothing at all

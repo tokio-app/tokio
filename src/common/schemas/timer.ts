@@ -16,10 +16,8 @@ const addedSeconds = (value: number) => z.number().min(0).default(value);
 
 // Seconds each trigger adds, before the multiplier. 0 leaves it out.
 const TimerSecondsSchema = z.object({
-  // Per coin of TikTok's gifts sent
+  // Per coin of the gifts sent
   coin: addedSeconds(1),
-  // Per Jewel of YouTube's Gifts sent, as per coin
-  jewel: addedSeconds(1),
   // Every likes_every likes
   likes: addedSeconds(10),
   likes_every: z.number().int().min(1).default(100),
@@ -54,7 +52,6 @@ const name = z.string().max(40).default("");
 // likes show after their count: "1 coin", "100 likes".
 const TimerNamesSchema = z.object({
   coin: name,
-  jewel: name,
   likes: name,
   superfan: name,
   follow: name,

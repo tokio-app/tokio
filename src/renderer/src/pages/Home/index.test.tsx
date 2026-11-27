@@ -439,7 +439,6 @@ describe("Home", () => {
       await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
         byPlatform: { tiktok: top },
         subsByPlatform: {},
-        jewelsByPlatform: {},
       });
 
       expect(gifters().map((g) => g.textContent)).toEqual([
@@ -461,7 +460,6 @@ describe("Home", () => {
       await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
         byPlatform: {},
         subsByPlatform: {},
-        jewelsByPlatform: {},
       });
 
       expect(page().getByText("No gifts yet")).toBeInTheDocument();

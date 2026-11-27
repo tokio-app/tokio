@@ -69,7 +69,6 @@ const TRIGGERS: {
   rule: MessageKey;
 }[] = [
   { key: "coin", label: "tools.triggers.coin", rule: "tools.rules.perCoin" },
-  { key: "jewel", label: "tools.triggers.jewel", rule: "tools.rules.perJewel" },
   { key: "likes", label: "tools.triggers.likes", rule: "tools.rules.likes" },
   {
     key: "superfan",

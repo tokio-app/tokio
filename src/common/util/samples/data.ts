@@ -97,13 +97,3 @@ export const GIFTS = [
     maxCombo: 1,
   },
 ];
-
-// Real YouTube Gifts, by their picture's name, each priced in Tokio's list
-export const YOUTUBE_GIFTS = [
-  { key: "silver_star_v2_320x320", name: "Star" },
-  { key: "sparkles_v2_320x320", name: "Sparkles" },
-  { key: "treat", name: "Treat" },
-  { key: "gold_coin_v2_320x320", name: "Gold coin" },
-  { key: "heart", name: "Heart" },
-  { key: "one_hundred_v2_320x320", name: "100" },
-];

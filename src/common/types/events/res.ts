@@ -388,12 +388,10 @@ export interface AppEventsResponseMap {
   // The reply to GET_LIVE_GIFTERS, pushed again as they change: each
   // platform's top gifters in this LIVE, the most first, none outside a LIVE.
   // Their numbers are this LIVE's. subsByPlatform ranks who gifted subs, by
-  // their count, and jewelsByPlatform who sent YouTube's Gifts, by their
-  // Jewels.
+  // their count.
   [APP_EVENTS_RESPONSE.LIVE_GIFTERS]: {
     byPlatform: Partial<Record<Platform, Gifter[]>>;
     subsByPlatform: Partial<Record<Platform, Gifter[]>>;
-    jewelsByPlatform: Partial<Record<Platform, Gifter[]>>;
   };
   // The reply to GET_SONGS, pushed again as the request queue changes, as
   // overlays get it
@@ -414,7 +412,7 @@ export interface AppEventsResponseMap {
   }>;
   // The range and query it was asked for, failures included. Dates without a
   // query get their totals first, then again with the gifters: by amount in
-  // data, by gifted subs in subGifters, by Jewels in jewelGifters.
+  // data, by gifted subs in subGifters.
   [APP_EVENTS_RESPONSE.GIFTERS]: Reply<{
     from?: number;
     to?: number;
@@ -422,7 +420,6 @@ export interface AppEventsResponseMap {
     totals?: Pick<LiveSummary, "coins" | "gifts" | "platforms">;
     data?: RankedGifter[];
     subGifters?: RankedGifter[];
-    jewelGifters?: RankedGifter[];
   }>;
 
   // OVERLAYS

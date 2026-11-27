@@ -337,41 +337,21 @@ describe("TimerService", () => {
       expect(changes).toEqual([20_000]);
     });
 
-    it("counts Kick's Kicks per Kick", () => {
+    it("counts Kick's Kicks per Kick, and nothing for a YouTube gift", () => {
       ready(settings({}, { coin: 2, kick: 0.5 }));
+      const youtube = gift(1, true, 100, "y");
 
       timer.handle(TOKIO_EVENTS.KICKS, {
         user: { ...viewer("k"), platform: "kick" },
         kicks: 100,
         message: "",
       });
-
-      expect(changes).toEqual([50_000]);
-    });
-
-    it("counts YouTube's Gifts per Jewel, a combo whole, and TikTok's per coin", () => {
-      ready(settings({}, { coin: 2, jewel: 0.5 }));
-      // "comboed x3 Yes for 6 Jewels": 2 Jewels each, in one event
-      const combo = gift(3, true, 2, "y");
-      timer.handle(TOKIO_EVENTS.GIFT, {
-        ...combo,
-        user: { ...combo.user, platform: "youtube" },
-      });
-      timer.handle(TOKIO_EVENTS.GIFT, gift(1, true, 5, "t"));
-
-      expect(changes).toEqual([3_000, 10_000]);
-    });
-
-    it("adds nothing for a YouTube Gift without a price", () => {
-      ready(settings({}, { jewel: 1 }));
-      const youtube = gift(1, true, 0, "y");
-
       timer.handle(TOKIO_EVENTS.GIFT, {
         ...youtube,
         user: { ...youtube.user, platform: "youtube" },
       });
 
-      expect(changes).toEqual([]);
+      expect(changes).toEqual([50_000]);
     });
 
     it("adds the like cycles and carries the rest over", () => {

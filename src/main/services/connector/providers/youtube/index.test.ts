@@ -291,40 +291,8 @@ describe("YouTubeConnector", () => {
         "youtube:UCgiver",
         "youtube:UCearly",
       ]);
-      expect(onGift.mock.calls[0][0].gift.coins).toBe(2);
-    });
-
-    it("keeps a combo's price for the LIVE, and logs a Gift without one once", async () => {
-      const info = vi.spyOn(Logger, "info");
-      const onGift = capture(TOKIO_EVENTS.GIFT);
-      const ohagi = (text: string) => giftAction("viewer32", text, "ohagi");
-      youtube.state.polls = [
-        { actions: [] },
-        { actions: [ohagi("sent Ohagi"), ohagi("sent Ohagi")] },
-        {
-          actions: [
-            ohagi("comboed x2 Ohagi for 30 Jewels"),
-            ohagi("sent Ohagi"),
-          ],
-        },
-      ];
-      await connector.connect("madeup");
-
-      await vi.waitFor(() => expect(onGift).toHaveBeenCalledTimes(4));
-      expect(
-        onGift.mock.calls.map(([e]) => [e.gift.coins, e.gift.comboCount]),
-      ).toEqual([
-        [0, 1],
-        [0, 1],
-        [15, 2],
-        [15, 1],
-      ]);
-      const logged = info.mock.calls.filter(([line]) =>
-        line.includes("No price"),
-      );
-      expect(logged).toEqual([
-        ["<YouTube> No price for the Gift Ohagi (ohagi).", expect.anything()],
-      ]);
+      // YouTube doesn't say what a single Gift costs
+      expect(onGift.mock.calls[0][0].gift.coins).toBe(0);
     });
 
     it("sends chat through the chat stage", async () => {
