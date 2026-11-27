@@ -202,24 +202,24 @@ const reportOverlayUpdates = (
 
 // Live events reach TTS, music, alerts and the UI from here. No request waits
 // for them, so their failures are reported to the user directly.
-const registerConnectorEvents = ({
-  connectorService: conn,
-  win,
-  storeManagerService: store,
-  ttsService: tts,
-  musicService: music,
-  alertsService: alerts,
-  gamesService: games,
-  studioService: studio,
-  overlayService: overlays,
-  liveService: live,
-  historyService: history,
-  pathManagerService: paths,
-  serverService: server,
-  controlsService: controls,
-  ratesService: rates,
-  notifier,
-}: AppHandlerVariables) => {
+const registerConnectorEvents = (handler: AppHandlerVariables) => {
+  const {
+    connectorService: conn,
+    win,
+    storeManagerService: store,
+    ttsService: tts,
+    musicService: music,
+    alertsService: alerts,
+    gamesService: games,
+    overlayService: overlays,
+    liveService: live,
+    historyService: history,
+    pathManagerService: paths,
+    serverService: server,
+    controlsService: controls,
+    ratesService: rates,
+    notifier,
+  } = handler;
   const dispatchAlert = async <K extends AppEvents>(
     type: K,
     payload: TokioEventMap[K],
@@ -429,11 +429,7 @@ const registerConnectorEvents = ({
     if (win.isDestroyed()) return;
     win.webContents.send(
       APP_EVENTS_RESPONSE.CONNECTED,
-      connectionState({
-        connectorService: conn,
-        liveService: live,
-        storeManagerService: store,
-      }),
+      connectionState(handler),
     );
   };
 
@@ -679,12 +675,7 @@ const registerConnectorEvents = ({
         win.webContents.send(APP_EVENTS_RESPONSE.EMOTES, { data: res.data });
       }
       // The games overlay's rows with that emote get its picture
-      await sendGamesOverlay({
-        storeManagerService: store,
-        overlayService: overlays,
-        serverService: server,
-        pathManagerService: paths,
-      });
+      await sendGamesOverlay(handler);
     }
   };
   conn.on(TOKIO_EVENTS.CHAT, (d) => {
@@ -714,22 +705,9 @@ const registerConnectorEvents = ({
         });
       }
       // The games overlay's rows with that gift get its picture and name
-      await sendGamesOverlay({
-        storeManagerService: store,
-        overlayService: overlays,
-        serverService: server,
-        pathManagerService: paths,
-      });
+      await sendGamesOverlay(handler);
       // And so do studio elements that show it
-      await sendStudioOverlays({
-        storeManagerService: store,
-        overlayService: overlays,
-        serverService: server,
-        pathManagerService: paths,
-        liveService: live,
-        studioService: studio,
-        historyService: history,
-      });
+      await sendStudioOverlays(handler);
     }
   };
   conn.on(TOKIO_EVENTS.GIFT, (d) => {
@@ -1094,6 +1072,33 @@ const registerTranslation = (handler: AppHandlerVariables) => {
   });
 };
 
+type Warn = Parameters<AppHandlerVariables["notifier"]["warn"]>;
+
+// A save of the profile's fans or history. Saving logged a failure, and the
+// next save tries again.
+const saveOrWarn =
+  (
+    notifier: AppHandlerVariables["notifier"],
+    save: () => Promise<boolean>,
+    source: Warn[0],
+    code: Warn[1],
+    message: Parameters<typeof t>[0],
+    key: string,
+  ) =>
+  () => {
+    save()
+      .then((saved) => {
+        if (saved) return;
+        notifier.warn(source, code, t(message), {
+          key,
+          windowMs: REPEAT_NOTICE_MS,
+        });
+      })
+      .catch((error) => {
+        notifier.report({ source, error });
+      });
+  };
+
 // The profile keeps the fans its LIVEs show, whatever features are on.
 // Overlays get them as they connect, and again when they change.
 const registerFans = ({
@@ -1118,23 +1123,14 @@ const registerFans = ({
   fans.onChange(push);
   server.onConnect((id) => server.sendToClient(id, message()));
 
-  const save = () => {
-    fans
-      .save()
-      .then((saved) => {
-        // Saving logged it. The fans are tried again on the next save.
-        if (saved) return;
-        notifier.warn(
-          "overlays",
-          FEEDBACK_CODES.FANS_SAVE_FAILED,
-          t("main.init.fansSaveFailed"),
-          { key: "fans", windowMs: REPEAT_NOTICE_MS },
-        );
-      })
-      .catch((error) => {
-        notifier.report({ source: "overlays", error });
-      });
-  };
+  const save = saveOrWarn(
+    notifier,
+    () => fans.save(),
+    "overlays",
+    FEEDBACK_CODES.FANS_SAVE_FAILED,
+    "main.init.fansSaveFailed",
+    "fans",
+  );
   conn.on(TOKIO_EVENTS.DISCONNECTED, save);
   // shortcut: a quit or crash during a LIVE loses up to 30 s of fans, upgrade
   // to a save on quit if streamers notice. The updater's install can't wait
@@ -1180,23 +1176,14 @@ const registerHistory = ({
   history.onChange(push);
   server.onConnect((id) => server.sendToClient(id, message()));
 
-  const save = () => {
-    history
-      .save()
-      .then((saved) => {
-        // Saving logged it. The history is tried again on the next save.
-        if (saved) return;
-        notifier.warn(
-          "system",
-          FEEDBACK_CODES.HISTORY_SAVE_FAILED,
-          t("main.init.historySaveFailed"),
-          { key: "history", windowMs: REPEAT_NOTICE_MS },
-        );
-      })
-      .catch((error) => {
-        notifier.report({ source: "system", error });
-      });
-  };
+  const save = saveOrWarn(
+    notifier,
+    () => history.save(),
+    "system",
+    FEEDBACK_CODES.HISTORY_SAVE_FAILED,
+    "main.init.historySaveFailed",
+    "history",
+  );
   conn.on(TOKIO_EVENTS.DISCONNECTED, () => {
     history.end();
     // Coin stats lists the LIVE that just ended
