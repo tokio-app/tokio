@@ -118,11 +118,6 @@ export async function importPictures(
   }
   if (pictures.length === 0) throw new LoggedError(error);
 
-  let saved = true;
-  for (const picture of pictures) {
-    if (!(await storeManagerService.addMinecraftPicture(picture))) {
-      saved = false;
-    }
-  }
+  const saved = await storeManagerService.addMinecraftPictures(pictures);
   return { pictures, failed, saved };
 }

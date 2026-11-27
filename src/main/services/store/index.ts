@@ -637,7 +637,7 @@ export class StoreManagerService extends Service {
   }
 
   public addSound(sound: AlertSound): Promise<boolean> {
-    return this._addFile("sounds", sound);
+    return this._addFiles("sounds", [sound]);
   }
 
   /** Adds the sounds not listed yet, with one save. */
@@ -655,7 +655,7 @@ export class StoreManagerService extends Service {
   }
 
   public addMedia(media: MediaFile): Promise<boolean> {
-    return this._addFile("media", media);
+    return this._addFiles("media", [media]);
   }
 
   /** Adds the media files not listed yet, with one save. */
@@ -672,8 +672,9 @@ export class StoreManagerService extends Service {
     return this._storeData!.settings.minecraftPictures;
   }
 
-  public addMinecraftPicture(picture: MediaFile): Promise<boolean> {
-    return this._addFile("minecraftPictures", picture);
+  /** Adds the pictures not listed yet, with one save. */
+  public addMinecraftPictures(pictures: MediaFile[]): Promise<boolean> {
+    return this._addFiles("minecraftPictures", pictures);
   }
 
   public removeMinecraftPicture(file: string): Promise<boolean> {
@@ -780,13 +781,6 @@ export class StoreManagerService extends Service {
       saved = (await this.updateProfileData(updates, profileFile)) && saved;
     }
     return saved;
-  }
-
-  private _addFile(
-    library: "sounds" | "media" | "minecraftPictures",
-    entry: AlertSound,
-  ): Promise<boolean> {
-    return this._addFiles(library, [entry]);
   }
 
   private async _addFiles(

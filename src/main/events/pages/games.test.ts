@@ -437,8 +437,8 @@ describe("games events", () => {
         ),
       };
       const storeManagerService = {
-        addMinecraftPicture: vi.fn(async (picture: MediaFile) => {
-          library.push(picture);
+        addMinecraftPictures: vi.fn(async (pictures: MediaFile[]) => {
+          library.push(...pictures);
           return true;
         }),
         getMinecraftPictures: () => library,
@@ -498,7 +498,7 @@ describe("games events", () => {
     });
 
     it("adds every picture, the first going on the action", async () => {
-      const { h } = setup();
+      const { h, storeManagerService } = setup();
       pickFiles("/creeper.png", "/tnt.png", "/tnt.png");
 
       await h.invoke(games, APP_EVENTS.IMPORT_MINECRAFT_PICTURE, {
@@ -512,6 +512,10 @@ describe("games events", () => {
       expect(h.replies(APP_EVENTS_RESPONSE.MINECRAFT_PICTURES)).toEqual([
         { success: true, data: [creeper, tnt] },
       ]);
+      // One save for the batch
+      expect(
+        storeManagerService.addMinecraftPictures,
+      ).toHaveBeenCalledExactlyOnceWith([creeper, tnt]);
       expect(h.notices).toEqual([
         expect.objectContaining({ message: "2 pictures added." }),
       ]);
@@ -564,16 +568,16 @@ describe("games events", () => {
           },
         ],
       ]);
-      expect(storeManagerService.addMinecraftPicture).not.toHaveBeenCalled();
+      expect(storeManagerService.addMinecraftPictures).not.toHaveBeenCalled();
       // The service logged it
       expect(logError).not.toHaveBeenCalled();
     });
 
     it("gives the action nothing when the library can't be saved", async () => {
       const { h, storeManagerService, library } = setup();
-      storeManagerService.addMinecraftPicture.mockImplementation(
-        async (picture) => {
-          library.push(picture);
+      storeManagerService.addMinecraftPictures.mockImplementation(
+        async (pictures) => {
+          library.push(...pictures);
           return false;
         },
       );

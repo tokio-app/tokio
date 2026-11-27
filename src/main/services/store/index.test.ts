@@ -2366,8 +2366,8 @@ describe("StoreManagerService", () => {
     it("adds a picture once and removes it", async () => {
       const store = await init();
 
-      await store.addMinecraftPicture(tnt);
-      await store.addMinecraftPicture({ ...tnt, name: "Other name" });
+      await store.addMinecraftPictures([tnt]);
+      await store.addMinecraftPictures([{ ...tnt, name: "Other name" }, tnt]);
       expect((await init()).getMinecraftPictures()).toEqual([tnt]);
 
       await store.removeMinecraftPicture("tnt.png");
