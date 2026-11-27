@@ -596,6 +596,23 @@ describe("home events", () => {
       });
     });
 
+    it("says a quick retry that works connected, right after its failure", async () => {
+      const results: Parameters<typeof both>[0] = {
+        twitch: { success: false, error: connectFailure("network", "") },
+      };
+      const { h } = both(results);
+      await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
+
+      results.twitch = { success: true };
+      await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
+
+      expect(h.notices.map((n) => n.message)).toEqual([
+        "Connected to @streamer on TikTok.",
+        "Unable to reach Twitch. Check your internet connection.",
+        "Connected to @mia on Twitch.",
+      ]);
+    });
+
     it("tells nothing about a platform a Disconnect canceled", async () => {
       const { h } = both({
         twitch: {

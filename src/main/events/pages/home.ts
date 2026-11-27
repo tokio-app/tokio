@@ -214,7 +214,6 @@ events.push(
       // Each platform's result is its own notice, and the state goes again.
       // All of them failing throws nothing, which would add a notice.
       await connectorService.connect(targets, (platform, res) => {
-        const key = `connect:${platform}`;
         if (res.error?.kind === "canceled") {
           // The user's own Disconnect stopped it: nothing to tell
         } else if (!res.success) {
@@ -222,7 +221,8 @@ events.push(
             "connector",
             FEEDBACK_CODES.CONNECT_FAILED,
             connectMessage(platform, handleOf(platform), res.error, true),
-            { key },
+            // Its success isn't keyed, so a quick retry that works says so
+            { key: `connect:${platform}` },
           );
         } else if (!isUp(on[platform])) {
           notifier.success(
@@ -232,7 +232,6 @@ events.push(
               handle: handleOf(platform),
               platform: PLATFORM_LABELS[platform],
             }),
-            { key },
           );
         }
         replyState();
