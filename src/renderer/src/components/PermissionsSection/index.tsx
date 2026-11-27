@@ -161,14 +161,7 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
         {rules}
         {/* The roles and the level pass with any one of them, see
             hasPermission */}
-        <p className={styles.rule}>
-          {t(
-            tab === "tiktok"
-              ? "components.permissions.ruleLevel"
-              : "components.permissions.rule",
-            { feature },
-          )}
-        </p>
+        <p className={styles.rule}>{t("components.permissions.rule")}</p>
       </div>
 
       <div className={styles.lists}>
