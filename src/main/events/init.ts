@@ -316,14 +316,15 @@ const registerConnectorEvents = ({
     // Not a live event, the services match emote triggers on chat events.
     if (trigger === EMOTE_TRIGGER) continue;
     const listener = (d: TokioEventMap[typeof trigger]) => {
-      const label = t(ALERT_TRIGGER_LABELS[trigger]);
       dispatchAlert(trigger, d).catch((error) => {
         notifier.report({
           source: "alerts",
           error,
           fallback: {
             code: FEEDBACK_CODES.ALERT_FAILED,
-            message: t("main.init.alertFailed", { label }),
+            message: t("main.init.alertFailed", {
+              label: t(ALERT_TRIGGER_LABELS[trigger]),
+            }),
           },
           context: trigger,
         });
@@ -334,7 +335,9 @@ const registerConnectorEvents = ({
           error,
           fallback: {
             code: FEEDBACK_CODES.GAME_ACTION_FAILED,
-            message: t("main.init.gameActionFailed", { label }),
+            message: t("main.init.gameActionFailed", {
+              label: t(ALERT_TRIGGER_LABELS[trigger]),
+            }),
           },
           context: trigger,
         });
