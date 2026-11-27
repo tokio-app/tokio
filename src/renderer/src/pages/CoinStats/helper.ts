@@ -144,10 +144,6 @@ export function keepSelection(
   );
 }
 
-// Spanish dates start with the weekday in lowercase, "sábado, 31 de octubre"
-export const capitalize = (text: string, language: string) =>
-  text.charAt(0).toLocaleUpperCase(language) + text.slice(1);
-
 // Counting back from now, or custom dates
 export type DatePreset = "all" | "day" | "week" | "month" | "year" | "custom";
 export type DateOperator = "on" | "after" | "before" | "between";

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  capitalize,
   fontFamily,
   formatDate,
   formatList,
@@ -88,5 +89,14 @@ describe("fontFamily", () => {
     expect(fontFamily('Evil"; color: red; x: "')).toBe(
       '"Evil\\"; color: red; x: \\"", "Archivo Variable", sans-serif',
     );
+  });
+});
+
+describe("capitalize", () => {
+  it("capitalizes a date that starts in lowercase", () => {
+    expect(capitalize("sábado, 31 de octubre de 2026", "es-419")).toBe(
+      "Sábado, 31 de octubre de 2026",
+    );
+    expect(capitalize("Saturday", "en")).toBe("Saturday");
   });
 });

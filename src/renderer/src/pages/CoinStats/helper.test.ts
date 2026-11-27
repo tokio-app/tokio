@@ -2,7 +2,6 @@ import { liveSummary } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
   allTime,
-  capitalize,
   DateFilter,
   dateRange,
   historyPlatforms,
@@ -280,14 +279,5 @@ describe("keepSelection", () => {
 
   it("goes to All time when no LIVE is left", () => {
     expect(keepSelection(3, lives, [])).toBeNull();
-  });
-});
-
-describe("capitalize", () => {
-  it("capitalizes a date that starts in lowercase", () => {
-    expect(capitalize("sábado, 31 de octubre de 2026", "es-419")).toBe(
-      "Sábado, 31 de octubre de 2026",
-    );
-    expect(capitalize("Saturday", "en")).toBe("Saturday");
   });
 });

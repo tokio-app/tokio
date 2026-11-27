@@ -26,7 +26,12 @@ import {
   tabPanel,
   Tabs,
 } from "@/components";
-import { formatDate, formatDuration, PLATFORM_ICONS } from "@/helper";
+import {
+  capitalize,
+  formatDate,
+  formatDuration,
+  PLATFORM_ICONS,
+} from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useLanguage, useT } from "@/ui/i18n";
 import { ReactNode, useEffect, useId, useRef, useState } from "react";
@@ -34,7 +39,6 @@ import { FiTrash2 } from "react-icons/fi";
 import styles from "./coinstats.module.css";
 import {
   allTime,
-  capitalize,
   DateFilter,
   dateRange,
   historyPlatforms,
