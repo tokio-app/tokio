@@ -1,6 +1,6 @@
 # Drive-app recipes
 
-Checks that need more than clicks. Each worked in the real app; the names were checked against the code when they were written down.
+Checks that need more than clicks. Each worked in the real app.
 
 ## Live events without a LIVE
 
@@ -41,7 +41,7 @@ await emit("tokio:event:chat", {
 });
 ```
 
-- Several emitters get chat listeners: `ServerService.initEvents` listens for every live event on the music service too. Only the connector's also listens for `tokio:event:connected`. `TokioEmitter` keeps an inner `EventEmitter`, which is the one recorded.
+- Several emitters get chat listeners (`ServerService.initEvents` listens on the music service too); only the connector's also listens for `tokio:event:connected`. `TokioEmitter`'s inner `EventEmitter` is the one recorded.
 - Payloads are typed by `TokioEventMap` (`src/common/types/connector.ts`). `tokio:event:disconnected` takes `{ reason: "ended" }` for a LIVE that ended.
 - `tokio:event:connected` starts the LIVE session, so Home's feed lists what follows. The page still says Offline, since its LIVE state comes from the `CONNECTED` reply: `push` that too (SKILL.md).
 - Don't look for the emitter with `node:inspector`'s `Runtime.queryObjects`: it killed main on Electron 45 every time.
@@ -70,7 +70,7 @@ await app.evaluate(({ BrowserWindow }) => {
 
 - Never put the user's own files (their videos, recordings, pictures) in a check or a screenshot. Make test media.
 - **Sound:** write a WAV like `tone()` in this skill's `scripts/screenshots.mjs`, or on Windows copy `C:\Windows\Media\Alarm01.wav`. Give a test alert `volume: 0` so nothing plays out loud.
-- **Video:** in a headless browser (Playwright's `chromium`, or the installed Edge with `channel: "msedge"`), draw on a `<canvas>`, record `canvas.captureStream(30)` with `MediaRecorder` (`video/webm`) for 3 s, and return the bytes as base64. About 18 KB, and it plays in the app.
+- **Video:** in a headless browser (Playwright's `chromium`, or Edge with `channel: "msedge"`), draw on a `<canvas>`, record `canvas.captureStream(30)` with `MediaRecorder` (`video/webm`) for 3 s, and return the bytes as base64.
 - **Upload:** stub `dialog.showOpenDialog` to return the file (SKILL.md's `app.evaluate`), then click the + on **Alerts → Library** (`button[title="Add sounds"]`, or `"Add images and videos"` on its other tab).
 
 ## Minimized or hidden windows
@@ -80,11 +80,12 @@ Playwright turns on Chromium's focus emulation for every page it drives, so `doc
 - Start Electron yourself: `<electron> . --remote-debugging-port=<port>` from the repo root, where `<electron>` is what `node -p "require('electron')"` prints. Use a temporary `TOKIO_HOME`, and remove `ELECTRON_RUN_AS_NODE` from its environment.
 - Read the page's `webSocketDebuggerUrl` from `http://127.0.0.1:<port>/json/list`, and send `Runtime.evaluate` over Node's global `WebSocket`, with no Playwright attached.
 - Minimize or close the window from the page: `window.api.emit("app:window:req:minimize")` or `"app:window:req:close"`.
-- Hidden pages change only after about 5 minutes, so wait 6. That's how a minimized window's AudioContext clock was caught running at about 0.65× real time while timers and workers kept time, before the main window got `backgroundThrottling: false`.
+- Hidden pages change only after about 5 minutes, so wait 6.
 - To probe Tone.js in a bare page, evaluate `node_modules/tone/build/Tone.js` there first.
 
 ## Overlays
 
+- **Watch an overlay page** (an alert's `/alerts/<id>/`, the timer's): turn the server on first: `toggle` **Enable server** in Settings, then click the confirm dialog's **Enable server**. Open the page in `app.evaluate` with `new BrowserWindow({ webPreferences: { partition: "obs", backgroundThrottling: false } })`: the app's own session cancels WebSockets, so the page couldn't connect there. Then find it with `windowWith("alerts/")`.
 - **Import a local build:** stub `dialog.showOpenDialog` to return `../tokio-overlays/overlays/<id>/dist` (build it there first), then click the Overlays page's + (`button[title="Import overlay"]`).
 - **Watch what main sends overlays:** create an ID in Tools → Test overlays (placeholder "Overlay name", **Create ID**), then connect Node's global `WebSocket` to `ws://localhost:37891?id=<id>`. Messages are `{ type, data }`, `type` a `TOKIO_EVENTS` name. Each press of Test plays the next moment of that ID's test LIVE.
 - **The games overlay:** seed a `--home` with the profile's `games.actions`, the store's `minecraftPictures` and the server on. Then open `http://localhost:37891/games/minecraft/` in a separate browser, through a page that iframes it over a game-like backdrop, to see the pictures float over a game.

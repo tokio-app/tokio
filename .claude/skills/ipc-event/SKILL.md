@@ -11,8 +11,8 @@ Follow IPC events and Feedback in `AGENTS.md`. This adds the shapes the code use
 ## Types
 
 - The request goes in `src/common/types/events/req.ts`: `APP_EVENTS.<NAME> = "app:<area>:<action>"`, and its payload in `AppEventsMap` (`void` when there's none).
-- The reply or push goes in `src/common/types/events/res.ts`: `APP_EVENTS_RESPONSE.<NAME> = "app:<area>:res:<action>"`, and its payload in `AppEventsResponseMap`. A reply that can fail is a `Reply<{ ... }>`. A reply about one item carries its id, failures included.
-- New feedback codes go in `FEEDBACK_CODES` (`src/common/types/feedback.ts`): past tense for successes (`PROFILE_CREATED`), `_FAILED` at the end for failures.
+- The reply or push goes in `src/common/types/events/res.ts`: `APP_EVENTS_RESPONSE.<NAME> = "app:<area>:res:<action>"`, and its payload in `AppEventsResponseMap`. A reply that can fail is a `Reply<{ ... }>`; one about an item carries its id.
+- New feedback codes go in `FEEDBACK_CODES` (`src/common/types/feedback.ts`), named as Feedback in `AGENTS.md` says.
 
 ## Handler
 
@@ -47,15 +47,13 @@ events.push(
 ```
 
 - Texts the user sees come from `src/common/i18n/locales/` (`.claude/rules/i18n.md`): add the English to `en.json`'s `main.*` block and the same key to `es-419.json`. Messages made in the handler use `t(key, params)` from `@/helper/i18n`; `failure.message` is the key alone.
-
-- A user action that changes something calls `notifier.success(source, code, message)` after its reply; `notifier` is among the services. Reads, status checks and autosaves send nothing.
-- To push without a request: `win.webContents.send(APP_EVENTS_RESPONSE.<NAME>, data)`, with `undefined` for a `void` payload.
+- A user action that changes something calls `notifier.success(source, code, message)` after its reply (Feedback in `AGENTS.md`).
+- A push without a request: `win.webContents.send(APP_EVENTS_RESPONSE.<NAME>, data)`.
 
 ## Renderer
 
 - Send with `window.api.emit(APP_EVENTS.<NAME>, data)`, or `useIpcRequest(APP_EVENTS.<NAME>, data)` to send once when the component mounts.
-- Listen with `useIpcListener(APP_EVENTS_RESPONSE.<NAME>, (data) => { ... })`, and drop a reply whose id isn't the item on screen.
-- Don't show the failure as a notice: main sends one, unless the handler has `notify: false`.
+- Listen with `useIpcListener(APP_EVENTS_RESPONSE.<NAME>, (data) => { ... })`, and drop a reply whose id isn't the item on screen. Main shows failures (unless `notify: false`), not the page.
 
 ## Tests
 
@@ -79,7 +77,7 @@ events.push(
 
 ## MCP
 
-A request that changes something users can change needs its MCP section field, kind or tool, so assistants can do it too (`.claude/rules/mcp.md`). Reads there go to the services, not through this request.
+A request that changes something users can change needs its MCP field, kind or tool (Conventions in `AGENTS.md`, `.claude/rules/mcp.md`).
 
 ## Done when
 

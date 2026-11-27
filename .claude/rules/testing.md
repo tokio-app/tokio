@@ -15,10 +15,11 @@ paths:
 - Fixtures live in `test/fixtures`; Prettier skips them so saved HTML keeps its markup.
 - `restoreMocks` only restores spies. `vi.fn` mocks keep their calls and implementation, so create them in each test.
 - `it.fails` marks a known bug. Turn it into `it` when the bug is fixed.
+- Splitting a slow test file doesn't shorten CI: its runners have about three workers, and the whole suite's work outweighs any one file.
 
 ## Main process
 
-- `test/setup.ts` mocks `electron` with the fakes in `test/main/electron.ts` (import them from `@test/electron`) and resets them before each test. Their state survives `vi.resetModules()`.
+- `test/setup.ts` mocks `electron` with the fakes in `@test/electron` and resets them before each test. Their state survives `vi.resetModules()`.
   - Windows, views and webContents record what they get (emit `render-process-gone` on a `FakeWebContents` to test `reloadWhenGone`). Tray icons are in `trays()`, notifications in `notifications()`.
   - `globalShortcut` keeps what's registered: `take(accelerator)` marks one another app holds, `press(accelerator)` fires one, and nothing registers or fires while suspended.
   - `screen` has a 1920×1040 work area unless a test sets `getPrimaryDisplay`. A `nativeImage`'s images only say what they were made from.
@@ -26,7 +27,9 @@ paths:
 - The setup also silences the console, and Logger only writes to absolute paths, so tests can name log files `"system.log"`. Spy on `Logger` to assert logs; after `vi.resetModules()`, on the copy the re-imported code got.
   - It turns debug off before each test. A spy on `Logger.debug` still records calls while debug is off.
   - It imports `Logger` before any test file runs, so a test's `vi.mock("node:fs/promises")` doesn't reach it. Fail a write for real instead: the logger test puts a folder where the backup goes.
-- Test IPC handlers with `createHandler(stubs)` from `@test/handler`: partial service stubs (anything else the handler reaches for fails the test), fake windows and a real `Notifier`. `invoke(stack, APP_EVENTS.X, data)` runs a page's handler as the Handler does; read `replies(channel)`, `pushed(channel)`, `notices`, or `sent()` for all in order. `createHandler(stubs, { stack })` gives code that runs a request in main a `handler.invoke` that runs that stack's handlers as `Handler.invoke` does: its replies reach `pushed`, all but `PRIVATE_REPLIES`. `eventSource()` stands in for the connector's and the music service's live events.
+- Test IPC handlers with `createHandler(stubs)` from `@test/handler`: partial service stubs (anything else the handler reaches for fails the test), fake windows and a real `Notifier`. `invoke(stack, APP_EVENTS.X, data)` runs a page's handler as the Handler does; read `replies(channel)`, `pushed(channel)`, `notices`, or `sent()` for all in order.
+  - `createHandler(stubs, { stack })` gives code that runs a request in main a `handler.invoke` that runs that stack's handlers: its replies reach `pushed`, all but `PRIVATE_REPLIES`.
+  - `eventSource()` stands in for the connector's and the music service's live events.
 - `test/setup.ts` also resets main's language to English (`resetLanguage`). The fake `app.getPreferredSystemLanguages` gives `["en-US"]`; `setLanguage("es-419")` tests the Spanish.
 - Give services a temp folder (`mkdtemp`) through their setters or `initialize`, stub `fetch` with `vi.stubGlobal`, and use fake timers for the queues.
 - The Windows TTS script runs for real, on Windows only (`describe.runIf`).
@@ -35,14 +38,15 @@ paths:
 ## Renderer
 
 - Each test gets a fresh fake `window.api` (`test/renderer/setup.ts`). `send` from `@test/ipc` pushes a reply from main inside `act` (await it); `sent(event)` lists the payloads emitted for an event, `sentEvents()` the events in order.
-- Render with `renderWithProviders` (`@test/render`), which adds the language provider, fake audio queues, the real notifications provider, a router holding only a root route, and a `user`. Without that router, a page's back button and links warn on every render (`useRouter must be used inside a <RouterProvider>`). jsdom's page has no `?lang`, so it's English. A test of the Spanish sets `?lang=es-419` with `history.replaceState` before rendering, or sends `LANGUAGE`. Pages that navigate use `renderApp(path)`: the real routes in memory history, built from `routerOptions` (`@/router`), so the app's error component applies.
+- Render with `renderWithProviders` (`@test/render`): the language provider, fake audio queues, the real notifications provider, a router holding only a root route (without it, back buttons and links warn on every render), and a `user`.
+  - It's English, since jsdom's page has no `?lang`. A test of the Spanish sets `?lang=es-419` with `history.replaceState` before rendering, or sends `LANGUAGE`.
+  - Pages that navigate use `renderApp(path)`: the real routes (`routerOptions`, `@/router`) in memory history, so the app's error component applies.
   - Components never reach Tone.js; `audio.queue(name)` is the fake queue they got, and `audio.value.decode` gives a 2 second sound of 8 samples.
   - Builders and replies are in `@test/fixtures`. Entry points (`main.tsx`) run with `runEntry` from `@test/entry`, which gives them their `#root`.
 - The renderer project runs on `pool: "vmThreads"`: one jsdom per worker instead of per file, which halves the suite's time.
-  - Each file still runs in its own realm, so objects from Node's globals carry the outer realm's `Object` and `Array`, and `fast-deep-equal` calls them unequal to the same data (their constructors differ). `test/renderer/setup.ts` rebuilds `structuredClone`'s copies in the file's realm.
+  - Each file still runs in its own realm, so objects from Node's globals carry the outer realm's `Object` and `Array`, and `fast-deep-equal` calls them unequal to the same data. `test/renderer/setup.ts` rebuilds `structuredClone`'s copies in the file's realm.
   - A test that fails only there, comparing equal data, likely meets another outer-realm object.
-- Overlay Studio's editor tests are in five files, their helpers in `@test/studio`. Splitting a slow test file doesn't shorten CI: its runners have about three workers, and the whole suite's work outweighs any one file.
-- A test that makes React or the router log on purpose spies on `console.error` or `console.warn` and checks the call, so the log stays clean: Vitest hides a passing test's console output when an AI agent runs it, but CI shows it.
+- A test that makes React or the router log on purpose spies on `console.error` or `console.warn` and checks the call: Vitest hides a passing test's console output when an AI agent runs it, but CI shows it.
 - Only `yarn dev` runs each state update twice (`StrictMode` in `main.tsx`). Code that keeps a ref across updates, like Overlay Studio's group frame, gets a test with `{ reactStrictMode: true }` (`renderApp`'s and `render`'s option), as an impure updater only breaks there.
 - jsdom has no layout. `test/renderer/dom.ts` gives elements a size (virtualized lists like `Select` render nothing at zero), fakes the observers (`intersect()` fires `IntersectionObserver`), `scrollTo` and `scrollIntoView`, and quiets media's `load`, `pause` and `play` (which resolves). Spy on them to test playback.
 - A `jest` shim lets Testing Library run with `vi.useFakeTimers()`; give user-event `advanceTimers: (ms) => vi.advanceTimersByTime(ms)`.

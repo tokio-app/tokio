@@ -20,8 +20,7 @@ paths:
 - A new live event with a `user` goes in `FAN_EVENTS`, and in `SUPERFAN` when it tells whether they're a Super Fan. Kick's Kicks stay out, as Twitch's cheers do: their viewer comes without badges, so they'd record nothing.
 - Up to `MAX_FANS` per platform in each profile, when recording and when loading. Each platform drops its own fan not seen for the longest first, in the `Map`'s order, which the file keeps.
 - No profile pictures (the user's call): TikTok signs their links (`x-expires`) and they expire about 2 days after they're sent. An overlay takes a fan's picture from their live events.
-- `fanBadge` is the fan badge's picture, which the connector reads with the level (`getFanBadge`): TikTok's fixed, unsigned file on `p16-webcast.tiktokcdn.com`, a heart with a tier mark and no number, one per 10 levels, so overlays draw `fanLevel` next to it.
-- A file saved without `superfan` or `fanBadge` loads with `false` and `""`.
+- `fanBadge` is the fan badge's picture (`getFanBadge` in the connector): TikTok's fixed, unsigned file, one per 10 levels and with no number, so overlays draw `fanLevel` next to it.
 
 ## The file
 
@@ -39,17 +38,11 @@ paths:
 
 ## The Fans page
 
-- `GET_FANS` replies `FANS` with every platform's fans (`all()`), each platform's together in `PLATFORMS` order: TikTok's by level, the others by months (unknown last), then the most recently seen. Nothing is pushed:
-  - Tools' list asks on mount and again on each `GET_PROFILE` reply (a profile switch).
-  - The page has no `PlatformsContext`, so it asks for the profile itself on mount, for its platforms. It asks for the fans after each `GET_PROFILE` reply, a failed one too, so a switch reloads both.
-- **Tabs** (the user's call), as LIVE history's:
-  - The profile's platforms plus any a saved fan is on, in `PLATFORMS` order, then All with two or more. With one platform there's no tab row.
-  - A picked tab stays while it's there.
-- **TikTok's tab:** the level is the row's one bold element, with its badge; a badge picture that's missing or fails leaves it alone.
-- **Twitch's, YouTube's and Kick's tabs:** main's order, each row led by the months (the number bold), else "Subscriber" (or "Member" on YouTube). There's no Super Fan word, since every one of them is a subscriber or member.
-- **All:** the most recently seen first, each row with its platform's icon and its own number. Nothing is ranked across platforms (the user's call).
-- Rows out of view skip layout (`content-visibility`), so `MAX_FANS` rows stay cheap.
-- The search filters the tab shown, through `viewerMatcher` (see `.claude/rules/history.md`). Each tab has its own empty text.
-- **Super Fans only** (the user's request) lists just them, together with the search. It sits at the end of the tab row and shows on TikTok's tab alone; with one platform it's in the header, after the search.
+- `GET_FANS` replies `FANS` with every platform's fans (`all()`), in `PLATFORMS` order. Nothing is pushed: Tools' list and the page ask again on each `GET_PROFILE` reply (a profile switch), a failed one too. The page has no `PlatformsContext`, so it asks for the profile itself, for its platforms.
+- **Tabs** (the user's call), as LIVE history's: the profile's platforms plus any a saved fan is on, then All with two or more. With one platform there's no tab row.
+- **Twitch's, YouTube's and Kick's tabs** show no Super Fan word, since every one of them is a subscriber or member.
+- **All:** the most recently seen first, each row with its platform's icon. Nothing is ranked across platforms (the user's call).
+- The search filters the tab shown, through `viewerMatcher` (see `.claude/rules/history.md`).
+- **Super Fans only** (the user's request) lists just them, together with the search. It shows on TikTok's tab alone, at the end of the tab row, or in the header with one platform.
 - Neither the search nor **Super Fans only** shows while the tab has no fans.
 - Fans can't be removed from the page.

@@ -6,7 +6,7 @@ argument-hint: "<bedrock|java> [version]"
 
 # Regenerate the Minecraft lists
 
-`src/common/games/minecraft-bedrock.json` and `minecraft-java.json` hold every mob and item each edition's `summon` and `give` take: `{ mobs, items }`, id → the game's English name, sorted by name. They feed `MINECRAFT_NAMES` (`src/common/util/games.ts`), and through it the Games page's pickers (`MOBS`, `ITEMS`) and the overlay's names. See `.claude/rules/games.md`. The names stay English in every app language: they're also how `withEdition` matches ids, and they aren't in the locale files.
+`src/common/games/minecraft-bedrock.json` and `minecraft-java.json` hold every mob and item each edition's `summon` and `give` take: `{ mobs, items }`, id → the game's English name, sorted by name. They feed `MINECRAFT_NAMES` (`src/common/util/games.ts`), the Games page's pickers and the overlay's names (`.claude/rules/games.md`). The names stay English in every app language: they're also how `withEdition` matches ids, and they aren't in the locale files.
 
 ## Bedrock
 
@@ -17,7 +17,7 @@ The current list is 1.26.50: 93 mobs, 1,596 items.
    - mobs: projectiles, boats and minecarts, the armor stand, `npc` and `cushion`;
    - items: command, structure, barrier, jigsaw and light blocks, and Education's `allow`, `deny` and `border_block`.
 3. **Names:** the game's `en_US.lang`: `entity.<id>.name`, the item's `serialization_id`, `item.<id>.name` or `tile.<id>.name`, otherwise the id in title case. `tnt` is "Primed TNT".
-4. **Check in the game:** run every id with `testfor @e[type=<id>]` and `clear @p <id> 0 0`, which count without changing the world. An unknown id is a syntax error. The 1.26.50 list had all 1,689 known.
+4. **Check in the game:** run every id with `testfor @e[type=<id>]` and `clear @p <id> 0 0`, which count without changing the world. An unknown id is a syntax error.
 
 ## Java
 
@@ -37,14 +37,13 @@ The current list is 26.3: 95 mobs, 1,645 items. It comes from Mojang's own data,
 
 `withEdition` (`src/renderer/src/pages/Games/helper.ts`) moves an action's mobs and items to the other edition: the same id, else `PAIRS`, else the id with the same English name, else a zombie or a diamond.
 
-- Most differing ids share a name and need nothing: Bedrock's `web` (Java's Cobweb), `evocation_illager` (Evoker) and `zombie_pigman` (Zombified Piglin) are mapped by name.
-- `PAIRS` holds the ids that differ and whose names differ too (`ender_crystal`/`end_crystal`, the zombie pigman spawn egg, silver glazed terracotta, `undyed_shulker_box`/`shulker_box`).
-- Add a pair when a regenerated list has an id that no name in the other list matches, but the same thing is there under another id.
+- Most differing ids share a name and are mapped by it (Bedrock's `web` is Java's Cobweb).
+- `PAIRS` holds the ids whose names differ too (`ender_crystal`/`end_crystal`). Add a pair when a regenerated list has an id that no name in the other list matches, but the same thing is there under another id.
 
 ## Done when
 
 - Both JSON files hold `{ mobs, items }` sorted by name, and the version and counts above are updated.
 - The help steps' ids (`helpCommands`, `src/main/services/games/commands.ts`) are still in both lists.
-- For Java, `bestEnchantments` (`src/common/games/enchantments.ts`) still matches the version's data in the client jar: for each item in `data/minecraft/tags/item/enchantable/*`, every enchantment in `data/minecraft/enchantment/` whose `supported_items` holds it, curses aside, at its `max_level`, minus the ones its `exclusive_set` rules out (the file's comment says which stay), in `tags/enchantment/tooltip_order`'s order. New enchantments get their names in both locale files, from the client's `en_us.json` and Java's `es_mx.json`.
+- For Java, `bestEnchantments` (`src/common/games/enchantments.ts`, `.claude/rules/minecraft-commands.md`) still matches the version's data in the client jar: for each item in `data/minecraft/tags/item/enchantable/*`, every enchantment in `data/minecraft/enchantment/` whose `supported_items` holds it, curses aside, at its `max_level`, minus the ones its `exclusive_set` rules out (the file's comment says which stay), in `tags/enchantment/tooltip_order`'s order. New enchantments get their names in both locale files, from the client's `en_us.json` and Java's `es_mx.json`.
 - `PAIRS` covers every new id that has a counterpart under another name.
 - `yarn test src/renderer/src/pages/Games src/common/util/games.test.ts` passes, then `yarn typecheck` and `yarn lint`.

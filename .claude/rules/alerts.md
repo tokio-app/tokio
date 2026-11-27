@@ -1,12 +1,10 @@
 ---
 paths:
   - "src/main/services/alerts/**"
-  - "src/main/helper/chat.ts"
-  - "src/main/helper/triggers.ts"
   - "src/main/helper/preview.ts"
   - "src/common/util/alerts.ts"
   - "src/renderer/src/pages/Alerts/**"
-  - "src/renderer/src/components/AlertItem/**"
+  - "src/renderer/src/components/AlertItem/index*"
   - "src/renderer/src/components/SoundPicker/**"
   - "src/renderer/src/components/MediaPicker/**"
   - "src/renderer/src/components/GiftSelect/**"
@@ -19,73 +17,49 @@ paths:
 
 # Alerts
 
-## Triggers
+The trigger rows, their matching, minimums and roles are in `.claude/rules/triggers.md`.
 
-- `AlertTriggerSchema` derives the triggers from `TOKIO_EVENTS` (a new event: the `live-event` skill). `ROOM_USER` is left out there and from `AlertTrigger`: it comes every few seconds and is meant for overlays.
+## Firing
+
 - Music change alerts fire once each time a song starts (`MusicService.onSongChange`), not for one that fails to start, is skipped while it loads, or was already playing when a request came. Overlays get every `MUSIC_CHANGE`, queue changes too (songs a lower queue length drops included), but `MusicQueue.clear` sends one only when the queue held songs, since it runs on every chat while music is off.
-- Gift alerts fire once per combo, on `repeatEnd`, or with `every_gift` once per gift, at most `queue_length` times per event. Only TikTok's gifts come in combos: YouTube's arrive one at a time (`comboCount` 1, `repeatEnd` true), so their rows have no **When it plays** choice, streak note or streak summary (`rowStreaks`, `src/common/util/rows.ts`).
-- **A row offers what its platforms send** (the user's call). `rowPlatforms` gives them: the row's own platform, else the profile's that send its event. Alerts, Overlay Studio and Games share the rows, so all three follow it:
-  - The emote picker lists the emotes of those platforms, told by their id's prefix (`idPlatform`), and keeps picked ones to clear.
-  - The variables are the event's minus the ones no such platform fills (`rowVariables`): YouTube's gifts have no `{count}`, and Kick's subs no `{comment}`. Studio's texts are still filled with every variable; only the editor's offer follows the row.
-- `GiftStreaks` (`src/main/helper/streaks.ts`, also used by `LiveService`, `GamesService` and the timer) counts what each gift event adds to its sender's streak. `AlertsService` runs it only while alerts are on, so alerts turned on mid-streak play the whole count so far.
-- Matching is `matchesTrigger` (`src/main/helper/triggers.ts`), shared with `GamesService`. Both get `added` and `total` from `streakOf` (same file), which counts the event in their `GiftStreaks` once; `total` is the `{count}`. `AlertsService` keeps `enabled` and the sound, message or media check.
-- An alert plays on its `trigger` or any of its `also_triggers` (Or rows, `MAX_TRIGGERS` in all, kept apart from `trigger` so an older Tokio still plays on the first). `handle` takes the first row that matches (`triggersOf(alert).find`): it decides `every_gift`'s repeat and the `alerts:<type>` queue, and `onError` gets it, so a notice names the row that fired (an Emote row on a chat still says Emote).
-- A trigger's `platform` limits it to that platform's events (missing is any; `.claude/rules/platforms.md`). The Redeem trigger's `keyword` is the reward's title, matched in any case, empty for any reward. Its variables are `{reward}`, with `{comment}` for what the viewer typed.
-- Alerts and Games share `TriggerSchema`, `TriggerFilter` and `TRIGGER_OPTIONS`; Games leaves five out (`GAME_TRIGGERS`). Game actions keep one trigger.
-- Only the Alerts editor offers these, and Overlay Studio's reaction rows the minimum too; game actions keep the defaults, which match everything:
-  - `min_coins` is a row's minimum in its event's own unit (the user's call: each money event its own). The saved name stays, for older files and an older Tokio.
-    - **Gift:** the streak's worth when it ends (`gift.coins × total`), or each gift's with `every_gift`, in TikTok's coins. It applies only to any gift: picked gifts are the alert's choice, so the matcher, the editor and the summary ignore it then.
-    - **Bits:** the cheer's Bits.
-    - **Kicks:** the Kicks sent, like Bits (the user's call).
-    - **Super Chat:** its `usd`. One without dollars (null or missing) fires, so a missing rate never silences an alert.
-    - **Gifted subs:** the event's `count`.
-    - The matcher reads it through `worthOf`, and every other trigger ignores it.
-  - The editor and the summary name the unit by the row (`minUnit`):
-    - Coins on a gift row that can get TikTok's gifts, and none on a YouTube gift row (its gifts have no price) unless a minimum is already saved.
-    - Bits, Kicks, US dollars ("worth $5+", without cents, since a minimum is whole) or gifted subs on those events' rows.
-  - `MinimumField` (`components/AlertItem`) draws it under a row, in the Alerts editor and Overlay Studio's reaction rows alike (the user's call).
-  - `roles` (`[]` is anyone): only Chat, Emote and Gift carry the viewer's roles, so `takesRoles` (`src/common/util/alerts.ts`, shared by the matcher, the editor and the summary) allows only them. Other triggers' saved roles are ignored.
-    - The editor offers a row the roles its platforms' events say (`rowRoles`): TikTok's chat, emotes and gifts say followers, moderators and Super Fans; Twitch's, YouTube's and Kick's chat and emotes say Moderators and their subscribers or members, from badges, and Twitch's and Kick's VIPs (`vip`, the user's call), but never who follows; their gifts say none.
-    - A role saved earlier stays shown to clear, and the matcher is unchanged.
-    - `roleName` names the Super Fan role as the row's platforms call it: Subscribers on Twitch and Kick, Members on YouTube, and every term on a row for any platform ("Super Fans, subscribers, and members", the user's call).
-- The Emote trigger (`EMOTE_TRIGGER`) isn't a live event: `matchesTrigger` matches it on `CHAT`. TikTok can't list a LIVE's emotes, so `StoreManagerService.recordEmotes` saves the ones seen in chat to `Profile.emotes`.
-- Keywords (`hasKeyword`, `src/main/helper/chat.ts`) match whole words (`wholeWord`), except next to scripts written without spaces (Chinese, Japanese, Thai); an emoji between words counts as a space.
+- Gift alerts fire once per combo, on `repeatEnd`, or with `every_gift` once per gift, at most `queue_length` times per event.
+- `AlertsService` runs its `GiftStreaks` only while alerts are on, so alerts turned on mid-streak play the whole count so far.
+- `handle` takes the first row that matches (`triggersOf(alert).find`): it decides `every_gift`'s repeat and the `alerts:<type>` queue, and `onError` gets it, so a notice names the row that fired (an Emote row on a chat still says Emote).
 
 ## Gifts
 
-- Only a profile with TikTok asks TikTok for its gift list (the user's call). `refreshTikTokGifts` (`src/main/helper/gifts.ts`) fetches it once a run: at startup, or the first time TikTok is added on Home or a profile with it is picked, never awaited by those handlers. It updates the overlays and the games and Studio overlays, and pushes `GET_GIFTS`, since pages ask only when they open. A failed fetch is tried again by the next trigger. Startup without a saved list awaits TikTok, and a profile without TikTok then loads none, with no warning.
-- TikTok's gift list (`extra/gifts.json`) misses some, like other regions' gifts. `OverlayService.recordGift` saves the ones viewers send that aren't on it to `extra/custom-gifts.json`, shared by all profiles. It saves nothing while TikTok's list is empty, since every gift would look missing. After a failed save it writes nothing for `LOAD_RETRY_MS`, as emote saves do, so a file that can't be written isn't tried and logged on every gift. A file that's there but doesn't read is never written over (it fails instead), and a saved gift's details count as compared once a run only after their save went through.
-- The Alerts and Games pages read both through `useTriggerChoices` (`pages/Alerts`), with the emotes; `giftOptions` merges them. Overlay gift settings use TikTok's list only. Picked gifts match TikTok's ids only, so `TriggerFilter` offers the picker on TikTok rows, on rows for any platform when the profile has TikTok, and wherever gifts are already picked, so they can be cleared.
+- Only a profile with TikTok asks TikTok for its gift list (the user's call). `refreshTikTokGifts` (`src/main/helper/gifts.ts`) fetches it once a run, at startup or when TikTok first joins the active profile, unawaited by those handlers, and pushes `GET_GIFTS`, since pages ask only when they open. A failed fetch is tried again by the next trigger. Startup without a saved list awaits TikTok, and a profile without TikTok then loads none, with no warning.
+- TikTok's list (`extra/gifts.json`) misses some, like other regions' gifts. `OverlayService.recordGift` saves the ones viewers send that aren't on it to `extra/custom-gifts.json`, shared by all profiles.
+  - It saves nothing while TikTok's list is empty, since every gift would look missing.
+  - After a failed save it writes nothing for `LOAD_RETRY_MS`, as emote saves do, so a file that can't be written isn't tried and logged on every gift.
+  - A file that's there but doesn't read is never written over (it fails instead), and a gift's details count as compared once a run only after their save went through.
 
 ## Page
 
-- The row's summary is one sentence per trigger (`triggerSummary`), each naming at most `NAMED` gifts or emotes, joined by `ROWS` (" · "): a trigger's conditions hold commas and "or" already, so another "or" between them blurred which went with which. A trigger that narrows nothing says nothing. There are no condition columns: a new condition goes in the editor and the sentence.
-- The row names every trigger's event once, joined with `listOf`'s `or` (`triggerLabel`), and so does the editor's title.
-- Picked gifts and emotes, every trigger's, show as pictures before the sentence (`triggerPictures`), at most `NAMED` then `+N`, so more picks don't widen the row; with none of their pictures known, the sentence names them.
+- The row's summary is one sentence per trigger (`triggerSummary`), joined by `ROWS` (" · "): a trigger's conditions hold commas and "or" already, so another "or" between them blurred which went with which. A new condition goes in the editor and the sentence, never a column.
+- Picked gifts and emotes show as pictures before the sentence (`triggerPictures`), at most `NAMED` then `+N`, so more picks don't widen the row.
 - No arrows between the row's columns, and sound and media aren't stacked in one column (the user's call). A long sentence wraps rather than hide a condition.
 - A row without media keeps its **Copy overlay URL** slot, hidden and disabled, so the rows' actions line up.
-- An empty `name` shows its place's default (`alertName`); a new alert gets `defaultAlertName(index)`. Defaults count the place when made, so after a delete two alerts can share one. The search keeps each alert's list index for that, and adding an alert clears it, since it would hide the new one.
+- An empty `name` shows its place's default (`alertName`), counted when made, so after a delete two alerts can share one. The search keeps each alert's list index for that, and adding an alert clears it, since it would hide the new one.
 - The alert's `volume` is the sound's or message's; a video has its own (`AlertMediaSchema.volume`), and another file keeps it and the duration.
-- `AlertEditor`'s panel `min-height` is the gift Trigger tab's, the tallest, so the dialog doesn't move between tabs. The pickers render after it, so they open over it and Escape closes the picker first.
-- The Trigger tab draws its rows with `TriggerRows` (`components/AlertItem`), shared with Overlay Studio: the first under **Event**, each other under **Or** with a remove button, then **Add a trigger**, `MAX_TRIGGERS` in all. Each row keeps its own filter, minimum and roles. With more rows than the panel holds, the tab scrolls inside it (`.scrolls`), so the dialog never outgrows the window.
+- `AlertEditor`'s panel `min-height` is the gift Trigger tab's, the tallest, so the dialog doesn't move between tabs. The pickers render after it, so they open over it and Escape closes the picker first. With more rows than it holds, the Trigger tab scrolls inside it (`.scrolls`), so the dialog never outgrows the window.
 - A space between a picker tile's name and its length keeps the button's name "Clip 12s".
 
 ## Sounds
 
-- The sound and media libraries are managed on **Alerts → Library** (`/alerts/library`, `pages/Library`), not in Settings (the user's call). It has one tab each over a panel that scrolls inside, newest first (the user's call); the pickers keep the stored order.
+- The sound and media libraries are managed on **Alerts → Library** (`pages/Library`), not in Settings (the user's call), a tab each, newest first (the user's call); the pickers keep the stored order.
 - The sound library is shared by all profiles (`settings.sounds`). Files in the `sounds` folder are named by a hash of their content (uploads) or URL (MyInstants); alerts store only the basename.
-- Imports (`importSound`, `importMedia`) go through `importFile` (`src/main/helper/library.ts`), shared with the Minecraft pictures. Read sounds through `AlertsService.readSound` (keeps paths inside the folder, caches). `UPLOAD_MEDIA` shares the `upload` loop with `UPLOAD_SOUNDS`: it imports every file, then lists them with one store save, so 1000 files aren't 1000 writes.
-- Sounds are up to `CACHE_MAX_FILE_BYTES`, so every sound added now is served from memory: `importSound` and `fetchSound` refuse bigger ones (`fetchSound` counts the bytes as they come). A bigger one saved before is read from disk only on `GET_SOUND_DATA`, one read shared by concurrent requests.
+- Imports go through `importFile` (`src/main/helper/library.ts`), shared with the Minecraft pictures. Read sounds through `AlertsService.readSound`, which keeps paths inside the folder. The `upload` loop imports every file, then lists them with one store save, so 1000 files aren't 1000 writes.
 - `handle` only checks that a library sound's file is there (`_missing`: the cache, else `access`), without reading it.
+- Sounds are up to `CACHE_MAX_FILE_BYTES`, so every sound added now is served from memory: `importSound` and `fetchSound` refuse bigger ones (`fetchSound` counts the bytes as they come). A bigger one saved before is read from disk only on `GET_SOUND_DATA`, one read shared by concurrent requests.
 - MyInstants has no API; `AlertsService` scrapes its result list (`resultInstants`, which counts div tags so the trending list after it stays out). Only fetch `www.myinstants.com` URLs.
-- `ALERT_AUDIO` carries a `key` (the file, or a `tts:` cache key), `repeat` and the cut. The window queues `repeat` copies sharing one decode, and forgets a `tts:` key's decode (`forgetDecoded`) once its copies have places, since messages rarely repeat.
-- Library sounds go by `key` alone: the window fetches the bytes with `GET_SOUND_DATA` (`soundData`) only when it hasn't decoded that key, one fetch for copies and concurrent events. Messages carry `data`.
+- `ALERT_AUDIO` carries a `key` (the file, or a `tts:` cache key), `repeat` and the cut. The window queues `repeat` copies sharing one decode, and forgets a `tts:` key's decode once its copies have places, since messages rarely repeat. It fetches a library sound's bytes (`GET_SOUND_DATA`) only when it hasn't decoded that key, one fetch for copies and concurrent events; messages carry `data`.
 - Queues: `alerts`, or `alerts:<trigger>` with `simultaneous`. `ALERT_CLEAR` stops every `alerts*` queue. Tests and previews (`useAlertTest`) use `alert-test`, so clearing never cuts them.
 
 ## Request numbering
 
-- The page applies a `SET_ALERT_SOUND` reply only while that alert waits for one (`asked`, set by `onRequest` from a Browse or MyInstants download), even after the picker closed. A library or TTS pick made since wins over a late reply. Media does the same with `askedMedia`, `SET_ALERT_MEDIA` and `appliedMedia`.
-- `onRequest` numbers each request: `DOWNLOAD_SOUND`, `IMPORT_SOUND` and `IMPORT_MEDIA` carry it as `request`, and the `SET_ALERT_*` replies echo it, failures included. A reply applies only if newer than the last one applied for that alert (`applied`), and the picker shows only the newest request's failure.
+- The page applies a `SET_ALERT_SOUND` reply only while that alert waits for one (`asked`, set by `onRequest` from a Browse or MyInstants download), even after the picker closed, so a library or TTS pick made since wins over a late reply. Media does the same with `askedMedia`, `SET_ALERT_MEDIA` and `appliedMedia`.
+- `onRequest` numbers each request: `DOWNLOAD_SOUND`, `IMPORT_SOUND` and `IMPORT_MEDIA` carry it as `request`, and `SET_ALERT_SOUND` and `SET_ALERT_MEDIA` echo it, failures included. A reply applies only if newer than the last one applied for that alert (`applied`), and the picker shows only the newest request's failure.
 - When the library's store file can't be written, the file still goes to the alert: the success reply comes first, then the `saveFailure()` one with the same `request`, which the page ignores and the picker shows. `upload` adds a listed file again for the same reason, counting only new ones.
 - The counter is module-level (`requests` in `pages/Alerts`), one for sounds and media, so a reply from before leaving the page can't beat a newer request.
 - `asked` and `askedMedia` are cleared on `useEditableSettings`'s `switched`, since a cloned profile has the same alert ids.
@@ -93,8 +67,7 @@ paths:
 
 ## Removing sounds and media
 
-- `REMOVE_SOUND` and `REMOVE_MEDIA` take the file out of its library, then off every alert in every profile (`StoreManagerService.removeFromAlerts`, sharing `_updateProfiles` with `removeFromGames`: `.claude/rules/store.md`), then delete it. A failed write keeps the file, for its alerts, and fails with `saveFailure()`.
-- `REMOVE_MEDIA` also clears it from Overlay Studio (`.claude/rules/studio.md`).
+- `REMOVE_SOUND` and `REMOVE_MEDIA` take the file out of its library, then off every alert in every profile (`StoreManagerService.removeFromAlerts`, `.claude/rules/store.md`), then delete it. A failed write keeps the file, for its alerts, and fails with `saveFailure()`. Overlay Studio's side is in `.claude/rules/studio.md`.
 - Main sends `ALERT_FILE_REMOVED`, and the Alerts page (and Studio's editor, for media) clears the file from what it shows, so its next save doesn't bring it back.
 - A sound whose file can't be deleted still leaves the library, with a warning (`SOUND_REMOVE_FAILED`).
 - **Clear** in the pickers takes the sound, message or media off the alert and keeps the file.
@@ -107,23 +80,21 @@ paths:
 - `AudioQueue` passes `start / speed` and `(end − start) / speed` to `GrainPlayer.start`, which reads the offset in played seconds, so the part starts at its cut at any speed.
 - A cut end fades over `CUT_FADE` on its own `Gain` node, so `setItemGain`'s ramps can't cancel it. A cut start needs nothing, as the grains fade in.
 - Tests pass the cut through `AlertTestRequest`, which main ignores.
-- Videos are cut the same way: `AlertMediaSchema` spreads `CUT`; images ignore it. `setMedia` keeps the cut for the same file and drops it for another. `showMedia` refuses non-finite ones and clamps them.
+- Videos are cut the same way (`AlertMediaSchema` spreads `CUT`; images ignore it). `setMedia` keeps the cut for the same file and drops it for another. `showMedia` refuses non-finite ones and clamps them.
 - The overlay page loads the video at `#t=<start>` and, from its first `playing`, hides it at `min(end, start + duration)` of `currentTime`, waiting again while the clock lags: a fragment's end is checked only every 250 ms. Its `duration` timer hides only media that isn't playing, since a video starts after its turn begins, which ended cuts early.
-- The waveform (`SoundCut`) gets the bytes with `GET_SOUND_DATA { file }`; `SOUND_DATA` echoes the file, failures included, with `notify: false`, as the tab shows the failure. It decodes them under the file's name, `ALERT_AUDIO`'s key, so the editor and the alert share one decode. A decode that ends after the tab's sound changed is dropped, its failure too.
-- `CutTrack` (`SoundCut.tsx`) and `ResetCut` are shared with the **Image or video** tab and Overlay Studio's video fields.
+- The waveform (`SoundCut`) decodes `GET_SOUND_DATA { file }`'s bytes under the file's name, `ALERT_AUDIO`'s key, so the editor and the alert share one decode. `SOUND_DATA` echoes the file, failures included, with `notify: false`, as the tab shows the failure. A decode that ends after the tab's sound changed is dropped, its failure too.
+- `CutTrack` and `ResetCut` (`SoundCut.tsx`) are shared with the **Image or video** tab and Overlay Studio's video fields.
 
 ## Text-to-speech
 
-- An alert plays `sound` or speaks `tts` (a message with its own voice, speed and pitch). `tts` wins if both are set.
-- `AlertsService.speak` fills the message with `formatAlertMessage` (variables per trigger in `ALERT_MESSAGE_VARIABLES`) and runs it through `TTSService.prepareText`, whose third argument limits banned words to the event's values. It caches the audio in the sound LRU under a `tts:` key.
+- An alert plays `sound` or speaks `tts` (a message with its own voice, speed and pitch); `tts` wins if both are set.
+- `TTSService.prepareText`'s third argument limits an alert message's banned words to the event's values. `AlertsService.speak` caches the audio in the sound LRU under a `tts:` key. Live alerts make their messages on a `TaskQueue` with the TTS page's cooldown and queue length.
 - A viewer on the TTS page's block list loses only the message (the user's call), checked with `isBlocked` on `eventUser`. The alert plays its sound, or its media alone; one with only a message plays nothing. Banned words still skip the whole alert. The allow list and the roles stay chat-only.
 - Alert queues are shared, so speed and pitch travel per sound on `ALERT_AUDIO.filters`, overriding the queue's.
-- `{translation}` (Chat and Emote) is the chat's translation, or what the viewer typed without one (`messageValues`). The windows offer it only while Chat translation has a language (`useVariables`, `.claude/rules/translation.md`).
-- A Like alert offers `{username}`, `{handle}` and `{count}` (the batch's likes), since it plays each viewer's batch. Game actions and Overlay Studio, which count likes from every viewer, take `countedVariables`: the same lists with none on Like (the user's call). A text there that already has them still gets the last batch's, since `messageValues` reads the payload.
+- `{translation}` (Chat and Emote) is the chat's translation, or what the viewer typed without one (`messageValues`); when it's offered: `.claude/rules/translation.md`.
 - `{count}` in a gift alert's message is the streak's total, not TikTok's `comboCount`. It isn't offered on every gift; a message that has it gets the count so far. One event that adds several gifts makes the message once and sends one `ALERT_AUDIO` with `repeat`.
 - `_generate(..., false)` doesn't log a live alert's failed message; previews (`speak`) log their own, which `speakTest` counts on.
-- A TTS test (`TEST_ALERT`'s `tts` branch) fills the message with a sample from the `platform` it carries: the row's own, else the profile's first that sends its event (`samplePlatform`), resolved by the row's Play, the editor's Sound tab, the sound picker's TTS tab and MCP's alert test. Without one it's TikTok's (Music change).
-- Live alerts make their messages through a `TaskQueue` with the TTS page's cooldown and queue length.
+- A TTS test (`TEST_ALERT`'s `tts` branch) fills the message with a sample from the `platform` it carries: the row's own, else the profile's first that sends its event (`samplePlatform`), which every caller resolves (the row's Play, the editor's Sound tab, the sound picker's TTS tab, MCP's alert test). Without one it's TikTok's (Music change).
 - `AlertsService.clear` runs wherever `ALERT_CLEAR` is sent: it drops the waiting messages, sounds and media, hides the media shown, and forgets the gift streaks, since their ends may be missed.
 
 ## Media
@@ -131,10 +102,10 @@ paths:
 - The media library is shared by all profiles (`settings.media`), files in the `media` folder named by a hash of their content, up to `MEDIA_MAX_BYTES`. `mediaKind` and the extensions are in `src/common/util/alerts.ts`, for the window too.
 - No SVG: opened from the overlay server, its scripts would run there.
 - Media is never cached or sent over IPC.
-- Each alert has its own overlay at `getAlertOverlayURL(id)` (`/alerts/<alert id>/`): one page (`services/server/alert.html`) at every id, which reads the id from its path. Nothing is stored for it, so deleting, cloning or importing alerts needs no cleanup, and cloned profiles share their alerts' overlays.
+- Each alert's overlay (`getAlertOverlayURL(id)`) is one page (`services/server/alert.html`) at every id, which reads the id from its path. Nothing is stored for it, so deleting, cloning or importing alerts needs no cleanup, and cloned profiles share their alerts' overlays.
 - The media folder is mounted at `/alerts/media/` (`express.static`, so videos get byte ranges).
-- The window's queue times the media, so it shows with the alert's sound and waits its turn. The item's place lasts `max(sound length / speed, duration)` (`minDuration`); a media-only alert holds a silent place (`AudioQueue.wait`). Then `queueAlert` emits `SHOW_ALERT_MEDIA` with the delay, and main keeps the timers, so `clear` can drop the media still waiting.
-- The page shows one at a time. A removed video is paused and loses its `src`, since Chromium keeps a detached video with a source alive. A video is muted if the browser refuses sound, but one removed before its play started isn't replayed muted.
+- The window's queue times the media, so it shows with the alert's sound and waits its turn: the item's place lasts `max(sound length / speed, duration)` (`minDuration`), and a media-only alert holds a silent place (`AudioQueue.wait`). `queueAlert` then emits `SHOW_ALERT_MEDIA` with the delay, and main keeps the timers, so `clear` can drop the media still waiting.
+- A removed video is paused and loses its `src`, since Chromium keeps a detached video with a source alive. A video is muted if the browser refuses sound, but one removed before its play started isn't replayed muted.
 - Migration: `withSavedMedia` gives media saved without a volume the alert's, and cuts a video saved before cuts at its old `duration` unless its old `match_video` was on.
 - Media rides on the alert's audio: a missing sound, or a message that banned words block or that fails, skips it too. A file missing on disk (a profile from another computer) shows nothing, with no notice.
 - Stopping a test leaves its media on the overlay until it ends.
@@ -142,8 +113,7 @@ paths:
 
 ## LibraryPicker
 
-- `LibraryPicker` (`components/MediaPicker/LibraryPicker.tsx`) holds the library, search, listeners, failure check and delete flow of the `MediaPicker` and the Games page's `PicturePicker`. Build a new library picker on it.
-- The `MediaPicker` only picks: it closes after a pick, and once a browsed file for its alert arrives. It takes `{ id, chosen }` (an alert's or an Overlay Studio element's id, and its file).
+- `LibraryPicker` (`components/MediaPicker/LibraryPicker.tsx`) holds what the `MediaPicker` and the Games page's `PicturePicker` share: the library, search, listeners, failure check and delete flow. Build a new library picker on it.
 
 ## tokio-media:
 
