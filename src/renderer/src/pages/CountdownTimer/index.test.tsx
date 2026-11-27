@@ -89,15 +89,13 @@ describe("CountdownTimer", () => {
       }),
     );
 
-    // YouTube's Gifts are priced in Jewels
+    // YouTube's gifts have no price
     expect(rows()).toEqual([
-      "Jewels",
       "Chat messages",
       "New subs",
       "Gifted subs",
       "Super Chats",
     ]);
-    expect(added.getByText("seconds per Jewel")).toBeVisible();
 
     await send(
       APP_EVENTS_RESPONSE.GET_PROFILE,

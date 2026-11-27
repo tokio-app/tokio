@@ -1467,7 +1467,6 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     shares: 17,
     gifts: 126,
     coins: 3480,
-    jewels: 0,
     kicks: 0,
     bits: 0,
     superChats: 0,
@@ -1508,11 +1507,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     giftSubs: 0,
     giftedAt: Date.now() - (i + 1) * 60_000,
   }));
-  await push("app:home:res:gifters", {
-    byPlatform: { tiktok: gifters },
-    subsByPlatform: {},
-    jewelsByPlatform: {},
-  });
+  await push("app:home:res:gifters", { byPlatform: { tiktok: gifters } });
   // A song playing, so the rail shows it at its foot
   await push("app:music:res:music:connected", { success: true });
   await push("app:home:res:songs", {

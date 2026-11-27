@@ -52,14 +52,12 @@ export type Activity =
 export type ActivityItem = Activity & { id: number };
 
 // Counted since Tokio connected. Each currency is its platform's alone, never
-// added to another: coins TikTok's, jewels YouTube's Gifts', kicks Kick's,
-// bits Twitch's cheers.
+// added to another: coins TikTok's, kicks Kick's, bits Twitch's cheers.
 export type LiveTotals = {
   followers: number;
   shares: number;
   gifts: number;
   coins: number;
-  jewels: number;
   kicks: number;
   bits: number;
   // YouTube's Super Chats and Super Stickers, how many
@@ -107,9 +105,6 @@ export type Gifter = {
   gifts: number;
   // Subs they gifted (Twitch, YouTube's memberships, Kick)
   giftSubs: number;
-  // YouTube's Gifts, in Jewels, apart from coins (its Super Chats' dollars).
-  // Missing is none, as in files saved before Gifts had a price.
-  jewels?: number;
   // When their last gift came, in ms since the epoch
   giftedAt: number;
   // Missing means TikTok
@@ -117,14 +112,8 @@ export type Gifter = {
 };
 
 // One platform's part of a LIVE in the history: its money in its currency
-// (PLATFORM_CURRENCY), its gifts and its gifted subs, and YouTube's Gifts in
-// Jewels apart (missing is none)
-export type HistoryTotals = {
-  amount: number;
-  gifts: number;
-  giftSubs: number;
-  jewels?: number;
-};
+// (PLATFORM_CURRENCY), its gifts and its gifted subs
+export type HistoryTotals = { amount: number; gifts: number; giftSubs: number };
 
 // A LIVE the profile kept, from the connect to the disconnect like Home's
 // session
@@ -151,10 +140,6 @@ export type GiftMinute = {
   // an id goes under its platform's: "" for TikTok, then "kick:", "twitch:"
   // and "youtube:". Older files have two numbers, read as no gifted subs.
   gifters: Record<string, [amount: number, gifts: number, giftSubs: number]>;
-  // YouTube's Jewels in it, by the same keys, only those with some. Missing
-  // is none. Apart from gifters, as an older Tokio drops an unknown key but
-  // refuses a 4th number.
-  jewels?: Record<string, number>;
 };
 
 // A LIVE with every viewer who sent gifts in it, the most first, and
@@ -169,11 +154,10 @@ export type LiveRecord = LiveSummary & {
 export type RankedGifter = Gifter & { rank: number };
 
 // For LIVE history: the finished LIVEs, newest first, and all time's top
-// gifters: by amount those who sent some, by gifted subs those who gifted
-// some, and by Jewels those who sent YouTube's Gifts (main always sends it)
+// gifters: by amount those who sent some, and by gifted subs those who
+// gifted some
 export type LiveHistory = {
   lives: LiveSummary[];
   gifters: Gifter[];
   subGifters: Gifter[];
-  jewelGifters?: Gifter[];
 };

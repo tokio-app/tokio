@@ -11,7 +11,6 @@ import { giftCurrencies, triggersFor, type GiftCurrency } from "./platforms";
 // which ones apply
 const TIMER_TRIGGERS = {
   coin: TOKIO_EVENTS.GIFT,
-  jewel: TOKIO_EVENTS.GIFT,
   likes: TOKIO_EVENTS.LIKE,
   superfan: TOKIO_EVENTS.SUPER_FAN,
   follow: TOKIO_EVENTS.FOLLOW,
@@ -24,12 +23,12 @@ const TIMER_TRIGGERS = {
   superchat: TOKIO_EVENTS.SUPER_CHAT,
 } as const satisfies Record<keyof TimerSettings["look"]["names"], AlertTrigger>;
 
-// The gift currency the coin and Jewel rows count
+// The gift currency the coin row counts
 const CURRENCY_OF: Partial<Record<keyof typeof TIMER_TRIGGERS, GiftCurrency>> =
-  { coin: "coins", jewel: "jewels" };
+  { coin: "coins" };
 
-// Which timer triggers apply to the platforms: the ones they send, coins
-// only with TikTok and Jewels only with YouTube
+// Which timer triggers apply to the platforms: the ones they send, and
+// coins only with TikTok
 export const timerTriggersOn = (platforms: readonly Platform[]) => {
   const sent = triggersFor(platforms);
   const currencies = giftCurrencies(platforms);
@@ -67,7 +66,7 @@ export interface TimerTrigger {
 /**
  * The triggers that add time, in the timer page's order, as the carousel
  * shows them: the streamer's name for each (the language's when blank),
- * counted for coins, Jewels, likes, Bits and Kicks, and the time it adds with the
+ * counted for coins, likes, Bits and Kicks, and the time it adds with the
  * multiplier. Triggers that add nothing, or that none of the profile's
  * platforms send, are left out.
  */
@@ -83,7 +82,6 @@ export function timerTriggers(
   const keyword = chat.keyword.trim();
   const triggers: [keyof typeof TIMER_TRIGGERS, string, number][] = [
     ["coin", `1 ${name("coin")}`, seconds.coin],
-    ["jewel", `1 ${name("jewel")}`, seconds.jewel],
     ["likes", `${seconds.likes_every} ${name("likes")}`, seconds.likes],
     ["superfan", name("superfan"), seconds.superfan],
     ["follow", name("follow"), seconds.follow],

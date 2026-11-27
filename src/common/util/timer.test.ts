@@ -26,7 +26,6 @@ describe("TimerSettingsSchema's names", () => {
 
     expect(names({})).toEqual({
       coin: "",
-      jewel: "",
       likes: "",
       superfan: "",
       follow: "",
@@ -74,15 +73,10 @@ describe("timerTriggers", () => {
     ]);
   });
 
-  it("lists Jewels and a Super Chat, and no coins, for a YouTube profile", () => {
+  it("lists a Super Chat, and no coins, for a YouTube profile", () => {
     expect(
       timerTriggers(settings(), "en", ["youtube"]).map((t) => t.label),
-    ).toEqual(["1 Jewel", "New sub", "Gifted sub", "Super Chat"]);
-    expect(
-      timerTriggers(settings(), "es-419", ["tiktok", "youtube"]).map(
-        (t) => t.label,
-      ),
-    ).toEqual(expect.arrayContaining(["1 moneda", "1 gema"]));
+    ).toEqual(["New sub", "Gifted sub", "Super Chat"]);
   });
 
   it("lists Kicks, and no coins, for a Kick profile, and both with TikTok", () => {

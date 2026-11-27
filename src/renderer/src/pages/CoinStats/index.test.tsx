@@ -33,10 +33,9 @@ const lives = (
   list: LiveSummary[],
   gifters: Gifter[] = [],
   subGifters: Gifter[] = [],
-  jewelGifters: Gifter[] = [],
 ) =>
   send(APP_EVENTS_RESPONSE.LIVES, {
-    data: { lives: list, gifters, subGifters, jewelGifters },
+    data: { lives: list, gifters, subGifters },
   });
 
 const record = (live: LiveSummary, gifters: Gifter[]) =>
@@ -577,7 +576,7 @@ describe("LIVE history", () => {
       platforms: {
         tiktok: part(12_400, 1203, 0),
         twitch: part(2500, 0, 4),
-        youtube: { ...part(57.4, 2, 1), jewels: 30 },
+        youtube: part(57.4, 2, 1),
       },
     };
     const di: Gifter = {
@@ -591,14 +590,8 @@ describe("LIVE history", () => {
       userId: "youtube:yui",
       platform: "youtube",
       giftSubs: 1,
-      jewels: 30,
     };
-    await lives(
-      [saturday, both],
-      [gifter("Ana", 5200), di, yui],
-      [di, yui],
-      [yui],
-    );
+    await lives([saturday, both], [gifter("Ana", 5200), di, yui], [di, yui]);
     await record(saturday, [gifter("Kai", 600, 40)]);
 
     const tabs = screen.getByRole("tablist", { name: "Platform" });
@@ -641,28 +634,14 @@ describe("LIVE history", () => {
     expect(gifterRows("Top Bits")).toEqual([expect.stringMatching(/^1DDi/)]);
     await user.click(rank("Gifted subs"));
 
-    // Another tab opens on its first ranking: YouTube's Gifts by Jewels,
-    // apart from its Super Chats
+    // Another tab opens on its money
     await user.click(tab("YouTube"));
-    expect(
-      within(ranks()!)
-        .getAllByRole("tab")
-        .map((t) => t.textContent),
-    ).toEqual(["Jewels", "Super Chats", "Gifted subs"]);
-    expect(rank("Jewels")).toHaveAttribute("aria-selected", "true");
+    expect(rank("Super Chats")).toHaveAttribute("aria-selected", "true");
     expect(selected()).toMatch(/^Friday/);
-    expect(stat("Jewels")).toHaveTextContent("30");
     expect(stat("Super Chats")).toHaveTextContent("$57.40");
     expect(stat("Gifts")).toHaveTextContent("2");
     expect(stat("Gifted subs")).toHaveTextContent("1");
-    expect(gifterRows("Top gifters")).toEqual(["1YYui@yui30 Jewels2 gifts"]);
-    await user.click(rank("Super Chats"));
     expect(gifterRows("Top Super Chats")).toEqual(["1YYui@yui$57.402 gifts"]);
-    // All time's, from main
-    await user.click(option(/^All time/));
-    await user.click(rank("Jewels"));
-    expect(gifterRows("Top gifters")).toEqual(["1YYui@yui30 Jewels2 gifts"]);
-    await user.click(option(/^Friday/));
 
     // Every currency on its own, the LIVEs by their gifts, and no ranking
     await user.click(tab("All"));
@@ -677,7 +656,6 @@ describe("LIVE history", () => {
     expect(stat("Coins")).toHaveAttribute("title", "12,400");
     expect(stat("Bits")).toHaveAttribute("title", "2,500");
     expect(stat("Super Chats")).toHaveTextContent("$57.40");
-    expect(stat("Jewels")).toHaveTextContent("30");
     expect(stat("Gifts")).toHaveAttribute("title", "1,205");
     expect(stat("Gifted subs")).toHaveTextContent("5");
     expect(

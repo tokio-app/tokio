@@ -517,69 +517,6 @@ describe("StudioEditor", () => {
       expect(row(/^Top Bits this LIVE/)).toBeVisible();
     });
 
-    it("tops YouTube's Super Chats or its Gifts' Jewels as two sources", async () => {
-      const list = { ...elementOf("list"), platform: "youtube" as const };
-      const { user } = await open(holding(list));
-      await send(
-        APP_EVENTS_RESPONSE.GET_PROFILE,
-        profileReply((p) => {
-          p.platforms = ["youtube"];
-        }),
-      );
-      await user.click(row(/^Top Super Chats/));
-
-      await user.click(field("Shows").getByText("Top Super Chats this LIVE"));
-      await user.click(
-        inList(
-          page().getByRole("group", { name: "Shows" }),
-          "Top gifters this LIVE",
-        )!,
-      );
-      await waitFor(() =>
-        expect(lastSave()?.items[0]).toMatchObject({
-          source: "gifters",
-          platform: "youtube",
-          rank: "jewels",
-        }),
-      );
-      // Jewels are a count, like coins
-      expect(drawn(list.id).querySelector(".studio-number")!.textContent).toBe(
-        "12.4K",
-      );
-
-      await user.click(field("Shows").getByText("Top gifters this LIVE"));
-      await user.click(
-        inList(
-          page().getByRole("group", { name: "Shows" }),
-          "Top Super Chats this LIVE",
-        )!,
-      );
-      // Back as it came, so nothing to save
-      expect(field("Shows").getByRole("combobox")).toHaveTextContent(
-        "Top Super Chats this LIVE",
-      );
-      expect(drawn(list.id).querySelector(".studio-number")!.textContent).toBe(
-        "$124.00",
-      );
-    });
-
-    it("offers no Jewels top for another platform's gifters", async () => {
-      const list = elementOf("list");
-      const { user } = await open(holding(list));
-      await send(
-        APP_EVENTS_RESPONSE.GET_PROFILE,
-        profileReply((p) => {
-          p.platforms = ["tiktok", "youtube"];
-        }),
-      );
-      await user.click(row(/^Top gifters/));
-
-      await user.click(field("Shows").getByText("Top gifters this LIVE"));
-      const shows = page().getByRole("group", { name: "Shows" });
-      expect(inList(shows, "Top Super Chats this LIVE")).toBeNull();
-      expect(inList(shows, "Top gifted subs this LIVE")).toBeTruthy();
-    });
-
     it("lists another source, with its own rows and fields", async () => {
       const list = elementOf("list");
       const { user } = await open(holding(list));

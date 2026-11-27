@@ -185,8 +185,6 @@ export type StudioNumbers = {
   shares: number;
   // TikTok's alone: each platform's currency is counted apart
   coins: number;
-  // YouTube's Gifts', apart from its Super Chats
-  jewels: number;
   kicks: number;
   bits: number;
   // The Super Chats' US dollars, null until the exchange rates load

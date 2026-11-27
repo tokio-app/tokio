@@ -8,7 +8,6 @@ import {
   PLATFORMS,
 } from "@/common/types";
 import {
-  byJewels,
   bySubs,
   DateRange,
   inRange,
@@ -50,7 +49,6 @@ import {
   GiftersList,
   GiftersSection,
   Ranking,
-  rankingsOf,
 } from "./sections/GiftersSection";
 import { ListSection } from "./sections/ListSection";
 import { SummarySection } from "./sections/SummarySection";
@@ -126,12 +124,7 @@ export function CoinStats() {
   const platforms = historyPlatforms(history?.lives ?? []);
   const tabs = statsTabs(platforms);
   const tab = picked && tabs.includes(picked) ? picked : tabs[0];
-  const by =
-    ranked?.tab === tab
-      ? ranked.by
-      : tab === "all"
-        ? "amount"
-        : rankingsOf(tab)[0];
+  const by = ranked?.tab === tab ? ranked.by : "amount";
   // A platform's tab lists the LIVEs that were on it
   const tabLives =
     tab === "all" ? shown : shown.filter((l) => platformParts(l)[tab]);
@@ -235,8 +228,6 @@ export function CoinStats() {
   // ranks. All ranks none.
   const paid = <G extends Gifter>(list?: G[]) =>
     list?.filter((g) => platformOf(g) === tab);
-  // The list of the ranking picked
-  const ofRanking = <T,>(lists: Record<Ranking, T>) => lists[by];
 
   const dates = isDates(datesReply) ? datesReply : undefined;
   const total = allTime(tabLives, range ?? {});
@@ -254,13 +245,7 @@ export function CoinStats() {
     if (searching) {
       const found = isSearch(searchReply) ? searchReply : undefined;
       return {
-        gifters: paid(
-          ofRanking({
-            amount: found?.data,
-            subs: found?.subGifters,
-            jewels: found?.jewelGifters,
-          }),
-        ),
+        gifters: paid(by === "subs" ? found?.subGifters : found?.data),
         empty: t("coinStats.gifters.noMatch", { query: search.trim() }),
         failed:
           found?.success === false
@@ -274,11 +259,9 @@ export function CoinStats() {
       const all = got?.data?.gifters;
       return {
         gifters: paid(
-          ofRanking({
-            amount: all?.filter((g) => g.coins > 0),
-            subs: all?.filter((g) => g.giftSubs > 0).sort(bySubs),
-            jewels: all?.filter((g) => (g.jewels ?? 0) > 0).sort(byJewels),
-          }),
+          by === "subs"
+            ? all?.filter((g) => g.giftSubs > 0).sort(bySubs)
+            : all?.filter((g) => g.coins > 0),
         ),
         failed:
           got?.success === false ? t("coinStats.gifters.failed") : undefined,
@@ -286,13 +269,7 @@ export function CoinStats() {
     }
     if (range) {
       return {
-        gifters: paid(
-          ofRanking({
-            amount: dates?.data,
-            subs: dates?.subGifters,
-            jewels: dates?.jewelGifters,
-          }),
-        ),
+        gifters: paid(by === "subs" ? dates?.subGifters : dates?.data),
         dated: true,
         failed:
           dates?.success === false
@@ -301,13 +278,7 @@ export function CoinStats() {
       };
     }
     return {
-      gifters: paid(
-        ofRanking({
-          amount: history.gifters,
-          subs: history.subGifters,
-          jewels: history.jewelGifters,
-        }),
-      ),
+      gifters: paid(by === "subs" ? history.subGifters : history.gifters),
     };
   };
 
@@ -405,8 +376,7 @@ export function CoinStats() {
                       disabled={
                         history.lives.length === 0 &&
                         history.gifters.length === 0 &&
-                        history.subGifters.length === 0 &&
-                        !history.jewelGifters?.length
+                        history.subGifters.length === 0
                       }
                       onClick={() => setClearing(true)}
                     >

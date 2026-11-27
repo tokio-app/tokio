@@ -10,7 +10,7 @@ paths:
 
 # Platforms
 
-Tokio connects to TikTok, Twitch, YouTube and Kick (`PLATFORMS`, `src/common/types/connector.ts`), several at once. TikTok's provider is in `.claude/rules/connector.md`, the others' in `twitch.md`, `youtube.md` and `kick.md`. Twitch's Bits are `CHEER`, YouTube's Super Chats and Super Stickers `SUPER_CHAT`, YouTube's Gifts `GIFT` with their price in Jewels as `coins`, and Kick's Kicks `KICKS` (`kicks` and the pinned `message`), like Bits: Kicks are never gifts (the user's call).
+Tokio connects to TikTok, Twitch, YouTube and Kick (`PLATFORMS`, `src/common/types/connector.ts`), several at once. TikTok's provider is in `.claude/rules/connector.md`, the others' in `twitch.md`, `youtube.md` and `kick.md`. Twitch's Bits are `CHEER`, YouTube's Super Chats and Super Stickers `SUPER_CHAT`, YouTube's Gifts `GIFT` with 0 coins, and Kick's Kicks `KICKS` (`kicks` and the pinned `message`), like Bits: Kicks are never gifts (the user's call).
 
 ## What the user chose
 
@@ -51,10 +51,10 @@ Every provider but TikTok's namespaces the ids it sends: `twitch:<id>` for `User
 
 ## Money
 
-- Each platform's currency is named and counted on its own, never added to another or ranked against it (the user's call): TikTok's coins, Kick's Kicks, Twitch's Bits, YouTube's Super Chats in US dollars, and YouTube's Gifts in Jewels.
+- Each platform's currency is named and counted on its own, never added to another or ranked against it (the user's call): TikTok's coins, Kick's Kicks, Twitch's Bits, YouTube's Super Chats in US dollars.
 - **What names each currency:**
   - `PLATFORM_CURRENCY` (`src/common/util/platforms.ts`) names each platform's money, which Home, LIVE history and MCP count it in: `coins`, `kicks`, `bits` or `usd`.
-  - `GIFT_CURRENCY` says what each platform's gifts cost in: `coins` for TikTok, `jewels` for YouTube, none for Twitch and Kick, which send no gifts. `giftCurrencies(platforms)` gives the ones a profile pays in.
+  - `GIFT_CURRENCY` says what each platform's gifts cost in: `coins` for TikTok, none for the others (YouTube's Gifts have no price; Twitch and Kick send no gifts). `giftCurrencies(platforms)` gives the ones a profile pays in.
   - Both are `Record`s, so a new platform has to decide.
 - A gift without a currency counts as a gift, never as an amount, and makes its sender a gifter only beside money or gifted subs (the user's call: hide the zero, `.claude/rules/history.md`).
 

@@ -79,21 +79,16 @@ describe("platforms", () => {
     ]);
   });
 
-  it("prices TikTok's gifts in coins and YouTube's in Jewels: Kick's Kicks aren't gifts", () => {
+  it("prices only TikTok's gifts, in coins: Kick's Kicks aren't gifts", () => {
     expect(GIFT_CURRENCY).toEqual({
       tiktok: "coins",
       twitch: null,
-      youtube: "jewels",
+      youtube: null,
       kick: null,
     });
-    expect(giftCurrencies(["kick", "youtube", "tiktok"])).toEqual([
-      "coins",
-      "jewels",
-    ]);
-    expect(giftCurrencies(["youtube"])).toEqual(["jewels"]);
+    expect(giftCurrencies(["kick", "youtube", "tiktok"])).toEqual(["coins"]);
     expect(giftCurrencies(["kick"])).toEqual([]);
-    expect(giftCurrencies(["twitch", "youtube"])).toEqual(["jewels"]);
-    expect(giftCurrencies(["twitch", "kick"])).toEqual([]);
+    expect(giftCurrencies(["twitch", "youtube"])).toEqual([]);
   });
 
   it("reads a viewer without a platform as TikTok's", () => {

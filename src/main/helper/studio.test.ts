@@ -60,7 +60,6 @@ const session = (startedAt: number | null) => ({
     shares: 2,
     gifts: 9,
     coins: 1500,
-    jewels: 320,
     kicks: 250,
     bits: 700,
     superChats: 3,
@@ -79,7 +78,6 @@ const setup = (
     kickGifters,
     youtubeGifters,
     subGifters = {},
-    jewelGifters = {},
   }: {
     startedAt?: number | null;
     studio?: StudioService;
@@ -89,8 +87,6 @@ const setup = (
     youtubeGifters?: Gifter[];
     // Each platform's top sub gifters
     subGifters?: Partial<Record<Platform, Gifter[]>>;
-    // Each platform's top senders of YouTube's Gifts, by Jewels
-    jewelGifters?: Partial<Record<Platform, Gifter[]>>;
   } = {},
 ) => {
   const sendToClient = vi.fn((_id: string, _data: unknown) => true);
@@ -120,7 +116,6 @@ const setup = (
         youtube: youtubeGifters,
       }),
       topSubGifters: () => subGifters,
-      topJewelGifters: () => jewelGifters,
     },
     pathManagerService: { files: { logs: { overlays: "overlays.log" } } },
   });
@@ -258,7 +253,6 @@ describe("sendStudioOverlays", () => {
       followers: 0,
       shares: 0,
       coins: 0,
-      jewels: 0,
       kicks: 0,
       bits: 0,
       superchats: 0,
@@ -273,7 +267,6 @@ describe("sendStudioOverlays", () => {
 
     expect(liveNumbers(handler, 1)).toMatchObject({
       coins: 1500,
-      jewels: 320,
       kicks: 250,
       bits: 700,
       superchats: 42.5,
@@ -436,39 +429,6 @@ describe("sendStudioOverlays", () => {
       { rows: [{ name: "Kai", value: "40" }] },
       { rows: [{ name: "Yui", value: "$57.40" }] },
       { rows: [] },
-    ]);
-  });
-
-  it("tops YouTube's Super Chats or its Gifts' Jewels, as the list ranks", async () => {
-    const yui: Gifter = {
-      userId: "youtube:UC1",
-      username: "Yui",
-      handle: "@yui",
-      picture: "",
-      coins: 57.4,
-      gifts: 3,
-      giftSubs: 0,
-      jewels: 1200,
-      giftedAt: 0,
-      platform: "youtube",
-    };
-    const { handler, views } = setup(
-      [
-        overlay(ID, [
-          element("y", { kind: "list", platform: "youtube" }),
-          element("j", { kind: "list", platform: "youtube", rank: "jewels" }),
-        ]),
-      ],
-      { youtubeGifters: [yui], jewelGifters: { youtube: [yui] } },
-    );
-
-    await sendStudioOverlays(handler);
-
-    const [[, view]] = views();
-    expect(view?.layers[0].elements).toMatchObject([
-      { rows: [{ name: "Yui", value: "$57.40" }] },
-      // A count, like coins
-      { rows: [{ name: "Yui", value: "1.2K" }] },
     ]);
   });
 

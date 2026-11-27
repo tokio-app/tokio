@@ -75,7 +75,6 @@ const noTotals = (): LiveTotals => ({
   shares: 0,
   gifts: 0,
   coins: 0,
-  jewels: 0,
   kicks: 0,
   bits: 0,
   superChats: 0,
@@ -148,8 +147,7 @@ export class LiveService extends Service {
       const { added, total } = this._streaks.add(event);
       const { user, gift } = event;
       const unit = Math.max(0, gift.coins);
-      // Each platform's own: TikTok's coins, YouTube's Jewels, none on Twitch
-      // and Kick
+      // YouTube's Gifts have no price
       const currency = GIFT_CURRENCY[platformOf(user)];
       this._count(user, "gifts", added);
       if (currency) this._count(user, currency, unit * added);

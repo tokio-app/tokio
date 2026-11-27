@@ -344,7 +344,7 @@ describe("fromAction", () => {
     return mapped.data.gift;
   };
 
-  it("prices a Gift from the list, named by its label", () => {
+  it("names a Gift by its label, with no price", () => {
     expect(
       giftOf(
         gift(
@@ -356,7 +356,7 @@ describe("fromAction", () => {
     ).toMatchObject({
       id: "youtube:silver_star_v2_320x320",
       name: "Star",
-      coins: 2,
+      coins: 0,
       comboCount: 1,
       repeatEnd: true,
     });
@@ -366,22 +366,12 @@ describe("fromAction", () => {
         .name,
     ).toBe("Hi, you");
     // Without a label, the text says it
-    expect(
-      giftOf(gift("sent Gold coin", "gold_coin_v2_320x320")),
-    ).toMatchObject({ name: "Gold coin", coins: 10 });
+    expect(giftOf(gift("sent Gold coin", "gold_coin_v2_320x320")).name).toBe(
+      "Gold coin",
+    );
   });
 
-  it("prices a Gift whose picture it doesn't know by its name", () => {
-    expect(
-      giftOf(gift("sent Tacos", "tacos", "@viewer32 sent a gift, Tacos")),
-    ).toMatchObject({ name: "Tacos", coins: 180 });
-    // The picture wins: guitar's is Rock star's, at 7800, not Guitar's 1000
-    expect(
-      giftOf(gift("sent Rock star", "guitar", "@viewer32 sent a gift, Guitar")),
-    ).toMatchObject({ coins: 7800 });
-  });
-
-  it("maps a combo with its count, at each gift's price", () => {
+  it("maps a combo as one Gift with its count", () => {
     expect(
       giftOf(
         gift(
@@ -393,28 +383,26 @@ describe("fromAction", () => {
     ).toMatchObject({
       id: "youtube:yes_jp",
       name: "Yes",
-      coins: 2,
+      coins: 0,
       comboCount: 3,
+      repeatEnd: true,
     });
-    // Its own price wins over the list's, its name comes from the text
+    // Without a label, its name comes from the text
     expect(
       giftOf(
         gift("comboed x2 Gold coin for 24 Jewels", "gold_coin_v2_320x320"),
       ),
-    ).toMatchObject({ name: "Gold coin", coins: 12, comboCount: 2 });
+    ).toMatchObject({ name: "Gold coin", comboCount: 2 });
     expect(
       giftOf(
         gift("comboed x1,000 Star for 2,000 Jewels", "silver_star_v2_320x320"),
-      ),
-    ).toMatchObject({ coins: 2, comboCount: 1000 });
+      ).comboCount,
+    ).toBe(1000);
   });
 
-  it("takes a combo it can't read as one gift at the list's price", () => {
+  it("takes a combo it can't read as one gift", () => {
     for (const text of ["comboed x0 Star for 0 Jewels", "comboed Star"]) {
-      expect(giftOf(gift(text, "silver_star_v2_320x320"))).toMatchObject({
-        coins: 2,
-        comboCount: 1,
-      });
+      expect(giftOf(gift(text, "silver_star_v2_320x320")).comboCount).toBe(1);
     }
   });
 
