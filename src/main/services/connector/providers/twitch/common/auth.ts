@@ -50,14 +50,8 @@ export async function failureOf(
   what: string,
 ): Promise<ConnectorFailure> {
   const message = `Twitch's ${what} answered ${await reasonOf(res)}`;
-  if (res.status === 429) {
-    // Ratelimit-Reset is when the bucket fills again, in epoch seconds
-    const reset = Number(res.headers.get("ratelimit-reset"));
-    const seconds = reset ? Math.ceil(reset - Date.now() / 1000) : 0;
-    return connectFailure("rateLimited", message, {
-      retryAfterSeconds: seconds > 0 ? seconds : undefined,
-    });
-  }
+  // Home's message for a platform's limit names no wait
+  if (res.status === 429) return connectFailure("rateLimited", message);
   if (res.status >= 500) return connectFailure("network", message);
   if (res.status === 401 || res.status === 403) {
     return connectFailure("badKey", message);

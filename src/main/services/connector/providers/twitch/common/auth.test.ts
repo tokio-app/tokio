@@ -206,27 +206,16 @@ describe("TwitchAuth", () => {
       expect(onLost).toHaveBeenCalled();
     });
 
-    it("tells a rate limit with when to try again", async () => {
+    it("tells a rate limit", async () => {
       vi.stubGlobal(
         "fetch",
-        vi.fn(
-          async () =>
-            new Response("{}", {
-              status: 429,
-              headers: {
-                "Ratelimit-Reset": String(Math.ceil(Date.now() / 1000) + 30),
-              },
-            }),
-        ),
+        vi.fn(async () => new Response("{}", { status: 429 })),
       );
       auth.setAccount({ id: "1", login: "streamer", key: "refresh-1" });
 
       const failure = await auth.refresh().catch((err: unknown) => err);
 
-      expect(failure).toMatchObject({
-        kind: "rateLimited",
-        retryAfterSeconds: expect.toBeOneOf([30, 31]),
-      });
+      expect(failure).toMatchObject({ kind: "rateLimited" });
     });
 
     it("keeps a quit waiting until the new token is saved", async () => {
