@@ -7,6 +7,7 @@ import {
   ConnectorResponse,
   fail,
   GiftResponse,
+  keepNewest,
   kindOf,
   toFailure,
 } from "../../common";
@@ -44,7 +45,8 @@ type Connection = {
   retry?: NodeJS.Timeout;
   wake?: () => void;
   // Each handle's viewer id (youtube:<channel id>) in this LIVE, by its
-  // lowercase, for Gifts, which name their sender by handle alone
+  // lowercase, for Gifts, which name their sender by handle alone. The last
+  // IDS_KEPT handles used.
   ids: Map<string, string>;
 };
 
@@ -299,7 +301,7 @@ export class YouTubeConnector extends ConnectorProvider {
   private _events(conn: Connection, actions: ChatAction[]): Mapped[] {
     for (const action of actions) {
       const sender = fromWidget(action);
-      if (sender) conn.ids.set(sender.handle.toLowerCase(), sender.userId);
+      if (sender) this._remember(conn, sender.handle, sender.userId);
     }
     return actions.flatMap(
       (action) => this._named(conn, fromAction(action)) ?? [],
@@ -316,13 +318,18 @@ export class YouTubeConnector extends ConnectorProvider {
     const { user } = mapped.data;
     const handle = user.handle.toLowerCase();
     if (mapped.event !== TOKIO_EVENTS.GIFT) {
-      if (user.userId && handle) conn.ids.set(handle, user.userId);
+      if (user.userId && handle) this._remember(conn, handle, user.userId);
       return mapped;
     }
     const userId = conn.ids.get(handle);
+    if (userId) this._remember(conn, handle, userId);
     return userId
       ? { ...mapped, data: { ...mapped.data, user: { ...user, userId } } }
       : mapped;
+  }
+
+  private _remember(conn: Connection, handle: string, userId: string) {
+    keepNewest(conn.ids, handle.toLowerCase(), userId, this._config.IDS_KEPT);
   }
 
   // The viewers, until the LIVE ends: its count turns into the video's views

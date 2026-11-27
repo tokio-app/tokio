@@ -9,6 +9,7 @@ import {
   DeviceCode,
   fail,
   GiftResponse,
+  keepNewest,
   kindOf,
   PlatformAccount,
   toFailure,
@@ -480,12 +481,7 @@ export class TwitchConnector
         return;
       }
     }
-    // The last used goes to the end, and the oldest out
-    this._pictures.delete(id);
-    this._pictures.set(id, url);
-    if (this._pictures.size > this._config.PICTURES_KEPT) {
-      this._pictures.delete(this._pictures.keys().next().value!);
-    }
+    keepNewest(this._pictures, id, url, this._config.PICTURES_KEPT);
     if (url) user.profilePictures = [url];
   }
 

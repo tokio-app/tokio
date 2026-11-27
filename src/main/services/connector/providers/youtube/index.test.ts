@@ -307,6 +307,31 @@ describe("YouTubeConnector", () => {
       expect(onGift.mock.calls[0][0].gift.coins).toBe(0);
     });
 
+    it("keeps the channel ids of the last IDS_KEPT handles used", async () => {
+      connector = new YouTubeConnector({
+        fetch: youtube.fetch,
+        POLL_MS: 5,
+        IDS_KEPT: 2,
+      });
+      const onGift = capture(TOKIO_EVENTS.GIFT);
+      const star = (handle: string) =>
+        giftAction(handle, "sent Star", "silver_star_v2_320x320");
+      youtube.state.polls = [
+        { actions: [giftCard("Ana", "UCana"), giftCard("Ben", "UCben")] },
+        // Ana's used, so Ben is the oldest when Cy comes
+        { actions: [star("Ana")] },
+        { actions: [giftCard("Cy", "UCcy"), star("Ana"), star("Ben")] },
+      ];
+      await connector.connect("madeup");
+
+      await vi.waitFor(() => expect(onGift).toHaveBeenCalledTimes(3));
+      expect(onGift.mock.calls.map(([e]) => e.user.userId)).toEqual([
+        "youtube:UCana",
+        "youtube:UCana",
+        "youtube:@Ben",
+      ]);
+    });
+
     it("logs a listener's throw and goes on with the poll and the chat", async () => {
       const warn = vi.spyOn(Logger, "warn");
       const onChat = capture(TOKIO_EVENTS.CHAT);

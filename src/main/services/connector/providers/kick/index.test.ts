@@ -4,7 +4,7 @@ import { once } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocket, WebSocketServer } from "ws";
 import type { ReconnectState } from "../../common";
-import type { FetchInit } from "./config";
+import type { FetchInit, KickConfig } from "./config";
 import { KickConnector } from "./index";
 
 const json = (status: number, body: unknown) =>
@@ -40,6 +40,7 @@ describe("KickConnector", () => {
   let port: number;
   let connector: KickConnector;
   let states: ReconnectState[];
+  let options: Partial<KickConfig>;
 
   const capture = (event: TOKIO_EVENTS) => {
     const listener = vi.fn();
@@ -113,7 +114,7 @@ describe("KickConnector", () => {
       return json(404, {});
     });
 
-    connector = new KickConnector({
+    options = {
       fetch,
       USER_AGENT: "Tokio/test",
       CONNECT_RETRY_MS: 10,
@@ -122,7 +123,8 @@ describe("KickConnector", () => {
       TERMINAL_MIN_MS: 60,
       TERMINAL_MAX_MS: 120,
       VIEWERS_MS: 50,
-    });
+    };
+    connector = new KickConnector(options);
     states = [];
     connector.onReconnect((state) => states.push(state));
   });
@@ -370,6 +372,44 @@ describe("KickConnector", () => {
       expect(
         warn.mock.calls.filter(([m]) => m.includes("id of a viewer")),
       ).toHaveLength(1);
+    });
+
+    it("keeps the ids of the last IDS_KEPT names used", async () => {
+      await connector.disconnect();
+      connector = new KickConnector({ ...options, IDS_KEPT: 2 });
+      const onGiftSub = capture(TOKIO_EVENTS.GIFT_SUB);
+      await connector.connect("streamer");
+      const chat = (id: number, username: string) =>
+        publish("chatrooms.20.v2", "App\\Events\\ChatMessageEvent", {
+          content: "hi",
+          sender: { id, username, slug: username },
+        });
+      const gifted = (gifter_username: string) =>
+        publish("chatroom_20", "App\\Events\\GiftedSubscriptionsEvent", {
+          gifter_username,
+          gifted_usernames: ["a"],
+        });
+
+      chat(5, "ana");
+      chat(6, "ben");
+      // Used, so it's the newest
+      gifted("ana");
+      await vi.waitFor(() => expect(onGiftSub).toHaveBeenCalledTimes(1));
+      // Ben is the oldest and goes out
+      chat(7, "cy");
+      gifted("ana");
+      gifted("ben");
+      await vi.waitFor(() => expect(onGiftSub).toHaveBeenCalledTimes(3));
+
+      expect(onGiftSub.mock.calls.map(([e]) => e.user.userId)).toEqual([
+        "kick:5",
+        "kick:5",
+        undefined,
+      ]);
+      expect(kick.urls.filter((u) => u.endsWith("/channels/ana"))).toEqual([]);
+      expect(kick.urls.filter((u) => u.endsWith("/channels/ben"))).toHaveLength(
+        1,
+      );
     });
 
     it("sends a sub under the viewer's id, from chat or a lookup", async () => {

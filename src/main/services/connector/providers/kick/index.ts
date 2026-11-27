@@ -8,6 +8,7 @@ import {
   ConnectorResponse,
   fail,
   GiftResponse,
+  keepNewest,
   kindOf,
   toFailure,
 } from "../../common";
@@ -38,7 +39,8 @@ type Connection = {
   retry?: NodeJS.Timeout;
   wake?: () => void;
   // Each username's viewer id (kick:<id>) in this LIVE, by its lowercase,
-  // from chat and Kicks or a lookup; undefined after a failed lookup
+  // from chat and Kicks or a lookup; undefined after a failed lookup. The
+  // last IDS_KEPT names used.
   ids: Map<string, Promise<string | undefined>>;
   // Subs waiting for their viewer's id, which a stop sends without it
   held: Set<Mapped>;
@@ -272,7 +274,15 @@ export class KickConnector extends ConnectorProvider {
       mapped.event === TOKIO_EVENTS.KICKS
     ) {
       const { username, userId } = mapped.data.user;
-      if (userId) conn.ids.set(username.toLowerCase(), Promise.resolve(userId));
+      if (userId) {
+        const name = username.toLowerCase();
+        keepNewest(
+          conn.ids,
+          name,
+          Promise.resolve(userId),
+          this._config.IDS_KEPT,
+        );
+      }
     }
     if (mapped.event === TOKIO_EVENTS.CHAT) {
       this.emitChat(mapped.data, () => this._conn === conn);
@@ -309,9 +319,9 @@ export class KickConnector extends ConnectorProvider {
   // a failure logged and kept too
   private _userId(conn: Connection, username: string) {
     const name = username.toLowerCase();
-    let id = conn.ids.get(name);
-    if (!id) {
-      id = name
+    const id =
+      conn.ids.get(name) ??
+      (name
         ? lookup(this._config, slugOf(name))
             .then(({ userId }) => {
               if (userId === null) throw new Error("It came without its id.");
@@ -324,9 +334,8 @@ export class KickConnector extends ConnectorProvider {
               );
               return undefined;
             })
-        : Promise.resolve(undefined);
-      conn.ids.set(name, id);
-    }
+        : Promise.resolve(undefined));
+    keepNewest(conn.ids, name, id, this._config.IDS_KEPT);
     return id;
   }
 
