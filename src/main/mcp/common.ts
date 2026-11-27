@@ -222,16 +222,16 @@ export const unknownTriggerKeys = (
     : [];
 
 /** An error result naming the unknown keys, undefined when there are none. */
-export function refuseUnknown(
-  schema: z.core.$ZodType,
-  changes: unknown,
-): CallToolResult | undefined {
-  const keys = unknownKeys(schema, changes);
-  if (keys.length === 0) return undefined;
-  return fail(
-    `Unknown settings: ${keys.join(", ")}. Nothing was saved: see describe for the fields.`,
-  );
-}
+export const refuseKeys = (keys: string[]): CallToolResult | undefined =>
+  keys.length === 0
+    ? undefined
+    : fail(
+        `Unknown settings: ${keys.join(", ")}. Nothing was saved: see describe for the fields.`,
+      );
+
+/** refuseKeys for the keys of `changes` that `schema` has no field for. */
+export const refuseUnknown = (schema: z.core.$ZodType, changes: unknown) =>
+  refuseKeys(unknownKeys(schema, changes));
 
 /** An error result listing what the schema refused. */
 export const invalid = (error: z.ZodError): CallToolResult =>

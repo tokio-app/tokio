@@ -39,6 +39,7 @@ import {
   invokeOk,
   ok,
   pushProfile,
+  refuseKeys,
   unknownTriggerKeys,
   PLATFORM_NOTE,
 } from "../common";
@@ -272,12 +273,8 @@ export const kinds: Kinds = {
       });
     },
     save: async (handler, id, changes) => {
-      const unknown = unknownTriggerKeys(TriggerSchema, changes);
-      if (unknown.length > 0) {
-        return fail(
-          `Unknown settings: ${unknown.join(", ")}. Nothing was saved: see describe for the fields.`,
-        );
-      }
+      const unknown = refuseKeys(unknownTriggerKeys(TriggerSchema, changes));
+      if (unknown) return unknown;
       const changed = guardProfile(handler);
       const { storeManagerService } = handler;
       const profile = await activeProfile(handler);

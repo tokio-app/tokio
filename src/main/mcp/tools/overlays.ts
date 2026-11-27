@@ -40,6 +40,7 @@ import {
   invalid,
   invokeOk,
   ok,
+  refuseKeys,
   unknownKeys,
   unknownTriggerKeys,
 } from "../common";
@@ -312,15 +313,11 @@ export const kinds: Kinds = {
       return ok({ ...overlay, url: getStudioOverlayURL(id) });
     },
     save: async (handler, id, changes) => {
-      const unknown = [
+      const unknown = refuseKeys([
         ...unknownItemKeys(changes.items),
         ...unknownCounterKeys(changes.counters),
-      ];
-      if (unknown.length > 0) {
-        return fail(
-          `Unknown settings: ${unknown.join(", ")}. Nothing was saved: see describe for the fields.`,
-        );
-      }
+      ]);
+      if (unknown) return unknown;
       const stored =
         id === undefined
           ? { id: randomUUID(), name: newStudioName(handler) }
