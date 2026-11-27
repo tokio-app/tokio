@@ -969,8 +969,11 @@ export class StoreManagerService extends Service {
     this._ensureInitialized();
     const entity = this._storeData!.profiles.find((p) => p.file === file);
     if (!entity) return "missing";
+    const path = join(this._pathManagerService.folders.profilesFolder, file);
+    // A sweep's update still writing would otherwise come back on autosave
+    await this._jsonManagerService.whenWritten(path);
     const profile = await this._jsonManagerService.loadFile(
-      join(this._pathManagerService.folders.profilesFolder, file),
+      path,
       ProfileSchema,
     );
     if (!profile) return "missing";

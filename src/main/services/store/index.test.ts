@@ -1515,6 +1515,38 @@ describe("StoreManagerService", () => {
       return () => release();
     };
 
+    it("switches to a profile with an update still writing to it", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      const load = json.loadFile.bind(json);
+      let reading!: () => void;
+      const started = new Promise<void>((resolve) => (reading = resolve));
+      const loadFile = vi
+        .spyOn(json, "loadFile")
+        .mockImplementationOnce((path, schema) => {
+          reading();
+          return load(path, schema);
+        });
+      const saving = store.updateProfileData(
+        { connector: { username: "streamer" } },
+        "stream.json",
+      );
+      // The update is reading. The switch's read ends after the update wrote,
+      // as when a sweep writes the profile meanwhile.
+      await started;
+      loadFile.mockImplementationOnce(async (path, schema) => {
+        const data = await load(path, schema);
+        await saving;
+        return data;
+      });
+
+      expect(await store.updateActiveProfile("stream.json")).toBe("switched");
+
+      expect((await store.getProfileData())?.connector.username).toBe(
+        "streamer",
+      );
+    });
+
     it("holds the new profile in memory while the switch is saving", async () => {
       const store = await init();
       await store.createNewProfile("stream.json", "Stream");
