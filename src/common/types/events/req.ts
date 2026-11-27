@@ -544,6 +544,8 @@ export interface AppEventsMap {
     // Where the trigger's sample comes from (samplePlatform)
     platform?: Platform;
     steps: GameStep[];
+    // Comes back on the reply, so a late one for an older test is dropped
+    request: number;
   };
   // Lights up the action's row on the games overlay, as a run does
   [APP_EVENTS.TEST_GAMES_OVERLAY]: {

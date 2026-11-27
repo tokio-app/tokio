@@ -290,6 +290,7 @@ describe("games events", () => {
       edition: "bedrock",
       trigger: TOKIO_EVENTS.FOLLOW,
       steps: [{ type: "command", command: "say hi" }],
+      request: 7,
     };
 
     it("runs the steps in the action's edition and replies each command with the game's answer", async () => {
@@ -311,7 +312,7 @@ describe("games events", () => {
         steps: request.steps,
       });
       expect(h.replies(APP_EVENTS_RESPONSE.TEST_GAME_ACTION)).toEqual([
-        { success: true, id: "action-1", results },
+        { success: true, id: "action-1", request: 7, results },
       ]);
       expect(h.notices).toEqual([]);
     });
@@ -333,6 +334,7 @@ describe("games events", () => {
         {
           success: false,
           id: "action-1",
+          request: 7,
           results: [],
           error: {
             code: FEEDBACK_CODES.GAME_TEST_FAILED,
@@ -358,6 +360,7 @@ describe("games events", () => {
         {
           success: false,
           id: "action-1",
+          request: 7,
           results: [],
           error: {
             code: FEEDBACK_CODES.GAME_TEST_FAILED,

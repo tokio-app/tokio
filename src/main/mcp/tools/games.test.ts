@@ -275,8 +275,8 @@ describe("games MCP tools", () => {
         platform: "twitch",
         steps: [expect.objectContaining({ type: "spawn", mob: "zombie" })],
       });
-      // The Games page shows them too
-      expect(h.pushed(APP_EVENTS_RESPONSE.TEST_GAME_ACTION)).toHaveLength(1);
+      // Private: a Games row testing the action would take it as its own
+      expect(h.pushed(APP_EVENTS_RESPONSE.TEST_GAME_ACTION)).toEqual([]);
     });
 
     it("gives the test's failure", async () => {

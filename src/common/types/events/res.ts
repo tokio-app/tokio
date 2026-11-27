@@ -570,6 +570,8 @@ export interface AppEventsResponseMap {
   // Each command the test ran, with the game's reply
   [APP_EVENTS_RESPONSE.TEST_GAME_ACTION]: Reply<{
     id: string;
+    // The request's, failures included
+    request: number;
     results: CommandResult[];
   }>;
 

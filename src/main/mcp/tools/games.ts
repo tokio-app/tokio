@@ -277,6 +277,8 @@ export const kinds: Kinds = {
           trigger: action.trigger.type,
           platform: samplePlatform(action.trigger, profile.platforms),
           steps: action.steps,
+          // Its reply is private: only this call gets it
+          request: 0,
         },
         APP_EVENTS_RESPONSE.TEST_GAME_ACTION,
       );

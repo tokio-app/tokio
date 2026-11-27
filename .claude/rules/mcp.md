@@ -36,7 +36,7 @@ paths:
   - `ACTIVE_FEATURES` and `SET_ACTIVITY_FEED`: `pushSettings`.
   - Handlers that already reply their list or the settings need nothing.
   - `PRIVATE_REPLIES` never reach the window.
-- Something a test plays goes on `ALERT_AUDIO`'s `alert-test` channel, since `useAlertTest` drops `TEST_ALERT` replies it didn't number.
+- Something a test plays goes on `ALERT_AUDIO`'s `alert-test` channel, since `useAlertTest` drops `TEST_ALERT` replies it didn't number. A game action's test sends `request: 0`: its reply is private, so no Games row takes it.
 
 ## Never exposed
 

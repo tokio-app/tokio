@@ -67,6 +67,8 @@ const panelElements = () =>
     .filter((button) => button.title === "Remove action")
     .map((button) => button.closest("li")!);
 const panels = () => panelElements().map((panel) => within(panel));
+// The last Test's number, which its reply echoes
+const asked = () => sent(APP_EVENTS.TEST_GAME_ACTION).at(-1)!.request;
 
 const setupSteps = () => screen.queryByText("Open a world with cheats on.");
 
@@ -762,7 +764,7 @@ describe("Games", () => {
   it("tests an action and shows what the game answered", async () => {
     const steps = [command("say hi"), command("bad")];
     const { user } = await load([action("a1", { steps }), action("a2")]);
-    const [first, second] = panels();
+    const [first] = panels();
 
     await user.click(first.getByRole("button", { name: "Test" }));
     expect(sent(APP_EVENTS.TEST_GAME_ACTION)).toEqual([
@@ -772,21 +774,34 @@ describe("Games", () => {
         trigger: TOKIO_EVENTS.FOLLOW,
         platform: "tiktok",
         steps,
+        request: expect.any(Number),
       },
     ]);
 
-    // Another action's reply
+    // Replies that aren't this Test's: an older one's, and another action's
+    const zombie = [{ command: "summon zombie ~ ~ ~", ok: true, message: "" }];
+    await send(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, {
+      success: true,
+      id: "a1",
+      request: asked() - 1,
+      results: zombie,
+    });
     await send(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, {
       success: true,
       id: "a2",
-      results: [{ command: "summon zombie ~ ~ ~", ok: true, message: "" }],
+      request: asked() + 1,
+      results: zombie,
     });
-    expect(first.queryByText("summon zombie ~ ~ ~")).not.toBeInTheDocument();
-    expect(second.queryByText("summon zombie ~ ~ ~")).toBeInTheDocument();
+    expect(screen.queryByText("summon zombie ~ ~ ~")).not.toBeInTheDocument();
+    expect(first.getByRole("button", { name: "Test" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
 
     await send(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, {
       success: true,
       id: "a1",
+      request: asked(),
       results: [
         { command: "say hi", ok: true, message: "[Aku] hi" },
         { command: "bad", ok: false, message: "Syntax error" },
@@ -806,6 +821,7 @@ describe("Games", () => {
     await send(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, {
       success: true,
       id: "a1",
+      request: asked(),
       results: Array.from({ length: 30 }, (_, i) => ({
         command: `say ${i + 1}`,
         ok: true,
@@ -834,6 +850,7 @@ describe("Games", () => {
     await send(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, {
       ...failure(notConnected),
       id: "a1",
+      request: asked(),
       results: [],
     });
 

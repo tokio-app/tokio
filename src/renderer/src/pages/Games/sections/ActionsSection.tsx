@@ -249,6 +249,10 @@ type TestResult = { results: CommandResult[]; error?: string };
 // A test sends up to 100 commands; the last ones are enough to read
 const RESULTS_SHOWN = 25;
 
+// Numbers each Test across mounts, so a reply from before leaving the page
+// can't match a new one
+let requests = 0;
+
 // A sentence with fields inside, its words in spans between them
 const sentence = (message: string, fields: Record<string, ReactNode>) =>
   rich(message, fields).map((part, i) =>
@@ -277,6 +281,8 @@ function ActionItem({
   const { trigger, steps } = action;
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
+  // The Test waiting for its reply
+  const asked = useRef<number | null>(null);
   // The text field the variables go into: the last one focused, or the first
   const [focused, setFocused] = useState(-1);
   const textRef = useRef<HTMLInputElement>(null);
@@ -300,7 +306,8 @@ function ActionItem({
   );
 
   useIpcListener(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, (res) => {
-    if (!res || res.id !== action.id) return;
+    if (!res || res.request !== asked.current) return;
+    asked.current = null;
     setTesting(false);
     setResult({ results: res.results, error: res.error?.message });
   });
@@ -369,7 +376,9 @@ function ActionItem({
             disabled={steps.length === 0}
             onClick={() => {
               setTesting(true);
+              asked.current = ++requests;
               window.api.emit(APP_EVENTS.TEST_GAME_ACTION, {
+                request: asked.current,
                 id: action.id,
                 edition: action.edition,
                 trigger: trigger.type,
