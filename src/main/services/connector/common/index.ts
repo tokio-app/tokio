@@ -1,5 +1,6 @@
 import {
   ChatEvent,
+  Emotes,
   Gift,
   TOKIO_EVENTS,
   TokioEventMap,
@@ -7,6 +8,7 @@ import {
 } from "@/common/types";
 import { formatError } from "@/common/util";
 import Logger from "@/logger";
+import type WebSocket from "ws";
 import { TokioEmitter } from "../../shared/emitter";
 
 // What stopped a connect, so the page can say what to do about it.
@@ -76,6 +78,20 @@ export interface AccountProvider {
     signal: AbortSignal,
   ): Promise<PlatformAccount>;
   signOut(): Promise<void>;
+}
+
+// TikTok's shape for a comment of emotes alone: no content, each emote at 0
+export const emoteOnly = (content: string, emotes: Emotes[]) =>
+  content.trim()
+    ? { content, emotes }
+    : { content: "", emotes: emotes.map((emote) => ({ ...emote, index: 0 })) };
+
+// Closes a socket nothing listens to anymore; its late errors are dropped
+export function discard(socket: WebSocket | null) {
+  if (!socket) return;
+  socket.removeAllListeners();
+  socket.on("error", () => {});
+  socket.terminate();
 }
 
 // Sets key's value as the newest, the oldest out past max

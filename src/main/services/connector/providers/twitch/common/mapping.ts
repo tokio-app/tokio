@@ -7,7 +7,7 @@ import {
   TokioEventMap,
   UserData,
 } from "@/common/types";
-import { rolesOf } from "../../../common";
+import { emoteOnly, rolesOf } from "../../../common";
 
 type Fragment = {
   type: "text" | "cheermote" | "emote" | "mention";
@@ -135,7 +135,7 @@ export function toChat(
   }
   // TikTok's shape: content without the emotes, each at its place in it
   let content = "";
-  let emotes: Emotes[] = [];
+  const emotes: Emotes[] = [];
   for (const f of e.message.fragments) {
     if (f.type === "emote" && f.emote) {
       const id = f.emote.id;
@@ -148,13 +148,8 @@ export function toChat(
       content += f.text;
     }
   }
-  // Only emotes and cheermotes, as TikTok sends an emote-only comment
-  if (!content.trim()) {
-    // A bare "Cheer100": its Bits come from channel.bits.use
-    if (!emotes.length) return null;
-    content = "";
-    emotes = emotes.map((emote) => ({ ...emote, index: 0 }));
-  }
+  // A bare "Cheer100": its Bits come from channel.bits.use
+  if (!content.trim() && !emotes.length) return null;
   const badges = new Set(e.badges.map((b) => b.set_id));
   const months = Number(
     e.badges.find((b) => b.set_id === "subscriber" || b.set_id === "founder")
@@ -169,7 +164,8 @@ export function toChat(
       ),
       ...rolesOf(badges, months),
     },
-    comment: { content, emotes, lang: "" },
+    // Emotes and cheermotes alone are an emote-only comment
+    comment: { ...emoteOnly(content, emotes), lang: "" },
   };
 }
 
