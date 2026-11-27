@@ -4,7 +4,7 @@ import { formatDate } from "@/helper/format";
 import { useLanguage, useT } from "@/ui/i18n";
 import { Modal } from "../Modal";
 import { EntityMetadata } from "@/common/schemas";
-import { RefObject, useEffect, useRef, useState } from "react";
+import { RefObject, useLayoutEffect, useRef, useState } from "react";
 import { Select } from "../Elements";
 import { Field } from "../Page";
 
@@ -283,7 +283,9 @@ export function useFocusAfterDelete(
   fallback: RefObject<HTMLElement | null>,
 ) {
   const deleted = useRef<{ id: string; index: number } | null>(null);
-  useEffect(() => {
+  // A layout effect, so it runs before the delete modal's cleanup, which
+  // would move the focus to the page first
+  useLayoutEffect(() => {
     const row = deleted.current;
     if (!row || ids.includes(row.id)) return;
     deleted.current = null;

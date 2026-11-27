@@ -69,5 +69,5 @@ The look follows the `frontend-design` skill. The palette's values and the logos
 - `Select`'s `OPTION_HEIGHT` is the item's `--control-height` plus the row's 2px padding on each side, so change them together.
 - Number fields use `NumberInput`. It compares values with `Object.is`, so NaN (an overlay number setting saved as text) shows an empty field.
 - Something hidden only by CSS also needs `tabIndex={-1}` and `aria-hidden`.
-- A row deleted from a list takes its focused trash button with it: `useFocusAfterDelete` (`components/DeleteModals`) moves the focus to the row now in its place, else the last row, else a fallback such as the add button.
+- A row deleted from a list takes its focused trash button with it: `useFocusAfterDelete` (`components/DeleteModals`) moves the focus to the row now in its place, else the last row, else a fallback such as the add button. It is a layout effect: the delete modal's cleanup, a passive effect, would move the lost focus to the page first. Its test stands in for that cleanup, since the real modal keeps the order hidden in jsdom.
 - A menu under a toggle button (`ProfileDropdown`, `NotificationBell`) uses `useMenu`, which closes it on a click outside and on Escape, giving the focus back to its toggle.
