@@ -701,6 +701,21 @@ describe("overlays MCP tools", () => {
         });
       });
 
+      it("keeps an editor save that lands while it reads the profile", async () => {
+        const { h, held, store } = seeded();
+        store.getProfileData = async () => {
+          // The editor renames t1 meanwhile
+          const [group, t1] = held[0].items;
+          held[0] = { ...held[0], items: [group, { ...t1, label: "Mine" }] };
+          return { platforms: ["tiktok"] };
+        };
+
+        const res = await edit(h, [{ op: "change", id: "a", set: { x: 5 } }]);
+
+        expect(res.isError).toBe(false);
+        expect(held[0].items[1]).toMatchObject({ id: "t1", label: "Mine" });
+      });
+
       it("adds items with their kind's defaults and new ids", async () => {
         const { h, held } = seeded();
 

@@ -728,11 +728,12 @@ export const tools: ToolDef<any>[] = [
     input: EditInput,
     annotations: WRITE,
     run: async (handler, { id, ops }) => {
+      // Before the read: an editor save landing in this wait would be saved over
+      const platforms = (await activeProfile(handler))?.platforms ?? ["tiktok"];
       const stored = findStudio(handler, id);
       if (!stored) return fail(`No studio overlay ${id}.`);
       const items = structuredClone(stored.items);
       const added: string[] = [];
-      const platforms = (await activeProfile(handler))?.platforms ?? ["tiktok"];
       for (const [i, op] of ops.entries()) {
         try {
           added.push(
