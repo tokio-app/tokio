@@ -36,7 +36,7 @@ const MusicSettings = Music.extend({
 });
 
 // Song titles are viewers' requests: viewer data
-const queueOf = ({ musicService }: Handler) =>
+export const queueOf = ({ musicService }: Handler) =>
   musicService
     .songs()
     .map(({ title, playing, played }) => ({ title, playing, played }));

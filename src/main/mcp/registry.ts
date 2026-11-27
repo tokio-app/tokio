@@ -69,17 +69,18 @@ const toJSONSchema = (schema: z.ZodType) =>
 const Changes = z.record(z.string(), z.unknown());
 
 /** Reads the services directly, never through invoke. */
-const getStatus = ({
-  connectorService,
-  liveService,
-  storeManagerService,
-  controlsService,
-  musicService,
-  gamesService,
-  timerService,
-  serverService,
-  updaterService,
-}: Handler): CallToolResult => {
+const getStatus = (handler: Handler): CallToolResult => {
+  const {
+    connectorService,
+    liveService,
+    storeManagerService,
+    controlsService,
+    musicService,
+    gamesService,
+    timerService,
+    serverService,
+    updaterService,
+  } = handler;
   const settings = storeManagerService.getSettings();
   const { startedAt, totals, usd } = liveService.getSession();
   const stats = storeManagerService.getLiveStats();
@@ -130,12 +131,7 @@ const getStatus = ({
     profile: settings.activeProfile.name,
     music: {
       connected: musicService.isActive(),
-      // Viewers' requests: their titles are viewer data
-      queue: musicService.songs().map(({ title, playing, played }) => ({
-        title,
-        playing,
-        played,
-      })),
+      queue: music.queueOf(handler),
     },
     minecraft: {
       state: minecraft.state,
