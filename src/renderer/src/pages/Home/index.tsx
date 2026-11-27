@@ -326,7 +326,11 @@ export function Home() {
         <ActivitySection
           connected={connected}
           activity={session.activity}
-          feedOff={!feedKinds(platforms).some(({ kind }) => feed[kind])}
+          feedOff={
+            !platforms.some((p) =>
+              feedKinds([p]).some(({ kind }) => feed[p][kind]),
+            )
+          }
           showPlatform={platforms.length > 1}
           onFeedSettings={() => setEditingFeed(true)}
           song={song}

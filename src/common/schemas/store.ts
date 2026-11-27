@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PLATFORMS } from "../types/connector";
+import { type Platform, PLATFORMS } from "../types/connector";
 import type { ControlAction } from "../types/controls";
 import { AlertSoundSchema, knownPlatforms } from "./profile";
 import { StoredStudioOverlaysSchema } from "./studio";
@@ -44,9 +44,9 @@ const TestOverlaySchema = z.object({
   name: z.string(),
 });
 
-// The events the Home page's activity feed shows, by the kinds of
-// ActivityItem. Kinds added later are shown.
-export const ActivityFeedSchema = z.object({
+// The events the Home page's activity feed shows from a platform, by the
+// kinds of ActivityItem. Kinds added later are shown.
+export const FeedKindsSchema = z.object({
   chat: z.boolean().default(true),
   gift: z.boolean().default(true),
   follow: z.boolean().default(true),
@@ -61,6 +61,28 @@ export const ActivityFeedSchema = z.object({
   superchat: z.boolean().default(true),
   kicks: z.boolean().default(true),
 });
+
+/** A z.object's shape with the schema for each platform, none left out. */
+export const perPlatform = <T extends z.ZodType>(schema: T) =>
+  ({
+    tiktok: schema,
+    twitch: schema,
+    youtube: schema,
+    kick: schema,
+  }) satisfies Record<Platform, T>;
+
+// Each platform's kinds (the user's call). A feed saved before they had their
+// own applies to every platform. A platform a newer Tokio saved that this one
+// doesn't know is dropped, and one missing shows everything.
+export const ActivityFeedSchema = z.preprocess(
+  (value) =>
+    value &&
+    typeof value === "object" &&
+    Object.keys(value).some((key) => key in FeedKindsSchema.shape)
+      ? Object.fromEntries(PLATFORMS.map((platform) => [platform, value]))
+      : value,
+  z.object(perPlatform(FeedKindsSchema.prefault({}))),
+);
 
 // The Twitch account Tokio signed in to, the same for every profile. key is
 // the refresh token, encrypted like the provider keys: never sent to the
@@ -193,6 +215,7 @@ export type AppProvider = z.infer<typeof ProviderSchema>;
 export type EntityMetadata = z.infer<typeof EntityMetadataSchema>;
 export type OverlayMetadata = z.infer<typeof OverlayMetaSchema>;
 export type TestOverlay = z.infer<typeof TestOverlaySchema>;
+export type FeedKinds = z.infer<typeof FeedKindsSchema>;
 export type ActivityFeed = z.infer<typeof ActivityFeedSchema>;
 export type TwitchAccount = z.infer<typeof TwitchAccountSchema>;
 export type GamesSettings = z.infer<typeof GamesSettingsSchema>;

@@ -1,5 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, LiveSession } from "@/common/types";
-import { EULER_SIGNUP_URL } from "@/common/util";
+import { defaultStoreData, EULER_SIGNUP_URL } from "@/common/util";
 import { createAlert } from "@/common/util";
 import {
   gifter,
@@ -674,8 +674,9 @@ describe("Home", () => {
 
       await send(
         APP_EVENTS_RESPONSE.GET_SETTINGS,
+        // The profile's platform, TikTok
         settingsReply((s) => {
-          s.settings.activityFeed = {
+          s.settings.activityFeed.tiktok = {
             chat: false,
             gift: false,
             follow: false,
@@ -712,7 +713,7 @@ describe("Home", () => {
       await send(
         APP_EVENTS_RESPONSE.GET_SETTINGS,
         settingsReply((s) => {
-          s.settings.activityFeed.chat = false;
+          s.settings.activityFeed.tiktok.chat = false;
         }),
       );
 
@@ -738,25 +739,10 @@ describe("Home", () => {
       await user.click(kind("Viewers joining"));
       await user.click(dialog().getByRole("button", { name: "Save" }));
 
-      expect(sent(APP_EVENTS.SET_ACTIVITY_FEED)).toEqual([
-        {
-          feed: {
-            chat: false,
-            gift: true,
-            follow: true,
-            share: true,
-            superfan: true,
-            join: false,
-            sub: true,
-            giftsub: true,
-            cheer: true,
-            raid: true,
-            redeem: true,
-            superchat: true,
-            kicks: true,
-          },
-        },
-      ]);
+      const feed = structuredClone(defaultStoreData.settings.activityFeed);
+      feed.tiktok.chat = false;
+      feed.tiktok.join = false;
+      expect(sent(APP_EVENTS.SET_ACTIVITY_FEED)).toEqual([{ feed }]);
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
       await openSettings(user);

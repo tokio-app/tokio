@@ -907,14 +907,59 @@ describe("StoreManagerService", () => {
       );
     });
 
-    it("saves what the feed shows", async () => {
+    it("saves what the feed shows from each platform", async () => {
       const store = await init();
-      const feed = { ...defaultStoreData.settings.activityFeed, chat: false };
+      const feed = structuredClone(defaultStoreData.settings.activityFeed);
+      feed.kick.chat = false;
 
       await store.updateActivityFeed(feed);
 
       expect((await readJSON(storeFile)).settings.activityFeed).toEqual(feed);
       expect((await init()).getSettings().activityFeed).toEqual(feed);
+    });
+
+    it("applies a feed saved before platforms had their own to every platform", async () => {
+      const kinds = { ...defaultStoreData.settings.activityFeed.tiktok };
+      const flat = { ...kinds, chat: false, join: false };
+      await writeFile(
+        storeFile,
+        JSON.stringify({
+          ...defaultStoreData,
+          settings: { ...defaultStoreData.settings, activityFeed: flat },
+        }),
+      );
+
+      const feed = (await init()).getSettings().activityFeed;
+
+      expect(feed).toEqual({
+        tiktok: flat,
+        twitch: flat,
+        youtube: flat,
+        kick: flat,
+      });
+    });
+
+    it("shows everything from a platform it has nothing saved for, and drops one it doesn't know", async () => {
+      const kinds = { ...defaultStoreData.settings.activityFeed.tiktok };
+      await writeFile(
+        storeFile,
+        JSON.stringify({
+          ...defaultStoreData,
+          settings: {
+            ...defaultStoreData.settings,
+            activityFeed: { kick: { ...kinds, chat: false }, trovo: kinds },
+          },
+        }),
+      );
+
+      const feed = (await init()).getSettings().activityFeed;
+
+      expect(feed).toEqual({
+        tiktok: kinds,
+        twitch: kinds,
+        youtube: kinds,
+        kick: { ...kinds, chat: false },
+      });
     });
   });
 

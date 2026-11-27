@@ -133,25 +133,13 @@ describe("settings MCP sections", () => {
 
       const res = await call("update_settings", {
         section: "activity_feed",
-        changes: { join: false },
+        changes: { kick: { chat: false } },
       });
 
       expect(res).toMatchObject({ isError: false, text: "Saved." });
-      const feed = {
-        chat: true,
-        gift: true,
-        follow: true,
-        share: true,
-        superfan: true,
-        join: false,
-        sub: true,
-        giftsub: true,
-        cheer: true,
-        raid: true,
-        redeem: true,
-        superchat: true,
-        kicks: true,
-      };
+      // Kick's chats alone
+      const feed = structuredClone(defaultStoreData.settings.activityFeed);
+      feed.kick.chat = false;
       expect(updateActivityFeed).toHaveBeenCalledExactlyOnceWith(feed);
       expect(setFeed).toHaveBeenCalledWith(feed);
       expect(h.pushed(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);

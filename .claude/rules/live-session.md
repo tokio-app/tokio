@@ -23,7 +23,8 @@ paths:
   - Minute 0's counts push nothing. The first count of each later minute pushes the session once, through its throttle, and `DISCONNECTED` cancels a push still waiting.
   - Home draws every minute but the last, then the live `VIEWS` count, so the chart's end moves with the readout.
 - The feed and the viewers stay after the LIVE ends, until the next one starts.
-- `settings.activityFeed` picks the kinds of events the feed keeps, for every profile, saved from Home's `FeedModal` with `SET_ACTIVITY_FEED`. `LiveService.setFeed` applies it when the app loads and on save, dropping the items it now hides. Hidden events aren't kept but still count toward the totals.
+- `settings.activityFeed` picks the kinds of events the feed keeps from each platform, for every profile, saved from Home's `FeedModal` with `SET_ACTIVITY_FEED`. With two or more platforms the modal has a tab for each, listing the kinds it sends (the user's call), so Kick's chats can go while TikTok's stay. `LiveService.setFeed` applies it when the app loads and on save, dropping the items it now hides. Hidden events aren't kept but still count toward the totals.
+  - A feed saved before platforms had their own applies to every platform (`ActivityFeedSchema`'s preprocess). An older Tokio reads the new one as everything shown.
 - Past LIVEs are kept by `HistoryService`, which counts the same span on its own: see `.claude/rules/history.md`.
 
 ## Home

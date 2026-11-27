@@ -1,5 +1,5 @@
 import { listOf, MessageKey, translate } from "@/common/i18n";
-import { ActivityFeed, Alert } from "@/common/schemas";
+import { Alert, FeedKinds } from "@/common/schemas";
 import {
   ActivityUser,
   AlertTrigger,
@@ -36,7 +36,7 @@ export const NO_SESSION: LiveSession = {
 // The kinds of events the feed can show, as its settings list them, with
 // the event each comes from
 const FEED_KINDS: {
-  kind: keyof ActivityFeed;
+  kind: keyof FeedKinds;
   label: MessageKey;
   trigger: AlertTrigger;
 }[] = [
