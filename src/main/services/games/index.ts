@@ -24,6 +24,7 @@ import {
   generateTriggerSample,
   IMAGE_EXTENSIONS,
 } from "@/common/util";
+import type { MessageKey } from "@/common/i18n";
 import { t } from "@/helper/i18n";
 import { importFile } from "@/helper/library";
 import { GiftStreaks } from "@/helper/streaks";
@@ -40,9 +41,15 @@ import { MinecraftConnection } from "./minecraft";
  * Why an action's commands didn't all run: offline when no game of the
  * action's edition was connected, otherwise the game refused one, with its
  * reply in message. full when the action had MAX_BACKLOG runs waiting, so
- * the event's were skipped.
+ * the event's were skipped. key is message's when Tokio failed the command,
+ * not the game.
  */
-type GameError = { offline: boolean; full?: boolean; message: string };
+type GameError = {
+  offline: boolean;
+  full?: boolean;
+  message: string;
+  key?: MessageKey;
+};
 
 // The wait between two runs of an action, so a burst doesn't flood the game
 export const RUN_GAP_MS = 100;
@@ -341,9 +348,9 @@ export class GamesService extends Service {
     const answers = async () => {
       const sent = sending.map(async ({ command, mayFail }) => {
         const result = await this._minecraft.send(command, edition);
-        // A clear that found nothing to take did its job; a game that left
-        // still fails it
-        return mayFail && !result.dropped ? { ...result, ok: true } : result;
+        // A clear that found nothing to take did its job; one that never
+        // reached the game, or got no answer, still fails
+        return mayFail && !result.key ? { ...result, ok: true } : result;
       });
       sending = [];
       const answered = await Promise.all(sent);
@@ -455,7 +462,11 @@ export class GamesService extends Service {
           // edition, the run counts as done and the rest go to the new one.
           const offline = this._unreachable(action.edition) !== undefined;
           if (offline || !failed.dropped) {
-            this._onError?.(action, { offline, message: failed.message });
+            this._onError?.(action, {
+              offline,
+              message: failed.message,
+              key: failed.key,
+            });
           }
           if (offline) break;
         }

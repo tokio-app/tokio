@@ -91,10 +91,12 @@ const request = (requestId: string, commandLine: string, version: number) =>
     body: { version, commandLine, origin: { type: "player" } },
   });
 
-const failed = (command: string, message: string): CommandResult => ({
+// Tokio's own failure, which carries its key so the log can be English
+const failed = (command: string, key: MessageKey): CommandResult => ({
   command,
   ok: false,
-  message,
+  message: t(key),
+  key,
 });
 
 /**
@@ -168,16 +170,16 @@ export class MinecraftConnection {
     // A game that took over during a launch's wait can still be in its handshake
     if (this._game && !this._game.ready) await this.settled();
     if (!this._game?.ready) {
-      return failed(command, t("main.minecraft.notConnected"));
+      return failed(command, "main.minecraft.notConnected");
     }
     if (edition && edition !== this._game.edition) {
       return {
-        ...failed(command, t("main.minecraft.notConnected")),
+        ...failed(command, "main.minecraft.notConnected"),
         dropped: true,
       };
     }
     if (this._waiting.length >= MAX_WAITING) {
-      return failed(command, t("main.minecraft.tooManyWaiting"));
+      return failed(command, "main.minecraft.tooManyWaiting");
     }
     return new Promise((resolve) => {
       this._waiting.push({ command, resolve });
@@ -338,7 +340,7 @@ export class MinecraftConnection {
     for (const { command, resolve, timer } of commands) {
       clearTimeout(timer);
       resolve({
-        ...failed(command, t("main.minecraft.disconnected")),
+        ...failed(command, "main.minecraft.disconnected"),
         dropped: true,
       });
     }
@@ -389,7 +391,7 @@ export class MinecraftConnection {
         () =>
           this._finish(
             requestId,
-            failed(next.command, t("main.minecraft.noAnswer")),
+            failed(next.command, "main.minecraft.noAnswer"),
           ),
         this._timeoutMs,
       );

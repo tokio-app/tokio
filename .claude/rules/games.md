@@ -43,7 +43,7 @@ The **Games** page connects Minecraft to Tokio: Bedrock Edition by itself, Java 
 - `onStatus` pushes `GAMES` on every change. A failed listen at startup keeps the setting on and warns once (`GAME_LISTEN_FAILED`); the page shows the status.
 - `registerGames` (`src/main/events/init.ts`) turns `onError` into notices:
   - `GAME_NOT_CONNECTED`, key `game:minecraft:offline`, 60 s: an action ran with the toggle on and no game of its edition. It names the edition and its command (`MINECRAFT_CONNECT_COMMANDS`, also the page's).
-  - `GAME_COMMAND_FAILED`, key `game:<action id>`, `REPEAT_NOTICE_MS`: the game refused a command.
+  - `GAME_COMMAND_FAILED`, key `game:<action id>`, `REPEAT_NOTICE_MS`: the game refused a command, or Tokio failed it. Tokio's own failures carry their locale `key`, and the log line takes its English text.
   - `GAME_BACKLOG_FULL`, key `game:<action id>:full`, `REPEAT_NOTICE_MS`: an event's runs were skipped.
 - `GAME_ACTION_FAILED` reports an unexpected throw from `dispatchGames`. The toggle, the autosave and Test send no success notices.
 

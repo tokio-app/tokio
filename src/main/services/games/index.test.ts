@@ -51,7 +51,13 @@ const fakeMinecraft = (
       ): Promise<CommandResult> => {
         // A game of the other edition drops it, as MinecraftConnection does
         if (sentFor && fake.status.edition && fake.status.edition !== sentFor) {
-          return { command, ok: false, message: "", dropped: true };
+          return {
+            command,
+            ok: false,
+            message: "",
+            key: "main.minecraft.notConnected",
+            dropped: true,
+          };
         }
         fake.sent.push(command);
         return fake.answer(command);
@@ -303,9 +309,23 @@ describe("GamesService", () => {
         command,
         ok: false,
         message: "Minecraft disconnected.",
+        key: "main.minecraft.disconnected",
         dropped: true,
       });
       expect((await games.test(test)).data?.[0].ok).toBe(false);
+      // So does one that never reached the game, or got no answer
+      for (const key of [
+        "main.minecraft.noAnswer",
+        "main.minecraft.tooManyWaiting",
+      ] as const) {
+        minecraft.answer = (command) => ({
+          command,
+          ok: false,
+          message: "",
+          key,
+        });
+        expect((await games.test(test)).data?.[0].ok).toBe(false);
+      }
     });
 
     it("picks a random boss again for each run of a streak", async () => {

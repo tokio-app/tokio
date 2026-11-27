@@ -1072,6 +1072,30 @@ describe("init events", () => {
       expect(logWarn.mock.calls).toEqual([logged, logged, logged]);
     });
 
+    it("logs Tokio's own failure of a command in English", async () => {
+      setLanguage("es-419");
+      const s = await live();
+      const fail = s.gamesService.onError.mock.calls[0][0];
+
+      fail(action, {
+        offline: false,
+        message: "Minecraft no respondió.",
+        key: "main.minecraft.noAnswer",
+      });
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          message: expect.stringContaining("Minecraft no respondió."),
+        }),
+      ]);
+      expect(logWarn.mock.calls).toEqual([
+        [
+          "<Games> A command of the Follow action failed -- Minecraft didn't answer.",
+          "games.log",
+        ],
+      ]);
+    });
+
     it("warns that an action's backlog is full at most once every 30 seconds", async () => {
       const s = await live();
       const fail = s.gamesService.onError.mock.calls[0][0];

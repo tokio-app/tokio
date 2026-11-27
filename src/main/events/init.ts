@@ -773,7 +773,7 @@ const registerGames = (handler: AppHandlerVariables) => {
     });
   });
   // Logged once per notice, as they can repeat on every event
-  games.onError((action, { offline, full, message }) => {
+  games.onError((action, { offline, full, message, key }) => {
     const label = t(ALERT_TRIGGER_LABELS[action.trigger.type]);
     // Logs stay English
     const logged = translate(
@@ -825,7 +825,7 @@ const registerGames = (handler: AppHandlerVariables) => {
       )
     ) {
       Logger.warn(
-        `<Games> A command of the ${logged} action failed -- ${message}`,
+        `<Games> A command of the ${logged} action failed -- ${key ? translate(DEFAULT_LANGUAGE, key) : message}`,
         paths.files.logs.games,
       );
     }
