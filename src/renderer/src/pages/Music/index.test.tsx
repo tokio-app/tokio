@@ -330,7 +330,7 @@ describe("Music", () => {
     expect(check).not.toBeChecked();
     // Its rule shows under it, not only on hover
     expect(check).toHaveAccessibleDescription(
-      "A viewer waits for their song to play before asking for another. A song already playing or waiting isn't added again.",
+      "Until their song plays. Songs already playing or waiting aren't added twice.",
     );
     expect(check).not.toHaveAttribute("title");
 
@@ -347,7 +347,7 @@ describe("Music", () => {
     });
     expect(check).toBeChecked();
     expect(check).toHaveAccessibleDescription(
-      "Only you and your moderators can use Next and Previous, or revoke any song. Viewers can still skip their own song while it plays and revoke their own requests.",
+      "Only you and your moderators can use them. Viewers can still skip or revoke their own songs.",
     );
 
     await user.click(check);

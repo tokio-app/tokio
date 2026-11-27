@@ -112,7 +112,7 @@ describe("PermissionsSection", () => {
     expect(level()).toBeDisabled();
     expect(
       screen.getByText(
-        "Anyone who is one of these, or has the fan level, can use TTS. With none checked, everyone can.",
+        "Any one of these is enough. With none checked, everyone can.",
       ),
     ).toBeInTheDocument();
 
@@ -295,7 +295,7 @@ describe("PermissionsSection with other platforms", () => {
     expect(box("VIPs")).toBeDisabled();
     expect(
       screen.getByText(
-        "Anyone who is one of these can use TTS. With none checked, everyone can.",
+        "Any one of these is enough. With none checked, everyone can.",
       ),
     ).toBeInTheDocument();
   });
