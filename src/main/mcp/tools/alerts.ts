@@ -95,8 +95,10 @@ const triggerSummary = ({
   user,
   min_coins,
   roles,
+  platform,
 }: Alert["trigger"]) => ({
   type,
+  ...(platform && { platform }),
   ...(gifts.length > 0 && { gifts }),
   ...(every_gift && { every_gift }),
   ...(emotes.length > 0 && { emotes }),

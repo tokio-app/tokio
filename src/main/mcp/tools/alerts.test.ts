@@ -267,6 +267,7 @@ describe("alerts MCP tools", () => {
             ...createAlert().trigger,
             type: TOKIO_EVENTS.GIFT,
             gifts: [2],
+            platform: "tiktok",
           },
         }),
       ]);
@@ -281,7 +282,11 @@ describe("alerts MCP tools", () => {
             id: "a2",
             name: "Roses",
             enabled: true,
-            trigger: { type: TOKIO_EVENTS.GIFT, gifts: [2] },
+            trigger: {
+              type: TOKIO_EVENTS.GIFT,
+              platform: "tiktok",
+              gifts: [2],
+            },
             also_triggers: [],
             sound: null,
             message: null,
