@@ -28,7 +28,7 @@ export type StatsTab = Platform | "all";
 const NO_PART: HistoryTotals = { amount: 0, gifts: 0, giftSubs: 0 };
 
 /**
- * The platforms the LIVEs were on, in Home's order: an older LIVE was
+ * The platforms the LIVEs were on, in PLATFORMS order: an older LIVE was
  * TikTok's. TikTok's alone without LIVEs.
  */
 export function historyPlatforms(lives: LiveSummary[]): Platform[] {

@@ -682,7 +682,7 @@ describe("home events", () => {
       expect(h.notices).toEqual([]);
     });
 
-    it("saves the known ones in Home's order, with no notice", async () => {
+    it("saves the known ones in the order sent, with no notice", async () => {
       const { h, storeManagerService, timerService } = setup();
 
       await h.invoke(home, APP_EVENTS.SET_PLATFORMS, {
@@ -697,28 +697,28 @@ describe("home events", () => {
       });
 
       expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
-        platforms: ["tiktok", "twitch"],
+        platforms: ["twitch", "tiktok"],
       });
       expect(h.replies(APP_EVENTS_RESPONSE.SET_PLATFORMS)).toEqual([
-        { success: true, platforms: ["tiktok", "twitch"] },
+        { success: true, platforms: ["twitch", "tiktok"] },
       ]);
       expect(timerService.setPlatforms).toHaveBeenCalledWith([
-        "tiktok",
         "twitch",
+        "tiktok",
       ]);
       expect(h.notices).toEqual([]);
     });
 
-    it("adds a platform while live, and keeps one that's on", async () => {
+    it("adds a platform while live, and keeps one that's on after them", async () => {
       const { h, storeManagerService } = setup({ tiktok: "connected" });
 
       await h.invoke(home, APP_EVENTS.SET_PLATFORMS, { platforms: ["kick"] });
 
       expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
-        platforms: ["tiktok", "kick"],
+        platforms: ["kick", "tiktok"],
       });
       expect(h.replies(APP_EVENTS_RESPONSE.SET_PLATFORMS)).toEqual([
-        { success: true, platforms: ["tiktok", "kick"] },
+        { success: true, platforms: ["kick", "tiktok"] },
       ]);
       expect(h.notices).toEqual([]);
     });

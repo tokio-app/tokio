@@ -126,7 +126,7 @@ function liveStats(
 // money: value is US dollars. null: not known yet.
 export type Stat = { label: MessageKey; value: number | null; money?: boolean };
 
-// The platforms in the LIVE, in Home's order: up now, or with numbers in it
+// The platforms in the LIVE, in PLATFORMS order: up now, or with numbers in it
 export const livePlatforms = (
   status: Partial<Record<Platform, PlatformStatus>>,
   session: LiveSession,

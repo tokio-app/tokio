@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -155,5 +155,83 @@ describe("Tabs", () => {
 
     await user.click(screen.getByTitle("Remove YouTube", { exact: true }));
     expect(onClose).toHaveBeenLastCalledWith("YouTube");
+  });
+
+  describe("moving tabs", () => {
+    // All stays last
+    const MOVABLE = [
+      { value: "TikTok", label: "TikTok", movable: true },
+      { value: "Twitch", label: "Twitch", movable: true },
+      { value: "All", label: "All" },
+    ];
+    const tab = (name: string) => screen.getByRole("tab", { name });
+    const names = () => screen.getAllByRole("tab").map((t) => t.textContent);
+
+    function Reorderable({ onReorder }: { onReorder: (v: string[]) => void }) {
+      const [tabs, setTabs] = useState(MOVABLE);
+      return (
+        <Tabs
+          tabs={tabs}
+          value="TikTok"
+          onChange={vi.fn()}
+          onReorder={(values) => {
+            onReorder(values);
+            setTabs(values.map((v) => MOVABLE.find((t) => t.value === v)!));
+          }}
+        />
+      );
+    }
+
+    it("moves the focused tab with Alt and an arrow, never past one that stays", async () => {
+      const user = userEvent.setup();
+      const onReorder = vi.fn();
+      render(<Reorderable onReorder={onReorder} />);
+      expect(tab("TikTok")).toHaveAttribute(
+        "aria-keyshortcuts",
+        "Alt+ArrowLeft Alt+ArrowRight",
+      );
+      expect(tab("All")).not.toHaveAttribute("aria-keyshortcuts");
+
+      await user.tab();
+      await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
+      expect(onReorder).toHaveBeenCalledWith(["Twitch", "TikTok", "All"]);
+      expect(names()).toEqual(["Twitch", "TikTok", "All"]);
+      expect(tab("TikTok")).toHaveFocus();
+
+      await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
+      expect(onReorder).toHaveBeenCalledOnce();
+      expect(tab("TikTok")).toHaveFocus();
+    });
+
+    it("moves a tab dropped on another, and nothing when the drag ends elsewhere", () => {
+      const onReorder = vi.fn();
+      render(<Reorderable onReorder={onReorder} />);
+      expect(tab("TikTok")).toHaveAttribute("draggable", "true");
+      expect(tab("All")).not.toHaveAttribute("draggable");
+
+      fireEvent.dragStart(tab("TikTok"), { dataTransfer: {} });
+      fireEvent.dragEnter(tab("Twitch"));
+      fireEvent.dragEnd(tab("TikTok"));
+      expect(onReorder).not.toHaveBeenCalled();
+
+      fireEvent.dragStart(tab("TikTok"), { dataTransfer: {} });
+      fireEvent.dragEnter(tab("Twitch"));
+      // Not onto All
+      fireEvent.dragEnter(tab("All"));
+      fireEvent.drop(tab("All"));
+      expect(onReorder).toHaveBeenCalledWith(["Twitch", "TikTok", "All"]);
+      expect(names()).toEqual(["Twitch", "TikTok", "All"]);
+    });
+
+    it("leaves tabs in place without onReorder", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(<Tabs tabs={MOVABLE} value="TikTok" onChange={onChange} />);
+      expect(tab("TikTok")).not.toHaveAttribute("draggable");
+
+      await user.tab();
+      await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
+      expect(onChange).toHaveBeenCalledWith("Twitch");
+    });
   });
 });

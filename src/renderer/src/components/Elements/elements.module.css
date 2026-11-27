@@ -707,4 +707,18 @@
   color: var(--font-primary);
 }
 
+/* A tab being dragged stays in its place, its × with it */
+.tab_dragged {
+  opacity: 0.4;
+}
+
+/* The line where the dragged tab lands, drawn inside so nothing shifts */
+.tab_before {
+  box-shadow: inset 2px 0 var(--accent-primary);
+}
+
+.tab_after {
+  box-shadow: inset -2px 0 var(--accent-primary);
+}
+
 /* TABS END */
