@@ -435,6 +435,26 @@ describe("TTSService", () => {
       expect(await say("!Tts hi", s)).toEqual(["hi"]);
     });
 
+    it("takes dot's and slash's own prefix, whatever value was saved", async () => {
+      const s = settings((s) => {
+        s.format.trigger = { mode: "dot", value: "" };
+      });
+
+      expect(await say(".hello", s)).toEqual(["hello"]);
+      expect(await say("hello", s)).toEqual([]);
+      s.format.trigger = { mode: "slash", value: "!tts" };
+      expect(await say("/hi", s)).toEqual(["hi"]);
+      expect(await say("!tts hi", s)).toEqual([]);
+    });
+
+    it("cuts a trigger whose letters lowercase longer", async () => {
+      const s = settings((s) => {
+        s.format.trigger = { mode: "custom", value: "!i\u0307" };
+      });
+
+      expect(await say("!\u0130 merhaba", s)).toEqual(["merhaba"]);
+    });
+
     it("reads nothing with a blank custom command", async () => {
       const s = settings((s) => {
         s.format.trigger = { mode: "custom", value: " " };

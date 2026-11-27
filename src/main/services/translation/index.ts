@@ -1,6 +1,10 @@
 import { ChatEvent, ChatTranslation, TranslationTest } from "@/common/types";
 import { baseLanguage, delay, TRANSLATION_LANGUAGES } from "@/common/util";
-import { hasKeyword, startsWithCommand } from "@/helper/chat";
+import {
+  hasAnyKeyword,
+  startsWithCommand,
+  startsWithTrigger,
+} from "@/helper/chat";
 import { Service } from "../shared";
 import { Translated, TranslationError } from "./common";
 import { translateWithGoogle } from "./providers/google";
@@ -58,15 +62,10 @@ type Parts = {
 function split(content: string, commands: ChatCommands): Parts | null {
   if (commands.commands.some((command) => startsWithCommand(content, command)))
     return null;
-  if (commands.keywords.some((k) => k.trim() && hasKeyword(content, k))) {
-    return null;
-  }
-  // Matched as TTS matches it, in any case
-  const { trigger } = commands;
-  const triggered =
-    trigger.trim() !== "" &&
-    content.slice(0, trigger.length).toLowerCase() === trigger.toLowerCase();
-  const start = triggered ? trigger.length : 0;
+  const keywords = commands.keywords.filter((k) => k.trim());
+  if (hasAnyKeyword(content, keywords)) return null;
+  // Matched and cut as TTS does
+  const start = Math.max(startsWithTrigger(content, commands.trigger), 0);
   const rest = content.slice(start);
   const lead = LEADING.exec(rest)![0];
   const middle = rest.slice(lead.length);

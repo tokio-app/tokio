@@ -15,7 +15,7 @@ paths:
 - Google's free endpoint only. DeepL was built and taken out (the user's call): its free API plan is now a one-time 1,000,000 characters, then a paid plan streamers wouldn't pay for.
 - One picker, **Settings → Chat translation** (`settings.translation.language`, `""` is off), for every feature. An English voice may end up reading Spanish.
 - `{comment}` stays as the viewer typed it. `comment.translation` and `{translation}` carry the translation, and the windows offer `{translation}` only while a language is picked and the profile has TikTok (`useVariables`, `shownVariables`). TTS's **Read translations** (`tts.format.translate`), shown only with TikTok, puts the translation in `{comment}`'s place.
-- Commands stay as typed: music controls' (the song name after one too), overlays' (registered in their own files), and the keywords of chat triggers. The TTS trigger stays at the start and the rest is translated.
+- Commands stay as typed: music controls' (the song name after one too), overlays' (registered in their own files), and the keywords of chat triggers. The TTS trigger stays at the start and the rest is translated, matched and cut by TTS's own `triggerPrefix` and `startsWithTrigger`, since TTS cuts the translation where it cuts the comment.
 - Mentions never reach the engine.
 - A tester in Settings (`TEST_TRANSLATION`).
 

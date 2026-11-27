@@ -6,11 +6,13 @@ import {
   formatError,
   TaskQueue,
 } from "@/common/util";
+import { triggerPrefix } from "@/common/util/tts";
 import {
   INVISIBLE,
   isBlank,
   removeEmojis,
   sameHandle,
+  startsWithTrigger,
   wholeWord,
 } from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
@@ -224,8 +226,11 @@ export class TTSService extends ProviderService<TTSProvider> {
   // (the translation starts with it as typed), and the one that is read
   private _comment(settings: Profile["tts"], chat: ChatEvent): Comment {
     const { trigger, translate } = settings.format;
-    const cut = (text: string) =>
-      trigger.mode === "any" ? text : text.slice(trigger.value.length).trim();
+    const prefix = triggerPrefix(trigger);
+    const cut = (text: string) => {
+      const at = startsWithTrigger(text, prefix);
+      return at < 0 ? text : text.slice(at).trim();
+    };
     const typed = cut(chat.comment.content);
     const translation =
       chat.comment.translation && cut(chat.comment.translation.text);
@@ -234,13 +239,15 @@ export class TTSService extends ProviderService<TTSProvider> {
   }
 
   private _valid(settings: Profile["tts"], chat: ChatEvent, comment: Comment) {
-    // In any case: phone keyboards often capitalize the first letter
+    // In any case: phone keyboards often capitalize the first letter. A
+    // blank command matches nothing, since it would match every message.
     const { trigger } = settings.format;
-    if (trigger.mode !== "any") {
-      // A blank command would match every message
-      if (!trigger.value.trim()) return false;
-      const start = chat.comment.content.slice(0, trigger.value.length);
-      if (start.toLowerCase() !== trigger.value.toLowerCase()) return false;
+    const prefix = triggerPrefix(trigger);
+    if (
+      trigger.mode !== "any" &&
+      startsWithTrigger(chat.comment.content, prefix) < 0
+    ) {
+      return false;
     }
     // Nothing to read, like only the trigger, or only emojis when they're
     // removed

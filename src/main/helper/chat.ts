@@ -66,12 +66,39 @@ export function cleanText(
  * emojis is looked for as written.
  */
 export function hasKeyword(content: string, keyword: string): boolean {
-  if (!keyword.trim()) return true;
-  const needle = cleanText(keyword, { asciiOnly: true });
-  if (!needle) return content.includes(keyword.trim());
+  return hasAnyKeyword(content, [keyword]);
+}
 
-  const pattern = new RegExp(wholeWord(needle), "v");
-  return pattern.test(cleanText(content, { asciiOnly: true }));
+/** Whether the chat has any of the keywords, each read as hasKeyword does. */
+export function hasAnyKeyword(content: string, keywords: string[]): boolean {
+  // Cleaned once for all of them
+  let cleaned: string | undefined;
+  return keywords.some((keyword) => {
+    if (!keyword.trim()) return true;
+    const needle = cleanText(keyword, { asciiOnly: true });
+    if (!needle) return content.includes(keyword.trim());
+
+    cleaned ??= cleanText(content, { asciiOnly: true });
+    return new RegExp(wholeWord(needle), "v").test(cleaned);
+  });
+}
+
+/**
+ * Where the chat goes on after the prefix it starts with, in any case, or -1.
+ * A blank prefix matches none.
+ */
+export function startsWithTrigger(content: string, prefix: string): number {
+  if (!prefix.trim()) return -1;
+  const wanted = prefix.toLowerCase();
+  // Not at prefix.length: some letters lowercase to two, like the Turkish
+  // dotted capital I to an i and a combining dot
+  let cut = 0;
+  for (const char of content) {
+    cut += char.length;
+    const start = content.slice(0, cut).toLowerCase();
+    if (start.length >= wanted.length) return start === wanted ? cut : -1;
+  }
+  return -1;
 }
 
 /**
@@ -79,10 +106,9 @@ export function hasKeyword(content: string, keyword: string): boolean {
  * a space and its args. An empty command matches none.
  */
 export function startsWithCommand(content: string, command: string): boolean {
-  const name = command.trim().toLowerCase();
-  if (!name) return false;
-  if (content.slice(0, name.length).toLowerCase() !== name) return false;
-  const next = content.charAt(name.length);
+  const cut = startsWithTrigger(content, command.trim());
+  if (cut < 0) return false;
+  const next = content.charAt(cut);
   return next === "" || /\s/.test(next);
 }
 

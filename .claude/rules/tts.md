@@ -51,7 +51,8 @@ paths:
 ## Chat TTS
 
 - `TTSService.talk` makes a chat message's audio on a `TaskQueue` (the TTS page's cooldown and queue length), and doesn't check a message a full queue would drop (`TaskQueue.full()`).
-- With a trigger other than "any", the comment must start with it, in any case (phones capitalize the first letter), and it's cut off and not read. A blank command reads nothing, since it would match every message.
+- With a trigger other than "any", the comment must start with its prefix (`triggerPrefix`, `src/common/util/tts.ts`), in any case (phones capitalize the first letter), and it's cut off and not read. Dot and slash take their own prefix whatever `value` holds, so a mode saved alone (MCP) still reads; custom takes `value`. A blank command reads nothing, since it would match every message.
+  - `startsWithTrigger` (`src/main/helper/chat.ts`) matches it and says where to cut, for TTS and chat translation alike. Cut there, never at the prefix's length: a lowercased Turkish dotted I is two characters.
 - A message that's empty once the trigger is cut, or only invisible characters (`isBlank`, `src/main/helper/chat.ts`), is skipped. So is one whose filled text has no letter, number or emoji, since Edge sends no audio for punctuation alone; `prepareText` refuses it, so the page's tester warns.
 - Replacements match whole words in any case, as keywords do (`wholeWord`, `.claude/rules/triggers.md`).
 - Banned words are checked in the comment, the name and the handle, not in the template's own words.

@@ -132,6 +132,13 @@ describe("chatCommands", () => {
     expect((await chatCommands(services(profile))).keywords).toEqual([]);
   });
 
+  it("takes dot's and slash's own prefix, whatever value was saved", async () => {
+    const profile = structuredClone(defaultProfile);
+    profile.tts.format.trigger = { mode: "dot", value: "" };
+
+    expect((await chatCommands(services(profile))).trigger).toBe(".");
+  });
+
   it("has no trigger while TTS reads every message", async () => {
     const profile = structuredClone(defaultProfile);
     profile.tts.format.trigger = { mode: "any", value: "!tts" };

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  hasAnyKeyword,
   hasKeyword,
   isBlank,
   isUser,
   removeEmojis,
   sameHandle,
   startsWithCommand,
+  startsWithTrigger,
 } from "./chat";
 
 describe("removeEmojis", () => {
@@ -110,8 +112,38 @@ describe("startsWithCommand", () => {
     ["!playlist", "!play", false],
     ["say !play", "!play", false],
     ["anything", "   ", false],
+    // A Turkish dotted capital I lowercases to two characters
+    ["!\u0130stek song", "!\u0130stek", true],
+    ["!\u0130STEK", "!i\u0307stek", true],
   ])("%j starts with %j: %s", (content, command, expected) => {
     expect(startsWithCommand(content, command)).toBe(expected);
+  });
+});
+
+describe("startsWithTrigger", () => {
+  it.each([
+    [".hello", ".", 1],
+    ["!TTS hi", "!tts", 4],
+    ["!ttshi", "!tts", 4],
+    ["hello", ".", -1],
+    ["!t", "!tts", -1],
+    ["hello", "", -1],
+    ["hello", "  ", -1],
+    // Cut after the letter typed, not at the prefix's length
+    ["\u0130yi geceler", "i\u0307yi", 3],
+    ["\u0130yi", "\u0130yi", 3],
+  ])("%j after %j: %d", (content, prefix, expected) => {
+    expect(startsWithTrigger(content, prefix)).toBe(expected);
+  });
+});
+
+describe("hasAnyKeyword", () => {
+  it("reads each keyword as hasKeyword does", () => {
+    expect(hasAnyKeyword("I love Café", ["jump", "cafe"])).toBe(true);
+    expect(hasAnyKeyword("I love Café", ["jump", "caf"])).toBe(false);
+    expect(hasAnyKeyword("party 🎉", ["🎉"])).toBe(true);
+    expect(hasAnyKeyword("hello", [])).toBe(false);
+    expect(hasAnyKeyword("hello", ["jump", " "])).toBe(true);
   });
 });
 
