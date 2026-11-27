@@ -112,6 +112,24 @@ describe("periodText", () => {
         NOW,
       ),
     ).toMatch(/^Oct 1, 2026 to Oct 20, 2026, 6:00\sPM$/);
+    // The whole day without a time, though the other end has one
+    expect(
+      periodText(
+        custom({ from: at("2026-11-10", "20:00"), to: at("2026-11-10") }),
+        "en",
+        NOW,
+      ),
+    ).toBe("Nov 10, 2026 to Nov 10, 2026");
+    expect(
+      periodText(
+        custom({
+          from: at("2026-11-09", "08:00"),
+          to: at("2026-11-10", "20:00"),
+        }),
+        "en",
+        NOW,
+      ),
+    ).toMatch(/^Nov 9, 2026, 8:00\sAM to Nov 10, 2026, 8:00\sPM$/);
     expect(
       periodText(
         custom({ operator: "before", from: at("2026-10-30") }),

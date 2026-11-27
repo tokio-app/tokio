@@ -263,8 +263,9 @@ export function periodText(
         date: text(from),
       });
     default: {
-      const [first, last] =
-        moment(from) <= moment(to) ? [from, to] : [to, from];
+      // Each end the one dateRange takes it from
+      const first = moment(from) <= moment(to) ? from : to;
+      const last = momentEnd(from) >= momentEnd(to) ? from : to;
       return translate(language, "coinStats.period.between", {
         from: text(first),
         to: text(last),
