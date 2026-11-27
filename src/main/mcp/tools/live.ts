@@ -462,6 +462,18 @@ export const tools: ToolDef<any>[] = [
       handler,
       { action, username, youtube, kick, platforms, platform },
     ) => {
+      // One letter apart: a disconnect that ignored `platforms` would end the
+      // whole LIVE
+      if (action === "disconnect" && platforms) {
+        return fail(
+          "disconnect takes `platform`, one platform, not `platforms`. Nothing was done.",
+        );
+      }
+      if (action === "connect" && platform) {
+        return fail(
+          "connect takes `platforms`, a list, not `platform`. Nothing was done.",
+        );
+      }
       if (action === "disconnect") {
         const { error } = await invokeOk(
           handler,

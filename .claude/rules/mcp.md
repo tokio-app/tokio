@@ -69,7 +69,7 @@ Paths to import (`add_to_library`) go through `checkPath`: absolute, a file, and
 
 - The `platforms` section is the profile's platforms (`SET_PLATFORMS`): a change while live keeps a platform that's on and says so. Its `username`, `youtube` and `kick` are the names saved without connecting (`SET_CHANNELS`).
 - A `platforms` write invokes only the handlers for what changed, each after `guardProfile`, so a switch between them can't land a name in another profile.
-- `connect` joins every platform, or only its `platforms`, refused before invoking when empty or naming one the profile doesn't use. `disconnect` leaves them all, or only its `platform`.
+- `connect` joins every platform, or only its `platforms`, refused before invoking when empty or naming one the profile doesn't use. `disconnect` leaves them all, or only its `platform`. Each refuses the other's field: they're a letter apart, and a disconnect that ignored `platforms` would end the whole LIVE.
 - `connect`'s `youtube` (a channel or LIVE link) and `kick` (a channel or kick.com link) are saved per profile like `username`. It refuses a profile on either platform with its channel neither given nor saved.
 - The alert and game action kinds describe a trigger's `platform` from `PLATFORM_NOTE`, built from `PLATFORM_TRIGGERS`, so a new platform needs nothing there.
 - A game action's trigger has no `min_coins` or `roles` in MCP (`ActionTriggerSchema`), as the Games page can't show them: `save_item` refuses them, `get` leaves them out, and a morph step refuses `NOT_MOBS`.
