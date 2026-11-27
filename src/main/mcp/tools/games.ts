@@ -5,6 +5,7 @@ import {
   GamesOverlaySchema,
   GameStepSchema,
   type Profile,
+  TriggerSchema,
 } from "@/common/schemas";
 import {
   countedVariables,
@@ -92,6 +93,13 @@ function stepProblem({ edition, steps }: GameAction): string | undefined {
   }
   return undefined;
 }
+
+// The Games page has no minimum or roles, so an action that had them would
+// skip events for a reason the streamer can't see or clear
+const ActionTriggerSchema = TriggerSchema.omit({
+  min_coins: true,
+  roles: true,
+});
 
 const findAction = (games: Profile["games"], id: string) =>
   games.actions.find((a) => a.id === id);
@@ -182,7 +190,7 @@ export const kinds: Kinds = {
     // The saved action without its id. Steps as they're saved (the stored
     // schema migrates old ones first, which describe can't show).
     schema: GameActionSchema.omit({ id: true })
-      .extend({ steps: z.array(GameStepSchema) })
+      .extend({ trigger: ActionTriggerSchema, steps: z.array(GameStepSchema) })
       .strict(),
     notes: [
       "What a LIVE event does in Minecraft, in the active profile: when its trigger fires, its steps run in order, in a game of its edition (bedrock or java) that's connected. trigger works as an alert's: type is the event, gifts are gift ids (list gifts) with every_gift to run once per gift instead of once per streak, emotes are emote ids (list emotes), keyword is the chat's. On like, the action runs once every likes_every likes from all viewers.",
@@ -211,8 +219,12 @@ export const kinds: Kinds = {
     get: async (handler, id) => {
       const action = findAction((await profileOf(handler)).games, id);
       if (!action) return noAction(id);
+      const stored = GameActionSchema.parse(action);
       return ok({
-        action: GameActionSchema.parse(action),
+        action: {
+          ...stored,
+          trigger: ActionTriggerSchema.parse(stored.trigger),
+        },
         overlayURL: getMinecraftOverlayURL(),
       });
     },
