@@ -1,5 +1,5 @@
 import { APP_EVENTS_RESPONSE } from "@/common/types";
-import { formatError, MEDIA_SCHEME, mediaKind } from "@/common/util";
+import { FAKE_LIVE, formatError, MEDIA_SCHEME, mediaKind } from "@/common/util";
 import { Notifier } from "@/helper/feedback";
 import { language, savedLanguage, setLanguage } from "@/helper/i18n";
 import { lockMenu } from "@/helper/menu";
@@ -63,8 +63,11 @@ app.commandLine.appendSwitch("disable-backgrounding-occluded-windows", "true");
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("disable-background-timer-throttling");
 
-// End-to-end tests run the app in a temporary folder, see e2e/.
-const testHome = process.env.TOKIO_HOME;
+// End-to-end tests run the app in a temporary folder, see e2e/, and yarn
+// dev:live keeps its made-up LIVEs and fans out of the real profiles.
+const testHome =
+  process.env.TOKIO_HOME ??
+  (FAKE_LIVE ? join(app.getPath("home"), ".tokio-dev") : undefined);
 if (testHome) {
   app.setPath("home", testHome);
   app.setPath("userData", testHome);

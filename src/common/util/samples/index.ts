@@ -559,6 +559,51 @@ const fewViewers = (
     return { viewer: user, chatter: chatter(user) };
   });
 
+// TikTok's gifts, one streak at a time from whoever `sender` picks. Type 1
+// gifts grow a few at a time, then TikTok sends the last count again to end
+// the streak; other gifts come once, ended. An ended streak adds to the
+// tally, which keeps the order viewers reached their totals in.
+const giftStreaks = (sender: () => UserData, tally: Map<UserData, Tally>) => {
+  let streak:
+    | { viewer: UserData; gift: (typeof GIFTS)[number]; size: number }
+    | undefined;
+  let sent = 0;
+  return (): GiftEvent => {
+    if (!streak) {
+      const gift = pickRandom(GIFTS);
+      streak = { viewer: sender(), gift, size: randomInt(1, gift.maxCombo) };
+      sent = 0;
+    }
+    const { viewer, gift, size } = streak;
+    if (gift.type === 1 && sent < size) {
+      sent = Math.min(size, sent + randomInt(1, 3));
+      return giftEvent(viewer, gift, sent, false);
+    }
+    const before = tally.get(viewer);
+    tally.delete(viewer);
+    tally.set(viewer, {
+      coins: (before?.coins ?? 0) + size * gift.coins,
+      gifts: (before?.gifts ?? 0) + size,
+      giftedAt: Date.now(),
+    });
+    streak = undefined;
+    return giftEvent(viewer, gift, size, true);
+  };
+};
+
+// TikTok's room ranks: the viewers by the coins their ended streaks sent
+const ranksOf = (tally: Map<UserData, Tally>): RoomUserEvent["ranks"] =>
+  [...tally]
+    .sort(([, a], [, b]) => b.coins - a.coins)
+    .map(([{ username, handle, profilePictures, userId }, { coins }], i) => ({
+      username,
+      handle,
+      profilePictures,
+      userId,
+      score: coins,
+      position: i + 1,
+    }));
+
 /**
  * A LIVE for overlays' Test button, played one press at a time. Each call
  * sends every live event the profile's platforms send, each in its
@@ -619,17 +664,7 @@ export const createTestLive = (platforms: readonly Platform[]) => {
     return joined;
   };
   const anyone = () => pickRandom(cast).viewer;
-
-  const startStreak = () => {
-    const gift = pickRandom(GIFTS);
-    return {
-      viewer: anyone(),
-      gift,
-      size: randomInt(1, gift.maxCombo),
-      sent: 0,
-    };
-  };
-  let streak: ReturnType<typeof startStreak> | undefined;
+  const nextGift = giftStreaks(anyone, tally);
 
   const tiktokPress = (): TokioPayload[] => {
     const joined = cast.length < TEST_VIEWERS ? newcomer() : pickRandom(cast);
@@ -637,25 +672,7 @@ export const createTestLive = (platforms: readonly Platform[]) => {
     const likeCount = randomInt(1, 15);
     // The total also counts likes from viewers the test leaves out.
     totalLikes += likeCount + randomInt(0, 40);
-
-    // Type 1 gifts grow a few at a time, then TikTok sends the last count
-    // again to end the streak. Other gifts come once, ended.
-    let gift: GiftEvent;
-    const s = (streak ??= startStreak());
-    if (s.gift.type === 1 && s.sent < s.size) {
-      s.sent = Math.min(s.size, s.sent + randomInt(1, 3));
-      gift = giftEvent(s.viewer, s.gift, s.sent, false);
-    } else {
-      gift = giftEvent(s.viewer, s.gift, s.size, true);
-      const before = tally.get(s.viewer);
-      tally.delete(s.viewer);
-      tally.set(s.viewer, {
-        coins: (before?.coins ?? 0) + s.size * s.gift.coins,
-        gifts: (before?.gifts ?? 0) + s.size,
-        giftedAt: Date.now(),
-      });
-      streak = undefined;
-    }
+    const gift = nextGift();
 
     return [
       { type: TOKIO_EVENTS.MEMBER_JOIN, data: { user: joined.viewer } },
@@ -748,18 +765,9 @@ export const createTestLive = (platforms: readonly Platform[]) => {
     const sum = (key: "viewers" | "views") =>
       rooms.reduce((total, room) => total + room[key], 0);
 
-    // Ranks carry only these fields, from the coins of the gifts that ended.
+    // From the coins of the gifts that ended
     const gifters = [...tally].sort(([, a], [, b]) => b.coins - a.coins);
-    const ranks = gifters.map(
-      ([{ username, handle, profilePictures, userId }, { coins }], i) => ({
-        username,
-        handle,
-        profilePictures,
-        userId,
-        score: coins,
-        position: i + 1,
-      }),
-    );
+    const ranks = ranksOf(tally);
 
     const topGifter = (user: UserData): TopGifter => {
       const thisLive = tally.get(user);
@@ -833,5 +841,241 @@ export const createTestLive = (platforms: readonly Platform[]) => {
         },
       },
     ];
+  };
+};
+
+// A made-up LIVE's room fills up to this many viewers, a newcomer now and then
+const FAKE_CAST = 40;
+
+// One live event, its data in the event's shape
+type LiveEvent = {
+  [K in AppEvents]: { type: K; data: TokioEventMap[K] };
+}[AppEvents];
+
+// Each platform's viewer, and the same viewer as its chat shows them
+const VIEWERS: Record<
+  Platform,
+  [() => UserData, (user: UserData) => UserData]
+> = {
+  tiktok: [userFactory, chatterFactory],
+  twitch: [twitchViewer, twitchChatter],
+  youtube: [youtubeViewer, youtubeChatter],
+  kick: [kickViewer, kickChatter],
+};
+
+/**
+ * A made-up LIVE on one platform, for yarn dev:live. next() gives its next
+ * event as the platform sends it, mostly chat; room() gives its room now. The
+ * same viewers keep coming back as more join, TikTok's gift streaks grow over
+ * a few events before they end, and its likes add up.
+ */
+export const createFakeLive = (platform: Platform) => {
+  const [viewer, chatter] = VIEWERS[platform];
+  const cast: { viewer: UserData; chatter: UserData }[] = [];
+  const newcomer = () => {
+    const user = viewer();
+    const joined = { viewer: user, chatter: chatter(user) };
+    cast.push(joined);
+    return joined;
+  };
+  for (let i = 0; i < 5; i++) newcomer();
+  // Mostly someone already in the room
+  const someone = () =>
+    cast.length < FAKE_CAST && randomBool(0.1) ? newcomer() : pickRandom(cast);
+  const from = () => someone().viewer;
+
+  const chat = (): LiveEvent => {
+    const event = chatEventFactory(
+      someone().chatter,
+      undefined,
+      platform !== "tiktok",
+    );
+    // Chat translation adds its own
+    delete event.comment.translation;
+    return { type: TOKIO_EVENTS.CHAT, data: event };
+  };
+
+  const tally = new Map<UserData, Tally>();
+  const nextGift = giftStreaks(from, tally);
+  let totalLikes = randomInt(500, 20000);
+  // What a Super Fan box sends after it
+  const queued: LiveEvent[] = [];
+
+  // Each event with how often it comes
+  const MIX: Record<Platform, [number, () => LiveEvent][]> = {
+    tiktok: [
+      [30, chat],
+      [
+        20,
+        () => {
+          const likeCount = randomInt(1, 15);
+          totalLikes += likeCount + randomInt(0, 40);
+          return {
+            type: TOKIO_EVENTS.LIKE,
+            data: { user: from(), likeCount, totalLikes },
+          };
+        },
+      ],
+      [
+        15,
+        () => ({
+          type: TOKIO_EVENTS.MEMBER_JOIN,
+          data: {
+            user: (cast.length < FAKE_CAST ? newcomer() : pickRandom(cast))
+              .viewer,
+          },
+        }),
+      ],
+      [15, () => ({ type: TOKIO_EVENTS.GIFT, data: nextGift() })],
+      [6, () => ({ type: TOKIO_EVENTS.FOLLOW, data: { user: from() } })],
+      [
+        4,
+        () => ({
+          type: TOKIO_EVENTS.SHARE,
+          data: { user: from(), shareCount: 1 },
+        }),
+      ],
+      [
+        3,
+        () => ({ type: TOKIO_EVENTS.SUPER_FAN_JOIN, data: { user: from() } }),
+      ],
+      [1, () => ({ type: TOKIO_EVENTS.SUPER_FAN, data: { user: from() } })],
+      [
+        0.5,
+        () => {
+          queued.push({ type: TOKIO_EVENTS.ENVELOPE, data: undefined });
+          return { type: TOKIO_EVENTS.SUPER_FAN_BOX, data: undefined };
+        },
+      ],
+    ],
+    twitch: [
+      [60, chat],
+      [8, () => ({ type: TOKIO_EVENTS.FOLLOW, data: { user: from() } })],
+      [
+        5,
+        () => ({
+          type: TOKIO_EVENTS.SUBSCRIBE,
+          data: subscribeEventFactory(from(), TWITCH_TIERS),
+        }),
+      ],
+      [
+        2,
+        () => ({
+          type: TOKIO_EVENTS.GIFT_SUB,
+          data: giftSubEventFactory(from(), TWITCH_GIFT_TIERS),
+        }),
+      ],
+      [
+        6,
+        () => ({ type: TOKIO_EVENTS.CHEER, data: cheerEventFactory(from()) }),
+      ],
+      [
+        4,
+        () => ({ type: TOKIO_EVENTS.REDEEM, data: redeemEventFactory(from()) }),
+      ],
+      // Another channel's streamer
+      [
+        1,
+        () => ({
+          type: TOKIO_EVENTS.RAID,
+          data: raidEventFactory(twitchViewer()),
+        }),
+      ],
+    ],
+    youtube: [
+      [60, chat],
+      [
+        6,
+        () => ({
+          type: TOKIO_EVENTS.SUPER_CHAT,
+          data: superChatEventFactory(from()),
+        }),
+      ],
+      [
+        6,
+        () => ({
+          type: TOKIO_EVENTS.GIFT,
+          data: youtubeGiftEventFactory(from()),
+        }),
+      ],
+      [
+        4,
+        () => ({
+          type: TOKIO_EVENTS.SUBSCRIBE,
+          data: subscribeEventFactory(from()),
+        }),
+      ],
+      [
+        2,
+        () => ({
+          type: TOKIO_EVENTS.GIFT_SUB,
+          data: giftSubEventFactory(from()),
+        }),
+      ],
+    ],
+    kick: [
+      [60, chat],
+      [
+        6,
+        () => ({ type: TOKIO_EVENTS.KICKS, data: kicksEventFactory(from()) }),
+      ],
+      [
+        5,
+        () => ({
+          type: TOKIO_EVENTS.SUBSCRIBE,
+          data: subscribeEventFactory(kickSubber(from()), [""], false),
+        }),
+      ],
+      [
+        2,
+        () => ({
+          type: TOKIO_EVENTS.GIFT_SUB,
+          data: giftSubEventFactory(kickSubber(from())),
+        }),
+      ],
+      [
+        3,
+        () => ({
+          type: TOKIO_EVENTS.REDEEM,
+          data: redeemEventFactory(kickNamed(from())),
+        }),
+      ],
+      // Another channel's streamer hosting
+      [
+        1,
+        () => ({
+          type: TOKIO_EVENTS.RAID,
+          data: raidEventFactory(kickNamed()),
+        }),
+      ],
+    ],
+  };
+  const mix = MIX[platform];
+  const total = mix.reduce((sum, [often]) => sum + often, 0);
+
+  let viewers = randomInt(20, 200);
+  // Only TikTok's providers send views
+  let views = platform === "tiktok" ? viewers + randomInt(50, 2000) : 0;
+
+  return {
+    next: (): LiveEvent => {
+      const waiting = queued.shift();
+      if (waiting) return waiting;
+      let roll = Math.random() * total;
+      for (const [often, make] of mix) {
+        roll -= often;
+        if (roll < 0) return make();
+      }
+      return chat();
+    },
+    room: (): RoomUserEvent => {
+      viewers = Math.max(1, viewers + randomInt(-4, 5));
+      if (views) views += randomInt(1, 10);
+      return {
+        viewers,
+        views,
+        ranks: platform === "tiktok" ? ranksOf(tally) : [],
+      };
+    },
   };
 };

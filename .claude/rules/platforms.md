@@ -67,6 +67,12 @@ Every provider but TikTok's namespaces the ids it sends: `twitch:<id>` for `User
 - Chat pictures: Twitch chat goes without (`shortcut:` in `providers/twitch/index.ts`), `Avatar` shows the initial. Follows, subs, cheers and redeems look their picture up once and cache it. YouTube's chat carries every author's picture. Kick's chat has none (initials); a Kick's sender comes with theirs.
 - A subscriber's or member's months come off their chat badge into `UserData.subMonths`, set only when it reads as a positive number (each provider's rule says which badge).
 
+## Dev mode
+
+- `yarn dev:live` builds with the mode `live`, which sets `FAKE_LIVE` (`src/common/util/constants/app.ts`). The build fixes the mode, so a release never has it, and Vitest's is `test`.
+- `ConnectorService(fake)` then connects each platform through a `FakeConnector` (`providers/fake`), with no network: `createFakeLive` (`src/common/util/samples`) makes its events, a recurring cast of viewers. The real providers stay for what isn't a LIVE: Twitch's sign-in and TikTok's gift list.
+- Its data is in `~/.tokio-dev` (`src/main/index.ts`, after `TOKIO_HOME`), apart from the real profiles (the user's call). Connect needs nothing there: Home skips `needs()` and the key hint, and main's `CONNECT` names an empty channel `tokio.demo`.
+
 ## The window
 
 - `PlatformsContext` (`src/renderer/src/context/platforms`) gives the trigger pickers the active profile's platforms. A page provides it from `useEditableSettings`' `onLoad(profile)`, or from one page-level `GET_PROFILE` (the Studio editor, Countdown; Settings and Official overlays read them with `useProfilePlatforms`). Never ask `GET_PROFILE` per component: its reply drops the page's unsaved autosave.

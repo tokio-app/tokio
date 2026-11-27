@@ -7,7 +7,7 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { formatError, PLATFORM_LABELS } from "@/common/util";
+import { FAKE_LIVE, formatError, PLATFORM_LABELS } from "@/common/util";
 import { parseAmount } from "@/helper/amount";
 import Logger from "@/logger";
 import type { RatesService } from "../rates";
@@ -25,6 +25,7 @@ import {
   ReconnectState,
 } from "./common";
 import {
+  FakeConnector,
   TikTokLiveConnector,
   KickConnector,
   TwitchConnector,
@@ -57,6 +58,9 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
   // Other platforms' providers, kept out of the pool so Settings' TikTok
   // picker and the store never list them
   private _platforms = new Map<Platform, ConnectorProvider>();
+  // yarn dev:live's made-up LIVEs, which connect in place of every platform.
+  // The real providers still sign in to Twitch and fetch TikTok's gifts.
+  private _fakes = new Map<Platform, ConnectorProvider>();
   // The platforms connected now, reconnecting ones included
   private _up = new Set<Platform>();
   // Each platform's last room numbers, merged into the session's
@@ -74,12 +78,18 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
   // Converts a Super Chat's amount to US dollars
   private _rates?: Pick<RatesService, "usdOf">;
 
-  constructor() {
+  constructor(fake = FAKE_LIVE) {
     super();
     this.addProvider("Default", new TikTokLiveConnector(), true); // NOTE: DO NOT CHANGE, Add your providers below.
     this._addPlatform("twitch", new TwitchConnector());
     this._addPlatform("youtube", new YouTubeConnector());
     this._addPlatform("kick", new KickConnector());
+    if (!fake) return;
+    for (const platform of PLATFORMS) {
+      const provider = new FakeConnector(platform);
+      this._fakes.set(platform, provider);
+      this._wire(platform, provider, () => true);
+    }
   }
 
   // TikTok's backends forward only while they're the current one
@@ -303,17 +313,23 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
     }
   }
 
-  // The pool's backends and the other platforms'
+  // The pool's backends, the other platforms' and the made-up ones
   private _providers(): ConnectorProvider[] {
-    return [...this._providerPool.values(), ...this._platforms.values()];
+    return [
+      ...this._providerPool.values(),
+      ...this._platforms.values(),
+      ...this._fakes.values(),
+    ];
   }
 
   // The provider each platform connects through now
   private _sources(): [Platform, ConnectorProvider][] {
+    if (this._fakes.size > 0) return [...this._fakes];
     return [["tiktok", this._current.provider], ...this._platforms];
   }
 
   private _provider(platform: Platform): ConnectorProvider | undefined {
+    if (this._fakes.size > 0) return this._fakes.get(platform);
     return platform === "tiktok"
       ? this._current.provider
       : this._platforms.get(platform);

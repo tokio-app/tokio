@@ -10,6 +10,7 @@ Stack: Electron 45, electron-vite, React 19, TypeScript, TanStack Router, Expres
 
 ```sh
 yarn dev                  # build the music window UI, then electron-vite dev (quit Tokio first)
+yarn dev:live             # yarn dev with a made-up LIVE on every platform, its data in ~/.tokio-dev
 yarn test                 # vitest (yarn test:watch to watch, --project main|renderer for one)
 yarn test:coverage        # vitest with a coverage report in coverage/
 yarn test:e2e             # build the app and drive it with Playwright (needs port 37891: quit Tokio first)

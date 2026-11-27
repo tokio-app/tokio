@@ -2,6 +2,7 @@ import { MessageKey } from "@/common/i18n";
 import { PLATFORMS, Platform, PlatformStatus } from "@/common/types";
 import {
   EULER_SIGNUP_URL,
+  FAKE_LIVE,
   isPlatform,
   PLATFORM_INPUT,
   PLATFORM_LABELS,
@@ -81,6 +82,8 @@ const needs = (
     twitchLogin,
   }: Pick<Props, "username" | "channels" | "twitchLogin">,
 ): MessageKey | null => {
+  // yarn dev:live's made-up LIVE needs nothing
+  if (FAKE_LIVE) return null;
   const typed = (text = "") => text.replace("@", "").trim() !== "";
   if (platform === "tiktok") {
     return typed(username) ? null : "home.dashboard.needUsername";

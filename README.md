@@ -74,6 +74,7 @@ Requires Node.js 24.18 or later and Yarn 1.22.22 or later.
 ```sh
 yarn install
 yarn dev          # run in development (quit Tokio first)
+yarn dev:live     # the same, with a made-up LIVE when you press Connect
 yarn test         # unit tests
 yarn typecheck    # type-check every process
 yarn lint         # lint

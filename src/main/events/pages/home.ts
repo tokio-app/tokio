@@ -10,6 +10,7 @@ import {
 } from "@/common/types";
 import {
   EMPTY_LIVE_STATS,
+  FAKE_LIVE,
   PLATFORM_INPUT,
   PLATFORM_LABELS,
 } from "@/common/util";
@@ -146,6 +147,8 @@ events.push(
           : PLATFORM_INPUT[platform] === "account"
             ? storeManagerService.getTwitchAccount().login
             : channelOf(platform, typed.trim().replace(/^@/, ""));
+      // yarn dev:live's made-up LIVE needs no name
+      if (FAKE_LIVE) targets[platform] ||= "tokio.demo";
     }
     const saved = await saveNames(
       storeManagerService,

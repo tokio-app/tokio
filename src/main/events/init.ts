@@ -35,6 +35,7 @@ import {
   PLATFORM_LABELS,
   TIMER_PATH,
   timerTriggers,
+  FAKE_LIVE,
 } from "@/common/util";
 import config from "@/config";
 import { globalShortcut, systemPreferences } from "electron";
@@ -1298,7 +1299,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     .formatToParts()
     .find((part) => part.type === "timeZoneName")?.value;
   Logger.run(
-    `<System> Tokio ${app.getVersion()} (${app.isPackaged ? "installed" : "dev"}) · ${process.platform} ${release()} ${process.arch} · Electron ${process.versions.electron} · ${language()} · ${zone} (${offset})`,
+    `<System> Tokio ${app.getVersion()} (${app.isPackaged ? "installed" : FAKE_LIVE ? "dev, fake LIVE" : "dev"}) · ${process.platform} ${release()} ${process.arch} · Electron ${process.versions.electron} · ${language()} · ${zone} (${offset})`,
     Object.values(pathManagerService.files.logs),
   );
   await storeManagerService.initialize(

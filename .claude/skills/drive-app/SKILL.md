@@ -8,7 +8,7 @@ argument-hint: "[what to check]"
 
 `scripts/drive.mjs` starts the built app the way `e2e/app.spec.ts` does and runs a steps file against it. The app's data goes to a new temporary folder (`TOKIO_HOME`), deleted afterwards, so `~/.tokio` is never touched. The script copies `~/.tokio/extra/gifts.json` into it so the gift pickers have TikTok's list.
 
-1. Build after changing app code: `yarn build:music:ui && npx electron-vite build`.
+1. Build after changing app code: `yarn build:music:ui && npx electron-vite build`. With `--mode live`, Connect connects to made-up LIVEs (`yarn dev:live`'s): build again without it when done.
 2. Write a steps file outside the repo (in the scratchpad when there is one):
 
    ```js
