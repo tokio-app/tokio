@@ -20,6 +20,7 @@ import { CustomGift, Platform, StudioView } from "@/common/types";
 import {
   ALERT_MESSAGE_VARIABLES,
   Currency,
+  listInJewels,
   PLATFORM_CURRENCY,
   STUDIO_NUMBERS,
   studioNumbersFor,
@@ -98,6 +99,7 @@ type NameContext = {
 // The money each platform's top list ranks by, as its source's name says it
 const MONEY_TOPS: Record<Currency, MessageKey> = {
   coins: "studio.list.sources.gifters",
+  jewels: "studio.list.sources.gifters",
   bits: "studio.list.sources.bits",
   kicks: "studio.list.sources.kicks",
   usd: "studio.list.sources.superChats",
@@ -105,15 +107,17 @@ const MONEY_TOPS: Record<Currency, MessageKey> = {
 
 /**
  * A list's source as the editor names it: the top gifters by their
- * platform's money ("Top Bits this LIVE"), the others by what they list.
+ * platform's money ("Top Bits this LIVE") or YouTube's by Jewels ("Top
+ * gifters this LIVE"), the others by what they list.
  */
-export const listSourceName = ({
-  source,
-  platform,
-}: Pick<StudioElementOf<"list">, "source" | "platform">): MessageKey =>
-  source === "gifters"
-    ? MONEY_TOPS[PLATFORM_CURRENCY[platform]]
-    : `studio.list.sources.${source}`;
+export const listSourceName = (
+  list: Pick<StudioElementOf<"list">, "source" | "platform" | "rank">,
+): MessageKey => {
+  if (list.source !== "gifters") return `studio.list.sources.${list.source}`;
+  return MONEY_TOPS[
+    listInJewels(list) ? "jewels" : PLATFORM_CURRENCY[list.platform]
+  ];
+};
 
 /**
  * What the layers list calls an element with no label: what it shows (its

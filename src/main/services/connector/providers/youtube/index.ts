@@ -1,4 +1,4 @@
-import { TOKIO_EVENTS } from "@/common/types";
+import { GiftEvent, TOKIO_EVENTS } from "@/common/types";
 import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import {
@@ -10,7 +10,12 @@ import {
   kindOf,
   toFailure,
 } from "../../common";
-import { fromAction, type Mapped } from "./common/mapping";
+import {
+  fromAction,
+  fromWidget,
+  type ChatAction,
+  type Mapped,
+} from "./common/mapping";
 import {
   findLive,
   parseInput,
@@ -41,6 +46,11 @@ type Connection = {
   // Each handle's viewer id (youtube:<channel id>) in this LIVE, by its
   // lowercase, for Gifts, which name their sender by handle alone
   ids: Map<string, string>;
+  // What one of a Gift costs in Jewels, by its picture's name, as a combo
+  // in this LIVE said
+  prices: Map<string, number>;
+  // The Gifts logged for having no price
+  unpriced: Set<string>;
 };
 
 /**
@@ -112,6 +122,8 @@ export class YouTubeConnector extends ConnectorProvider {
       reconnecting: false,
       stale: false,
       ids: new Map(),
+      prices: new Map(),
+      unpriced: new Set(),
     };
     this._conn = conn;
     let wait: number;
@@ -191,8 +203,8 @@ export class YouTubeConnector extends ConnectorProvider {
     );
     if (!answer) return null;
     conn.continuation = answer.continuation;
-    // Who chatted before, so their Gifts land on their channel id
-    for (const action of answer.actions) this._named(conn, fromAction(action));
+    // Who chatted or gave before, so their Gifts land on their channel id
+    this._events(conn, answer.actions);
     return this._wait(answer.timeoutMs);
   }
 
@@ -267,9 +279,9 @@ export class YouTubeConnector extends ConnectorProvider {
     const answer = await pollChat(this._config, conn.chat, conn.continuation);
     if (this._conn !== conn || !answer) return null;
     conn.continuation = answer.continuation;
-    for (const action of answer.actions) {
-      const mapped = this._named(conn, fromAction(action));
-      if (!mapped) continue;
+    for (const mapped of this._events(conn, answer.actions)) {
+      if (mapped.event === TOKIO_EVENTS.GIFT)
+        this._logUnpriced(conn, mapped.data);
       if (mapped.event === TOKIO_EVENTS.CHAT) {
         this.emitChat(mapped.data, () => this._conn === conn);
       } else {
@@ -279,10 +291,22 @@ export class YouTubeConnector extends ConnectorProvider {
     return this._wait(answer.timeoutMs);
   }
 
+  // A poll's events, in order. Each Gift's card, which comes before it,
+  // names its sender first, so the Gift goes out under their channel id.
+  private _events(conn: Connection, actions: ChatAction[]): Mapped[] {
+    for (const action of actions) {
+      const sender = fromWidget(action);
+      if (sender) conn.ids.set(sender.handle.toLowerCase(), sender.userId);
+    }
+    return actions.flatMap(
+      (action) => this._named(conn, fromAction(action)) ?? [],
+    );
+  }
+
   /**
    * Remembers a viewer's channel id by handle, and sends a Gift under it
-   * when known. A handle not seen in this LIVE keeps youtube:@handle, with
-   * no lookup: a Gift has no price, and they can come in bursts.
+   * when known, at the price a combo in this LIVE said. A handle not seen in
+   * this LIVE keeps youtube:@handle, with no lookup: Gifts come in bursts.
    */
   private _named(conn: Connection, mapped: Mapped | null): Mapped | null {
     if (!mapped) return null;
@@ -292,10 +316,26 @@ export class YouTubeConnector extends ConnectorProvider {
       if (user.userId && handle) conn.ids.set(handle, user.userId);
       return mapped;
     }
-    const userId = conn.ids.get(handle);
-    return userId
-      ? { ...mapped, data: { ...mapped.data, user: { ...user, userId } } }
-      : mapped;
+    const { gift } = mapped.data;
+    const key = gift.id.replace(/^youtube:/, "");
+    if (gift.comboCount > 1) conn.prices.set(key, gift.coins);
+    return {
+      ...mapped,
+      data: {
+        user: { ...user, userId: conn.ids.get(handle) ?? user.userId },
+        gift: { ...gift, coins: conn.prices.get(key) ?? gift.coins },
+      },
+    };
+  }
+
+  // A Gift that counts no Jewels, logged once a LIVE
+  private _logUnpriced(conn: Connection, { gift }: GiftEvent) {
+    if (gift.coins || conn.unpriced.has(gift.id)) return;
+    conn.unpriced.add(gift.id);
+    Logger.info(
+      `<YouTube> No price for the Gift ${gift.name} (${gift.id.replace(/^youtube:/, "")}).`,
+      this._logFile,
+    );
   }
 
   // The viewers, until the LIVE ends: its count turns into the video's views

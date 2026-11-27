@@ -211,7 +211,7 @@ describe("alerts MCP tools", () => {
   });
 
   describe("alert", () => {
-    it("explains each minimum's unit, Kicks' in Kicks", async () => {
+    it("explains each minimum's unit, Kicks' in Kicks and YouTube's Gifts' in Jewels", async () => {
       const { h } = setup();
       const { call } = await mcpClient(h.handler);
 
@@ -222,7 +222,8 @@ describe("alerts MCP tools", () => {
         `on ${TOKIO_EVENTS.KICKS}, Kick's Kicks`,
         "US dollars",
         "subs gifted",
-        "Kick sends no gifts",
+        "TikTok's coins, YouTube's Jewels",
+        "Kick and Twitch send no gifts",
       ]) {
         expect(value).toMatchObject({
           kind: { notes: expect.stringContaining(text) },

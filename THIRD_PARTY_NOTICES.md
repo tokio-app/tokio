@@ -44,6 +44,10 @@ The MCP server SDK compiles these packages into its own files and ships them wit
 
 It also compiles in content-type and fast-deep-equal (MIT), which the app ships as packages with their own license files too.
 
+## YouTube's Gift prices
+
+What each YouTube Gift costs in Jewels (`src/common/util/youtube.ts`) comes from `interfaz/compartido/regalos-youtube.js` of [tiktok-tts](https://github.com/iKhunsa/tiktok-tts) by iKhunsa (MIT, see [`LICENSES/YouTube-gift-prices.txt`](LICENSES/YouTube-gift-prices.txt)), which copied it from YouTube's "Send a gift" panel on 2026-11-02. The prices of Yes and Heart come from the test data of [YTLiveChat](https://github.com/Agash/YTLiveChat) by Agash Thamo (MIT). The gifts' pictures aren't shipped: they load from YouTube.
+
 ## Icons
 
 The [react-icons](https://github.com/react-icons/react-icons) package (MIT) bundles icon sets that keep their own licenses. Tokio uses these sets; all of them were converted from SVG to React components by react-icons.

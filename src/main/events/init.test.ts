@@ -422,6 +422,9 @@ function setup() {
     topSubGifters: vi.fn(
       (): ReturnType<HistoryService["topSubGifters"]> => ({}),
     ),
+    topJewelGifters: vi.fn(
+      (): ReturnType<HistoryService["topJewelGifters"]> => ({}),
+    ),
     getHistory: vi.fn((): LiveHistory => ({
       lives: [],
       gifters: [],
@@ -1788,6 +1791,7 @@ describe("init events", () => {
       shares: 0,
       gifts: 0,
       coins: 0,
+      jewels: 0,
       kicks: 0,
       bits: 0,
       superChats: 0,
@@ -2476,6 +2480,7 @@ describe("init events", () => {
       s.historyService.top.mockReturnValue(top([gifter]));
       s.historyService.topByPlatform.mockReturnValue({ tiktok: [record] });
       s.historyService.topSubGifters.mockReturnValue({ kick: [record] });
+      s.historyService.topJewelGifters.mockReturnValue({ youtube: [record] });
       change(s);
       change(s);
       expect(s.serverService.sendToAll.mock.calls).toEqual([[message()]]);
@@ -2487,12 +2492,13 @@ describe("init events", () => {
         [message(top([gifter]))],
       ]);
       // Home gets each platform's in this LIVE with each push, gifted subs
-      // topped apart
+      // and YouTube's Jewels topped apart
       expect(s.h.pushed(APP_EVENTS_RESPONSE.LIVE_GIFTERS)).toEqual([
-        { byPlatform: {}, subsByPlatform: {} },
+        { byPlatform: {}, subsByPlatform: {}, jewelsByPlatform: {} },
         {
           byPlatform: { tiktok: [record] },
           subsByPlatform: { kick: [record] },
+          jewelsByPlatform: { youtube: [record] },
         },
       ]);
     });

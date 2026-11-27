@@ -335,7 +335,10 @@ function TriggerNames({ settings, update }: SectionProps) {
                 row, so the fields line up, never empty so the row has a
                 baseline for its label. */}
             <span className={styles.count}>
-              {key === "coin" || key === "bit" || key === "kick"
+              {key === "coin" ||
+              key === "jewel" ||
+              key === "bit" ||
+              key === "kick"
                 ? 1
                 : key === "likes"
                   ? seconds.likes_every

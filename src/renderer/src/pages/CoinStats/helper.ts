@@ -12,6 +12,7 @@ import {
   DateRange,
   formatMoney,
   formatStat,
+  giftCurrencies,
   PLATFORM_CURRENCY,
   platformParts,
   triggersFor,
@@ -69,6 +70,7 @@ export function allTime(
       sum.amount += part.amount;
       sum.gifts += part.gifts;
       sum.giftSubs += part.giftSubs;
+      if (part.jewels) sum.jewels = (sum.jewels ?? 0) + part.jewels;
     }
   }
   return { parts, length };
@@ -77,6 +79,7 @@ export function allTime(
 // Each currency's tile
 const MONEY: Record<Currency, MessageKey> = {
   coins: "coinStats.stats.coins",
+  jewels: "coinStats.stats.jewels",
   kicks: "coinStats.stats.kicks",
   bits: "coinStats.stats.bits",
   usd: "coinStats.stats.superChats",
@@ -86,9 +89,10 @@ const MONEY: Record<Currency, MessageKey> = {
 export type Stat = { label: MessageKey; value: number; currency?: Currency };
 
 /**
- * The summary's tiles. A platform's tab: its money, then its gifts and
- * gifted subs where it sends them. All: each platform's money on its own
- * tile, never added up, then every gift and every gifted sub.
+ * The summary's tiles. A platform's tab: its money, YouTube's Jewels before
+ * its Super Chats, then its gifts and gifted subs where it sends them. All:
+ * each currency on its own tile, never added up, the gifts' currencies
+ * first as on Home, then every gift and every gifted sub.
  */
 export function readout(
   tab: StatsTab,
@@ -99,11 +103,23 @@ export function readout(
   const sent = triggersFor(shown);
   const sum = (key: "gifts" | "giftSubs") =>
     shown.reduce((n, p) => n + (parts[p]?.[key] ?? 0), 0);
+  const currencies = new Set([
+    ...giftCurrencies(shown),
+    ...shown.map((p) => PLATFORM_CURRENCY[p]),
+  ]);
+  // Jewels are kept apart from YouTube's amount, its Super Chats' dollars
+  const valueOf = (currency: Currency) =>
+    shown.reduce((n, p) => {
+      if (currency === "jewels") return n + (parts[p]?.jewels ?? 0);
+      return PLATFORM_CURRENCY[p] === currency
+        ? n + (parts[p]?.amount ?? 0)
+        : n;
+    }, 0);
   const stats: (Stat | false)[] = [
-    ...shown.map((p) => ({
-      label: MONEY[PLATFORM_CURRENCY[p]],
-      value: parts[p]?.amount ?? 0,
-      currency: PLATFORM_CURRENCY[p],
+    ...[...currencies].map((currency) => ({
+      label: MONEY[currency],
+      value: valueOf(currency),
+      currency,
     })),
     sent.includes(TOKIO_EVENTS.GIFT) && {
       label: "coinStats.stats.gifts",

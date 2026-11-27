@@ -12,7 +12,12 @@ import {
   PLATFORMS,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { PLATFORM_LABELS, triggersFor } from "@/common/util";
+import {
+  GIFT_CURRENCY,
+  listInJewels,
+  PLATFORM_LABELS,
+  triggersFor,
+} from "@/common/util";
 import { usePlatforms } from "@/context/platforms";
 import { useT } from "@/ui/i18n";
 import { FontFields } from "./FontFields";
@@ -20,6 +25,9 @@ import { listSourceName } from "./helper";
 import styles from "./studioeditor.module.css";
 
 type List = StudioElementOf<"list">;
+
+// A source, or YouTube's top gifters by their Gifts' Jewels
+type Choice = StudioListSource | "jewels";
 
 // The event a source lists, when only some platforms send it
 const NEEDS: Partial<Record<StudioListSource, AlertTrigger>> = {
@@ -49,14 +57,21 @@ export function ListFields({ element, onChange }: Props) {
   const sent = triggersFor(platforms);
   // Gifted subs, followers and gifts from the platforms that send them, a
   // saved one staying, and the top gifters named by the list's platform's
-  // money: Top Bits this LIVE
-  const sources = STUDIO_LIST_SOURCES.filter((value) => {
-    const needs = NEEDS[value];
-    return !needs || sent.includes(needs) || value === element.source;
-  }).map((value) => ({
-    value,
-    label: t(listSourceName({ source: value, platform: element.platform })),
-  }));
+  // money: Top Bits this LIVE. YouTube's rank its Super Chats or, as Top
+  // gifters this LIVE, its Gifts' Jewels.
+  const { platform } = element;
+  const sources: { value: Choice; label: string }[] =
+    STUDIO_LIST_SOURCES.filter((value) => {
+      const needs = NEEDS[value];
+      return !needs || sent.includes(needs) || value === element.source;
+    }).flatMap((value) => {
+      const named = (rank: List["rank"]) =>
+        t(listSourceName({ source: value, platform, rank }));
+      const source = { value, label: named("money") };
+      return value === "gifters" && GIFT_CURRENCY[platform] === "jewels"
+        ? [source, { value: "jewels" as const, label: named("jewels") }]
+        : [source];
+    });
   const top = element.source === "gifters" || element.source === "giftsubs";
   const valued = top || element.source === "gifts";
   // The profile's platforms the top can rank, and one saved
@@ -70,16 +85,19 @@ export function ListFields({ element, onChange }: Props) {
   const pickPlatform =
     top && (choices.length > 1 || !platforms.includes(element.platform));
   // Gifted subs start on a platform that gifts them
-  const setSource = (source: StudioListSource) =>
+  const setSource = (choice: Choice) => {
+    const source = choice === "jewels" ? "gifters" : choice;
     onChange({
       ...element,
       source,
+      rank: choice === "jewels" ? "jewels" : "money",
       platform:
         source === "giftsubs" && !giftsSubs(element.platform)
           ? (PLATFORMS.find((p) => platforms.includes(p) && giftsSubs(p)) ??
             element.platform)
           : element.platform,
     });
+  };
 
   return (
     <>
@@ -87,7 +105,7 @@ export function ListFields({ element, onChange }: Props) {
         <Select
           aria-label={t("studio.list.source")}
           options={sources}
-          value={element.source}
+          value={listInJewels(element) ? "jewels" : element.source}
           onChange={setSource}
         />
       </Field>

@@ -1,6 +1,12 @@
 import { TOKIO_EVENTS } from "@/common/types";
 import Logger from "@/logger";
-import { chatAction, fakeYouTube, type FakeYouTube } from "@test/youtube";
+import {
+  chatAction,
+  fakeYouTube,
+  giftAction,
+  giftCard,
+  type FakeYouTube,
+} from "@test/youtube";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReconnectState } from "../../common";
 import { YouTubeConnector } from "./index";
@@ -259,6 +265,66 @@ describe("YouTubeConnector", () => {
         "youtube:@stranger",
       ]);
       expect(onGift.mock.calls[0][0].user.handle).toBe("Viewer32");
+    });
+
+    it("sends a Gift under the channel id its card names", async () => {
+      const onGift = capture(TOKIO_EVENTS.GIFT);
+      const star = (handle: string) =>
+        giftAction(handle, "sent Star", "silver_star_v2_320x320");
+      youtube.state.polls = [
+        // The history's cards count too
+        { actions: [giftCard("Early", "UCearly"), star("Early")] },
+        {
+          actions: [
+            giftCard("Giver", "UCgiver"),
+            // A card again for the same Gift: still one Gift
+            giftCard("Giver", "UCgiver"),
+            star("Giver"),
+            star("early"),
+          ],
+        },
+      ];
+      await connector.connect("madeup");
+
+      await vi.waitFor(() => expect(onGift).toHaveBeenCalledTimes(2));
+      expect(onGift.mock.calls.map(([e]) => e.user.userId)).toEqual([
+        "youtube:UCgiver",
+        "youtube:UCearly",
+      ]);
+      expect(onGift.mock.calls[0][0].gift.coins).toBe(2);
+    });
+
+    it("keeps a combo's price for the LIVE, and logs a Gift without one once", async () => {
+      const info = vi.spyOn(Logger, "info");
+      const onGift = capture(TOKIO_EVENTS.GIFT);
+      const elote = (text: string) => giftAction("viewer32", text, "elote");
+      youtube.state.polls = [
+        { actions: [] },
+        { actions: [elote("sent Elote"), elote("sent Elote")] },
+        {
+          actions: [
+            elote("comboed x2 Elote for 30 Jewels"),
+            elote("sent Elote"),
+          ],
+        },
+      ];
+      await connector.connect("madeup");
+
+      await vi.waitFor(() => expect(onGift).toHaveBeenCalledTimes(4));
+      expect(
+        onGift.mock.calls.map(([e]) => [e.gift.coins, e.gift.comboCount]),
+      ).toEqual([
+        [0, 1],
+        [0, 1],
+        [15, 2],
+        [15, 1],
+      ]);
+      const logged = info.mock.calls.filter(([line]) =>
+        line.includes("No price"),
+      );
+      expect(logged).toEqual([
+        ["<YouTube> No price for the Gift Elote (elote).", expect.anything()],
+      ]);
     });
 
     it("sends chat through the chat stage", async () => {

@@ -12,7 +12,12 @@ import {
   PlatformStatus,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { Currency, PLATFORM_CURRENCY, triggersFor } from "@/common/util";
+import {
+  Currency,
+  GIFT_CURRENCY,
+  PLATFORM_CURRENCY,
+  triggersFor,
+} from "@/common/util";
 
 // Until main answers
 export const NO_SESSION: LiveSession = {
@@ -22,6 +27,7 @@ export const NO_SESSION: LiveSession = {
     shares: 0,
     gifts: 0,
     coins: 0,
+    jewels: 0,
     kicks: 0,
     bits: 0,
     superChats: 0,
@@ -105,6 +111,11 @@ function liveStats(
       label: "home.totals.coins",
       value: values.coins,
     },
+    // YouTube's Gifts, apart from its Super Chats' dollars
+    platforms.includes("youtube") && {
+      label: "home.totals.jewels",
+      value: values.jewels,
+    },
     sent.includes(TOKIO_EVENTS.KICKS) && {
       label: "home.totals.kicks",
       value: values.kicks,
@@ -152,11 +163,19 @@ export type Views = {
 export type LiveGifters =
   AppEventsResponseMap[APP_EVENTS_RESPONSE.LIVE_GIFTERS];
 
+// A top of who sent the most in one currency, the most first
+export type MoneyTop = { currency: Currency; list: Gifter[] };
+
+// What a gifter sent in a currency: Jewels apart, the rest in coins
+export const sentIn = (gifter: Gifter, currency: Currency) =>
+  currency === "jewels" ? (gifter.jewels ?? 0) : gifter.coins;
+
 // What a tab shows. All adds up the LIVE's platforms; likes, total views and
 // shares are TikTok's alone, so they're the same on both. Each platform's tab
-// tops who sent the most in its currency, and on Twitch, YouTube and Kick who
-// gifted the most subs, apart (the user's call). Never on All, which would
-// rank one currency against another.
+// tops who sent the most in each of its currencies (YouTube's Jewels, then
+// its Super Chats), and on Twitch, YouTube and Kick who gifted the most subs,
+// apart (the user's call). Never on All, which would rank one currency
+// against another.
 export function liveView(
   tab: HomeTab,
   platforms: readonly Platform[],
@@ -170,7 +189,7 @@ export function liveView(
   viewers: number;
   minutes: number[];
   stats: Stat[];
-  gifters: { currency: Currency; list: Gifter[] } | null;
+  tops: MoneyTop[] | null;
   subGifters: Gifter[] | null;
 } {
   const { session, views, likes, gifters } = numbers;
@@ -187,18 +206,29 @@ export function liveView(
       { ...part.totals, likes, views: views.total },
       session.usd,
     ),
-    gifters: all
-      ? null
-      : {
-          currency: PLATFORM_CURRENCY[tab],
-          // Their money alone: gifted subs have their own top
-          list: (gifters.byPlatform[tab] ?? []).filter((g) => g.coins > 0),
-        },
+    tops: all ? null : moneyTops(tab, gifters),
     subGifters:
       all || !triggersFor([tab]).includes(TOKIO_EVENTS.GIFT_SUB)
         ? null
         : (gifters.subsByPlatform[tab] ?? []),
   };
+}
+
+// Their money alone: gifted subs have their own top
+const top = (currency: Currency, list: Gifter[] = []): MoneyTop => ({
+  currency,
+  list: list.filter((g) => sentIn(g, currency) > 0),
+});
+
+// A platform's tops, its gifts' currency first
+function moneyTops(platform: Platform, gifters: LiveGifters): MoneyTop[] {
+  const gift = GIFT_CURRENCY[platform];
+  const money = PLATFORM_CURRENCY[platform];
+  const tops = [top(money, gifters.byPlatform[platform])];
+  if (gift && gift !== money) {
+    tops.unshift(top(gift, gifters.jewelsByPlatform[platform]));
+  }
+  return tops;
 }
 
 // The chart's points, x and y from 0 to 100 with y down, as the SVG's viewBox

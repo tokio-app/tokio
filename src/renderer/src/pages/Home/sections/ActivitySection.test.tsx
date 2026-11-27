@@ -55,12 +55,19 @@ describe("ActivitySection", () => {
       user: { ...user(platform), platform },
       gift: { name: "Rose", image: "", count: 1, coins },
     });
-    renderWithProviders(section([gift(3, "youtube", 5), gift(1, "tiktok", 1)]));
+    renderWithProviders(
+      section([
+        gift(3, "youtube", 20),
+        // A gift without a known price
+        gift(2, "youtube", 0),
+        gift(1, "tiktok", 1),
+      ]),
+    );
 
     expect(
       screen.getAllByRole("listitem").map((item) => item.textContent),
     ).toEqual([
-      // YouTube's Gifts have no price
+      "Yyoutube sent Rose 20 Jewels",
       "Yyoutube sent Rose ",
       "Ttiktok sent Rose 1 coin",
     ]);

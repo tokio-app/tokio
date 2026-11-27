@@ -46,7 +46,15 @@ const history: LiveHistory = {
 const empty: LiveHistory = { lives: [], gifters: [], subGifters: [] };
 // A sub gifter, ranked in the other list
 const subber = { ...gifter, userId: "twitch:7", coins: 0, giftSubs: 5 };
-const none = { gifters: [], subGifters: [] };
+// One who sent YouTube's Gifts, ranked by Jewels
+const tuber = {
+  ...gifter,
+  userId: "youtube:UC1",
+  coins: 0,
+  jewels: 20,
+  platform: "youtube" as const,
+};
+const none = { gifters: [], subGifters: [], jewelGifters: [] };
 
 const notice = (fields: object) => ["notice", expect.objectContaining(fields)];
 
@@ -126,16 +134,21 @@ describe("lives events", () => {
   });
 
   describe("GET_GIFTERS", () => {
-    it("replies the dates' totals first, then again with both rankings", async () => {
+    it("replies the dates' totals first, then again with every ranking", async () => {
       const found = [{ ...gifter, rank: 1 }];
       const subs = [{ ...subber, rank: 1 }];
+      const jewels = [{ ...tuber, rank: 1 }];
       const getTotals = vi.fn(
         async (_range: { from?: number; to?: number }) => totals,
       );
       const h = createHandler({
         historyService: {
           getTotals,
-          getGifters: async () => ({ gifters: found, subGifters: subs }),
+          getGifters: async () => ({
+            gifters: found,
+            subGifters: subs,
+            jewelGifters: jewels,
+          }),
         },
       });
 
@@ -154,6 +167,7 @@ describe("lives events", () => {
           totals,
           data: found,
           subGifters: subs,
+          jewelGifters: jewels,
         },
       ]);
     });

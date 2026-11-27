@@ -56,6 +56,8 @@ const GIFT_PLAYS: { value: "streak" | "gift"; label: MessageKey }[] = [
 // As the summary names them, keys translated where they show
 const WORTH: Record<MinUnit, MessageKey> = {
   coins: "components.alertItem.worth",
+  jewels: "components.alertItem.worthJewels",
+  coinsOrJewels: "components.alertItem.worthCoinsOrJewels",
   kicks: "components.alertItem.worthKicks",
   bits: "components.alertItem.worthBits",
   usd: "components.alertItem.worthUsd",
@@ -275,7 +277,7 @@ function rowSummary(
                 t("components.alertItem.someGifts")),
         );
       }
-      // YouTube's gifts come one at a time
+      // YouTube's gifts come whole, a combo in one event
       if (rowStreaks(trigger, platforms)) {
         parts.push(
           trigger.every_gift

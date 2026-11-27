@@ -7,6 +7,7 @@ import {
   TokioEventMap,
   UserData,
 } from "@/common/types";
+import { jewelsOf } from "@/common/util/youtube";
 
 type Thumbnail = { url: string; width?: number; height?: number };
 type Thumbnails = { thumbnails?: Thumbnail[] };
@@ -54,10 +55,23 @@ type GiftMessage = {
   authorName?: { content?: string };
   authorAvatar?: { avatarViewModel?: { image?: Sources } };
   giftImage?: Sources;
+  giftImageA11yLabel?: string;
+};
+// The card a Gift shows over the chat, which names its sender's channel
+type GiftWidget = {
+  content?: {
+    giftAttributionItemViewModel?: { authorName?: { content?: string } };
+    elementRenderer?: {
+      compatibilityOptions?: { liveChatAuthorExternalChannelId?: string };
+    };
+  };
 };
 
 export type ChatAction = {
   addChatItemAction?: { item?: Record<string, unknown> };
+  updateOrAddInteractivityWidgetAction?: {
+    widgetRenderer?: { interactivityWidgetRenderer?: GiftWidget };
+  };
   [action: string]: unknown;
 };
 
@@ -211,14 +225,37 @@ function fromGiftPurchase(e: GiftPurchase): Mapped {
   };
 }
 
-// A YouTube Gift, bought with Jewels. Its author has no channel id, so the
-// handle is the id.
+// A Gift's handle, "@name " in its chat item, "@name" in its card
+const handleOf = (name?: string) => (name ?? "").trim().replace(/^@/, "");
+
+// "comboed x3 Yes for 6 Jewels": the count, the name, all of them's Jewels.
+// shortcut: a combo counts its own count, though no LIVE has shown yet
+// whether YouTube also sends each of its gifts as a "sent Yes"; on a LIVE
+// with combos, check that a "comboed x3" doesn't follow three of those, or
+// they'd count twice
+const COMBO = /^comboed x(\d[\d,]*) (.+) for (\d[\d,]*) Jewels?$/i;
+const count = (digits = "") => Number(digits.replace(/,/g, ""));
+
+// A YouTube Gift, bought with Jewels: a single one ("sent Star") at the
+// list's price, or a combo at the price it states. Its author has no channel
+// id, so the handle is the id until the provider knows it.
 function fromGiftMessage(e: GiftMessage): Mapped {
-  const handle = (e.authorName?.content ?? "").trim().replace(/^@/, "");
+  const handle = handleOf(e.authorName?.content);
   const picture = largest(e.authorAvatar?.avatarViewModel?.image?.sources);
   const image = https(largest(e.giftImage?.sources));
   // ".../gift/assets/vicecity_heart_v2.png=w640-h640" is vicecity_heart_v2
   const file = image.split("/").pop()?.split(/[.=]/)[0] ?? "";
+  const text = (e.text?.content ?? "").trim();
+  const [, digits, comboName, total] = text.match(COMBO) ?? [];
+  const size = count(digits);
+  // A combo it can't read is a single gift
+  const [comboCount, coins] =
+    size > 0 ? [size, count(total) / size] : [1, jewelsOf(file) ?? 0];
+  // "@handle sent a gift, Yes", a combo's too
+  const name =
+    e.giftImageA11yLabel?.split(" sent a gift, ")[1] ??
+    comboName ??
+    text.replace(/^sent /i, "");
   return {
     event: TOKIO_EVENTS.GIFT,
     data: {
@@ -232,14 +269,12 @@ function fromGiftMessage(e: GiftMessage): Mapped {
       },
       gift: {
         id: `youtube:${file}`,
-        name: (e.text?.content ?? "").trim().replace(/^sent /i, ""),
+        name: name.trim(),
         image,
-        // shortcut: YouTube doesn't send what a Gift cost, so it counts no
-        // coins; give Gifts a price once the user picks how
-        coins: 0,
+        // Each gift's, as TikTok's coins are
+        coins,
         type: 0,
-        // Each is its own message, mostly from different viewers
-        comboCount: 1,
+        comboCount,
         repeatEnd: true,
       },
     },
@@ -270,4 +305,22 @@ export function fromAction(action: ChatAction): Mapped | null {
     if (item[renderer]) return map(item[renderer]);
   }
   return null;
+}
+
+// A Gift's card, which comes in the same poll before its chat item: its
+// sender's handle and viewer id, or null for any other action. It's never a
+// gift itself: a card can come again for the same Gift.
+export function fromWidget(
+  action: ChatAction,
+): { handle: string; userId: string } | null {
+  const content =
+    action.updateOrAddInteractivityWidgetAction?.widgetRenderer
+      ?.interactivityWidgetRenderer?.content;
+  const handle = handleOf(
+    content?.giftAttributionItemViewModel?.authorName?.content,
+  );
+  const channel =
+    content?.elementRenderer?.compatibilityOptions
+      ?.liveChatAuthorExternalChannelId;
+  return handle && channel ? { handle, userId: `youtube:${channel}` } : null;
 }

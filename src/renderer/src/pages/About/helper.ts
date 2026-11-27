@@ -78,6 +78,14 @@ export const COMPONENTS: Component[] = [
     doc: "MCP-SDK-bundled",
   },
   {
+    name: "tiktok-tts (YouTube's Gift prices)",
+    author: "iKhunsa",
+    license: "MIT",
+    url: "https://github.com/iKhunsa/tiktok-tts",
+    note: "What each YouTube Gift costs in Jewels, from its list of YouTube's gifts. The prices of Yes and Heart come from the test data of YTLiveChat by Agash Thamo (MIT).",
+    doc: "YouTube-gift-prices",
+  },
+  {
     name: "Electron and Chromium",
     author: "The Electron and Chromium authors",
     license: "MIT and others",

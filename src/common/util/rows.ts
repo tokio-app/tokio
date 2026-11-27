@@ -102,13 +102,11 @@ export function roleName(
   return listOf(language, names);
 }
 
-// Variables a platform's event never fills, so its rows don't offer them.
-// YouTube's gifts come one at a time, so {count} is always 1, and Kick's
-// subs carry no message.
+// Variables a platform's event never fills, so its rows don't offer them:
+// Kick's subs carry no message
 const UNFILLED: Partial<
   Record<Platform, Partial<Record<AlertTrigger, readonly string[]>>>
 > = {
-  youtube: { [TOKIO_EVENTS.GIFT]: ["count"] },
   kick: { [TOKIO_EVENTS.SUBSCRIBE]: ["comment"] },
 };
 
@@ -131,8 +129,8 @@ export function rowVariables(
 
 /**
  * Whether a gift row's gifts come in streaks, so it picks when to play:
- * TikTok's do, YouTube's come one at a time. TikTok's catalog,
- * the one to pick from, goes with it.
+ * TikTok's do, YouTube's come whole (a combo in one event). TikTok's
+ * catalog, the one to pick from, goes with it.
  */
 export const rowStreaks = (
   row: Row,

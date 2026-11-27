@@ -153,6 +153,23 @@ describe("allTime", () => {
     });
   });
 
+  it("adds up YouTube's Jewels apart, a part without them as none", () => {
+    const youtube = { amount: 5, gifts: 2, giftSubs: 0 };
+    const tubed = [
+      liveSummary(day(30, 20), {
+        platforms: { youtube: { ...youtube, jewels: 20 } },
+        endedAt: day(30, 21),
+      }),
+      liveSummary(day(29, 20), {
+        platforms: { youtube },
+        endedAt: day(29, 21),
+      }),
+    ];
+    expect(allTime(tubed).parts).toEqual({
+      youtube: { amount: 10, gifts: 4, giftSubs: 0, jewels: 20 },
+    });
+  });
+
   it("is empty without LIVEs", () => {
     expect(allTime([])).toEqual({ parts: {}, length: 0 });
   });
@@ -196,7 +213,7 @@ describe("readout", () => {
   const parts = {
     tiktok: { amount: 900, gifts: 30, giftSubs: 0 },
     twitch: { amount: 2500, gifts: 0, giftSubs: 4 },
-    youtube: { amount: 57.4, gifts: 2, giftSubs: 1 },
+    youtube: { amount: 57.4, gifts: 2, giftSubs: 1, jewels: 60 },
     kick: { amount: 300, gifts: 5, giftSubs: 2 },
   };
 
@@ -209,11 +226,23 @@ describe("readout", () => {
       { label: "coinStats.stats.bits", value: 2500, currency: "bits" },
       { label: "coinStats.stats.giftSubs", value: 4 },
     ]);
+    // Its Gifts' Jewels apart from its Super Chats' dollars
     expect(readout("youtube", [], parts)).toEqual([
+      { label: "coinStats.stats.jewels", value: 60, currency: "jewels" },
       { label: "coinStats.stats.superChats", value: 57.4, currency: "usd" },
       { label: "coinStats.stats.gifts", value: 2 },
       { label: "coinStats.stats.giftSubs", value: 1 },
     ]);
+    // A part saved before Jewels has none
+    expect(
+      readout("youtube", [], {
+        youtube: { ...parts.youtube, jewels: undefined },
+      })[0],
+    ).toEqual({
+      label: "coinStats.stats.jewels",
+      value: 0,
+      currency: "jewels",
+    });
     // Kicks, never gifts
     expect(readout("kick", [], {})).toEqual([
       { label: "coinStats.stats.kicks", value: 0, currency: "kicks" },
@@ -225,7 +254,9 @@ describe("readout", () => {
     expect(
       readout("all", ["tiktok", "twitch", "youtube", "kick"], parts),
     ).toEqual([
+      // The gifts' currencies first, as on Home
       { label: "coinStats.stats.coins", value: 900, currency: "coins" },
+      { label: "coinStats.stats.jewels", value: 60, currency: "jewels" },
       { label: "coinStats.stats.bits", value: 2500, currency: "bits" },
       { label: "coinStats.stats.superChats", value: 57.4, currency: "usd" },
       { label: "coinStats.stats.kicks", value: 300, currency: "kicks" },

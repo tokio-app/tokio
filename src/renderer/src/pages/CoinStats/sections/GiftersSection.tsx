@@ -1,6 +1,11 @@
 import { MessageKey, translate } from "@/common/i18n";
 import { Gifter, Platform, RankedGifter, TOKIO_EVENTS } from "@/common/types";
-import { Currency, PLATFORM_CURRENCY, triggersFor } from "@/common/util";
+import {
+  Currency,
+  GIFT_CURRENCY,
+  PLATFORM_CURRENCY,
+  triggersFor,
+} from "@/common/util";
 import {
   Avatar,
   EmptyState,
@@ -16,8 +21,22 @@ import { useLanguage, useT } from "@/ui/i18n";
 import { useId } from "react";
 import styles from "../coinstats.module.css";
 
-// What a list ranks: the platform's money, or gifted subs
-export type Ranking = "amount" | "subs";
+// What a list ranks: the platform's money, gifted subs, or YouTube's Gifts
+// by their Jewels
+export type Ranking = "amount" | "subs" | "jewels";
+
+/**
+ * The rankings a platform's tab switches between, the one it opens on
+ * first: YouTube's Jewels, as Home tops them first, then its money, then
+ * gifted subs where it sends them.
+ */
+export const rankingsOf = (platform: Platform): Ranking[] => [
+  ...(GIFT_CURRENCY[platform] === "jewels" ? (["jewels"] as const) : []),
+  "amount",
+  ...(triggersFor([platform]).includes(TOKIO_EVENTS.GIFT_SUB)
+    ? (["subs"] as const)
+    : []),
+];
 
 // Each top, named by what it ranks as Home names it, with the switch's
 // label and what it says with no one on it: in the whole history or a
@@ -29,6 +48,12 @@ const TOPS: Record<
   coins: {
     title: "coinStats.gifters.top",
     tab: "coinStats.stats.coins",
+    empty: "coinStats.gifters.empty",
+    dates: "coinStats.gifters.emptyDates",
+  },
+  jewels: {
+    title: "coinStats.gifters.top",
+    tab: "coinStats.stats.jewels",
     empty: "coinStats.gifters.empty",
     dates: "coinStats.gifters.emptyDates",
   },
@@ -59,7 +84,7 @@ const TOPS: Record<
 };
 
 const topOf = (platform: Platform, by: Ranking) =>
-  TOPS[by === "subs" ? "subs" : PLATFORM_CURRENCY[platform]];
+  TOPS[by === "amount" ? PLATFORM_CURRENCY[platform] : by];
 
 export interface GiftersList {
   // One platform's in the ranking shown, the most first, undefined until
@@ -87,7 +112,8 @@ interface Props extends GiftersList {
 }
 
 // What each of the platform's gifters sent in the ranking's unit: their
-// money, with their gifts where it sends them, or their gifted subs
+// money or Jewels, with their gifts where it sends them, or their gifted
+// subs
 function sentParts(
   platform: Platform,
   by: Ranking,
@@ -97,7 +123,9 @@ function sentParts(
   if (by === "subs")
     return [translate(language, "gifts.giftSubs", { count: gifter.giftSubs })];
   return [
-    amountLabel(gifter.coins, PLATFORM_CURRENCY[platform], language),
+    by === "jewels"
+      ? amountLabel(gifter.jewels ?? 0, "jewels", language)
+      : amountLabel(gifter.coins, PLATFORM_CURRENCY[platform], language),
     triggersFor([platform]).includes(TOKIO_EVENTS.GIFT) &&
       giftsLabel(gifter.gifts, language),
   ].filter((part) => part !== false);
@@ -119,9 +147,10 @@ export function GiftersSection({
   const language = useLanguage();
   const top = platform && topOf(platform, by);
   const title = t(top ? top.title : "coinStats.gifters.top");
-  // Twitch, YouTube and Kick rank their money and their gifted subs apart
-  const subs =
-    !!platform && triggersFor([platform]).includes(TOKIO_EVENTS.GIFT_SUB);
+  // Twitch and Kick rank their money and their gifted subs apart, YouTube
+  // its Jewels too
+  const rankings = platform ? rankingsOf(platform) : [];
+  const switches = rankings.length > 1;
 
   let content;
   if (!platform || !top) {
@@ -186,12 +215,12 @@ export function GiftersSection({
         )
       }
     >
-      {platform && subs && (
+      {platform && switches && (
         <Tabs
           variant="pill"
           className={styles.ranking}
           label={t("coinStats.gifters.by")}
-          tabs={(["amount", "subs"] as const).map((value) => ({
+          tabs={rankings.map((value) => ({
             value,
             label: t(topOf(platform, value).tab),
           }))}
@@ -200,7 +229,7 @@ export function GiftersSection({
           panelId={panelId}
         />
       )}
-      {platform && subs ? (
+      {platform && switches ? (
         <div {...tabPanel(panelId, by)} className={styles.ranked}>
           {content}
         </div>

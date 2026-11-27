@@ -70,6 +70,7 @@ export function Home() {
   const [gifters, setGifters] = useState<LiveGifters>({
     byPlatform: {},
     subsByPlatform: {},
+    jewelsByPlatform: {},
   });
   const [songs, setSongs] = useState<MusicInfo[]>([]);
   const [paused, setPaused] = useState(false);

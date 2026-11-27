@@ -1,6 +1,6 @@
 import { TOKIO_EVENTS } from "@/common/types";
 import { describe, expect, it } from "vitest";
-import { fromAction, type ChatAction } from "./mapping";
+import { fromAction, fromWidget, type ChatAction } from "./mapping";
 
 // Shaped like youtube.com's chat actions, with made-up viewers
 const add = (renderer: string, item: unknown): ChatAction => ({
@@ -276,9 +276,10 @@ describe("fromAction", () => {
     ).toBeNull();
   });
 
-  it("maps a YouTube Gift, named by its picture", () => {
+  it("maps a YouTube Gift it has no price for, with its picture", () => {
     const action = add("giftMessageViewModel", {
       text: { content: "sent Vice City heart" },
+      giftImageA11yLabel: "@viewer32 sent a gift, Vice City heart",
       authorName: { content: "@viewer32 " },
       authorAvatar: {
         avatarViewModel: { image: { sources: photo.thumbnails } },
@@ -320,6 +321,123 @@ describe("fromAction", () => {
         },
       },
     });
+  });
+
+  // As the chat sends them, with a made-up viewer
+  const gift = (text: string, file: string, label?: string) =>
+    add("giftMessageViewModel", {
+      text: { content: text },
+      authorName: { content: "@viewer32 " },
+      giftImage: {
+        sources: [
+          {
+            url: `//www.gstatic.com/youtube/img/pdg/gift/assets/${file}.png=w480-h480`,
+            width: 480,
+          },
+        ],
+      },
+      ...(label && { giftImageA11yLabel: label }),
+    });
+  const giftOf = (action: ChatAction) => {
+    const mapped = fromAction(action);
+    if (mapped?.event !== TOKIO_EVENTS.GIFT) throw new Error("No Gift");
+    return mapped.data.gift;
+  };
+
+  it("prices a Gift from the list, named by its label", () => {
+    expect(
+      giftOf(
+        gift(
+          "sent Star",
+          "silver_star_v2_320x320",
+          "@viewer32 sent a gift, Star",
+        ),
+      ),
+    ).toMatchObject({
+      id: "youtube:silver_star_v2_320x320",
+      name: "Star",
+      coins: 2,
+      comboCount: 1,
+      repeatEnd: true,
+    });
+    // A gift with a comma in its name keeps it whole
+    expect(
+      giftOf(gift("sent Hi, you", "hi_there", "@viewer32 sent a gift, Hi, you"))
+        .name,
+    ).toBe("Hi, you");
+    // Without a label, the text says it
+    expect(
+      giftOf(gift("sent Gold coin", "gold_coin_v2_320x320")),
+    ).toMatchObject({ name: "Gold coin", coins: 10 });
+  });
+
+  it("maps a combo with its count, at each gift's price", () => {
+    expect(
+      giftOf(
+        gift(
+          "comboed x3 Yes for 6 Jewels",
+          "yes_jp",
+          "@viewer32 sent a gift, Yes",
+        ),
+      ),
+    ).toMatchObject({
+      id: "youtube:yes_jp",
+      name: "Yes",
+      coins: 2,
+      comboCount: 3,
+    });
+    // Its own price wins over the list's, its name comes from the text
+    expect(
+      giftOf(
+        gift("comboed x2 Gold coin for 24 Jewels", "gold_coin_v2_320x320"),
+      ),
+    ).toMatchObject({ name: "Gold coin", coins: 12, comboCount: 2 });
+    expect(
+      giftOf(
+        gift("comboed x1,000 Star for 2,000 Jewels", "silver_star_v2_320x320"),
+      ),
+    ).toMatchObject({ coins: 2, comboCount: 1000 });
+  });
+
+  it("takes a combo it can't read as one gift at the list's price", () => {
+    for (const text of ["comboed x0 Star for 0 Jewels", "comboed Star"]) {
+      expect(giftOf(gift(text, "silver_star_v2_320x320"))).toMatchObject({
+        coins: 2,
+        comboCount: 1,
+      });
+    }
+  });
+
+  it("names a Gift's sender from its card, and nothing else", () => {
+    const card = (name: string, channel?: string) => ({
+      updateOrAddInteractivityWidgetAction: {
+        widgetRenderer: {
+          interactivityWidgetRenderer: {
+            content: {
+              giftAttributionItemViewModel: {
+                authorName: { content: name },
+                giftA11yLabel: `${name} sent a gift, Star`,
+              },
+              elementRenderer: {
+                compatibilityOptions: {
+                  liveChatAuthorExternalChannelId: channel,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(fromWidget(card("@Viewer32", "UCviewer32"))).toEqual({
+      handle: "Viewer32",
+      userId: "youtube:UCviewer32",
+    });
+    // Never an event
+    expect(fromAction(card("@Viewer32", "UCviewer32"))).toBeNull();
+    expect(fromWidget(card("@Viewer32"))).toBeNull();
+    expect(fromWidget({ updateOrAddInteractivityWidgetAction: {} })).toBeNull();
+    expect(fromWidget(add("liveChatTextMessageRenderer", author))).toBeNull();
   });
 
   it("ignores everything else", () => {

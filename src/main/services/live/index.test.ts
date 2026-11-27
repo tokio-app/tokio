@@ -23,6 +23,7 @@ const noTotals = {
   shares: 0,
   gifts: 0,
   coins: 0,
+  jewels: 0,
   kicks: 0,
   bits: 0,
   superChats: 0,
@@ -264,13 +265,28 @@ describe("LiveService", () => {
     expect(live.getSession().totals).toEqual({ ...noTotals, kicks: 105 });
   });
 
-  it("counts YouTube's Gifts without a price", () => {
+  it("counts YouTube's Gifts in Jewels, a combo by its count", () => {
+    const mia = viewer("mia", { platform: "youtube" });
     live.record(TOKIO_EVENTS.GIFT, {
-      ...gift({ comboCount: 3, coins: 7 }),
-      user: viewer("mia", { platform: "youtube" }),
+      ...gift({ id: "youtube:heart", name: "Heart", comboCount: 3, coins: 10 }),
+      user: mia,
+    });
+    // A regional gift without a known price counts as a gift alone
+    live.record(TOKIO_EVENTS.GIFT, {
+      ...gift({ id: "youtube:elote", name: "Elote", coins: 0 }),
+      user: mia,
     });
 
-    expect(live.getSession().totals).toEqual({ ...noTotals, gifts: 3 });
+    const session = live.getSession();
+    const totals = { ...noTotals, gifts: 4, jewels: 30 };
+    expect(session.totals).toEqual(totals);
+    expect(session.platforms.youtube?.totals).toEqual(totals);
+    expect(
+      session.activity.map((item) => item.type === "gift" && item.gift),
+    ).toEqual([
+      { name: "Elote", image: "rose.png", count: 1, coins: 0 },
+      { name: "Heart", image: "rose.png", count: 3, coins: 30 },
+    ]);
   });
 
   it("lists Twitch's subs, gifted subs, cheers, raids and redeems, with the platform", () => {

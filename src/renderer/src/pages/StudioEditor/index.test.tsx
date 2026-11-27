@@ -1578,17 +1578,17 @@ describe("StudioEditor", () => {
       text: "Thanks",
       when: "event",
       trigger: TriggerSchema.parse({
-        type: TOKIO_EVENTS.GIFT,
+        type: TOKIO_EVENTS.SUBSCRIBE,
         gifts: [],
-        platform: "youtube",
+        platform: "kick",
       }),
     });
     const { user } = await open(scene(element));
     await user.click(row(/^Thanks/));
 
-    // YouTube's Gifts come one at a time: no count to say
+    // Kick's subs carry no message
     const event = within(page().getByText("From the event:").closest("p")!);
-    expect(event.getByTitle("Insert {gift}")).toBeVisible();
-    expect(event.queryByTitle("Insert {count}")).toBeNull();
+    expect(event.getByTitle("Insert {username}")).toBeVisible();
+    expect(event.queryByTitle("Insert {comment}")).toBeNull();
   });
 });

@@ -13,7 +13,7 @@ import type { GiftStreaks } from "@/helper/streaks";
 
 /**
  * Whether a live event sets off a trigger, an alert's or a game action's,
- * with its filters: gifts and their coins, keyword, user, emotes, the
+ * with its filters: gifts and their price, keyword, user, emotes, the
  * viewer's roles, and Bits', Super Chats' and gifted subs' minimums.
  */
 export function matchesTrigger(
@@ -76,7 +76,8 @@ export function matchesTrigger(
     const { gifts, every_gift, min_coins } = trigger;
     const { id, coins, repeatEnd } = gift.gift;
     if (gifts.length > 0 && !gifts.includes(Number(id))) return false;
-    // Each gift's worth, or the whole streak's when it ends, for any gift
+    // Each gift's worth, or the whole streak's when it ends, for any gift,
+    // in its own currency: TikTok's coins or YouTube's Jewels
     const worth = every_gift ? coins : coins * total;
     if (gifts.length === 0 && worth < min_coins) return false;
     // Once when the streak ends, or once for each gift sent

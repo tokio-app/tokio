@@ -22,6 +22,7 @@ const NUMBERS: StudioNumbers = {
   followers: 2,
   shares: 1,
   coins: 99,
+  jewels: 0,
   kicks: 0,
   bits: 0,
   superchats: null,

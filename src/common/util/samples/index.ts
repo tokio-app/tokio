@@ -26,6 +26,7 @@ import {
   UserData,
 } from "@/common/types";
 import { platformOf, rowPlatforms } from "../platforms";
+import { jewelsOf } from "../youtube";
 import {
   ADJECTIVES,
   CHAT_MESSAGES,
@@ -33,6 +34,7 @@ import {
   LANGUAGES,
   NOUNS,
   TRANSLATED_CHATS,
+  YOUTUBE_GIFTS,
 } from "./data";
 
 const randomBool = (probability = 0.5): boolean => Math.random() < probability;
@@ -328,21 +330,23 @@ const superChatEventFactory = (user = youtubeViewer()): SuperChatEvent => {
   };
 };
 
-// A YouTube Gift, a real one, as the mapping sends it: no price, each its
-// own message
-const youtubeGiftEventFactory = (user = youtubeViewer()): GiftEvent => ({
-  user: youtubeGifter(user),
-  gift: {
-    id: "youtube:vicecity_heart_v2",
-    name: "Vice City heart",
-    image:
-      "https://www.gstatic.com/youtube/img/pdg/gift/assets/vicecity_heart_v2.png=w640-h640",
-    coins: 0,
-    type: 0,
-    comboCount: 1,
-    repeatEnd: true,
-  },
-});
+// A real YouTube Gift as the mapping sends it, at its price in Jewels, now
+// and then a combo of a few
+const youtubeGiftEventFactory = (user = youtubeViewer()): GiftEvent => {
+  const { key, name } = pickRandom(YOUTUBE_GIFTS);
+  return {
+    user: youtubeGifter(user),
+    gift: {
+      id: `youtube:${key}`,
+      name,
+      image: `https://www.gstatic.com/youtube/img/pdg/gift/assets/${key}.png=w640-h640`,
+      coins: jewelsOf(key) ?? 0,
+      type: 0,
+      comboCount: randomBool(0.2) ? randomInt(2, 5) : 1,
+      repeatEnd: true,
+    },
+  };
+};
 
 const singleUserFactory = () => ({
   user: userFactory(),

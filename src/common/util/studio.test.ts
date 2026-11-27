@@ -20,6 +20,7 @@ import { NO_MONEY } from "./format";
 import {
   fillStudioText,
   goalValue,
+  listInJewels,
   listInUsd,
   listRow,
   newStudioElement,
@@ -177,7 +178,10 @@ describe("studioNumbersFor", () => {
       ["likes", "viewers", "followers", "shares", "coins", "gifts", "uptime"],
     ],
     [["twitch"], ["viewers", "followers", "bits", "giftsubs", "uptime"]],
-    [["youtube"], ["viewers", "superchats", "gifts", "giftsubs", "uptime"]],
+    [
+      ["youtube"],
+      ["viewers", "jewels", "superchats", "gifts", "giftsubs", "uptime"],
+    ],
     [["kick"], ["viewers", "kicks", "giftsubs", "uptime"]],
   ] as const)("offers on %j only what it fills", (platforms, numbers) => {
     expect(studioNumbersFor(platforms)).toEqual(numbers);
@@ -808,12 +812,40 @@ describe("listRow", () => {
     expect(listRow({ ...entry, value: null }, "en").value).toBe("");
   });
 
-  it("writes US dollars for YouTube's top gifters only", () => {
+  it("writes US dollars for YouTube's top gifters by Super Chats only", () => {
     const entry = { picture: "", name: "Ana", text: "", icon: "", value: 57.4 };
+    const list = (
+      source: StudioListSource,
+      platform: Platform,
+      rank: "money" | "jewels" = "money",
+    ) => ({ source, platform, rank });
 
     expect(listRow(entry, "en", true).value).toBe("$57.40");
-    expect(listInUsd({ source: "gifters", platform: "youtube" })).toBe(true);
-    expect(listInUsd({ source: "gifters", platform: "twitch" })).toBe(false);
-    expect(listInUsd({ source: "chat", platform: "youtube" })).toBe(false);
+    expect(listInUsd(list("gifters", "youtube"))).toBe(true);
+    expect(listInUsd(list("gifters", "twitch"))).toBe(false);
+    expect(listInUsd(list("chat", "youtube"))).toBe(false);
+    // By Jewels, a count like coins
+    expect(listInUsd(list("gifters", "youtube", "jewels"))).toBe(false);
+    expect(listInJewels(list("gifters", "youtube", "jewels"))).toBe(true);
+    // Only YouTube's Gifts are priced apart from its money
+    expect(listInJewels(list("gifters", "tiktok", "jewels"))).toBe(false);
+    expect(listInJewels(list("giftsubs", "youtube", "jewels"))).toBe(false);
+    // The editor's samples follow: dollars, or Jewels as a count
+    const samples = new Samples(["youtube"]);
+    expect(samples.list(list("gifters", "youtube"))[0].value).toBe(124);
+    expect(samples.list(list("gifters", "youtube", "jewels"))[0].value).toBe(
+      12_400,
+    );
+  });
+
+  it("reads a list's rank as money when it's missing or unknown", () => {
+    const rank = (saved: unknown) => {
+      const list = element("l", { kind: "list", rank: saved });
+      return list.kind === "list" ? list.rank : null;
+    };
+
+    expect(rank(undefined)).toBe("money");
+    expect(rank("jewels")).toBe("jewels");
+    expect(rank("rubies")).toBe("money");
   });
 });

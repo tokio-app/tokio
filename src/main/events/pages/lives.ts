@@ -77,6 +77,7 @@ events.push(
       totals,
       data: lists.gifters,
       subGifters: lists.subGifters,
+      jewelGifters: lists.jewelGifters,
     });
   },
   {

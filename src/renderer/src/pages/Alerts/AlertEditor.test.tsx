@@ -296,14 +296,17 @@ describe("AlertEditor's minimum", () => {
   const minimum = () => screen.queryByRole("group", { name: "Worth at least" });
 
   // The streak's note only where gifts come in streaks, TikTok's: YouTube's
-  // come one at a time
+  // come whole
   it.each([
     [["tiktok"], {}, "coins", true],
     // Kick sends no gifts
     [["tiktok", "kick"], {}, "coins", true],
     [["tiktok", "youtube"], { platform: "tiktok" }, "coins", true],
-    // A minimum saved on a row with no price stays to fix
-    [["youtube"], { min_coins: 10 }, "coins", false],
+    [["tiktok", "youtube"], {}, "coins or Jewels", true],
+    [["youtube"], {}, "Jewels", false],
+    [["tiktok", "youtube"], { platform: "youtube" }, "Jewels", false],
+    // A minimum saved on a row with no gifts stays to fix
+    [["kick"], { min_coins: 10 }, "coins", false],
   ] as const)(
     "names it for %j and %j in %s, the note %s",
     (platforms, patch, unit, note) => {
@@ -318,8 +321,8 @@ describe("AlertEditor's minimum", () => {
     },
   );
 
-  it("has none for a row with no price", () => {
-    open(gift({ platform: "youtube" }), ["tiktok", "youtube"]);
+  it("has none for a row with no gifts", () => {
+    open(gift(), ["kick"]);
 
     expect(minimum()).toBeNull();
   });

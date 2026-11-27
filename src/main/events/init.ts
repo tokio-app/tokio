@@ -1145,6 +1145,7 @@ const registerHistory = ({
     win.webContents.send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
       byPlatform: history.topByPlatform(),
       subsByPlatform: history.topSubGifters(),
+      jewelsByPlatform: history.topJewelGifters(),
     });
   }, GIFTERS_PUSH_MS);
   history.onChange(push);
