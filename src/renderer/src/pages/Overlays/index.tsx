@@ -6,7 +6,8 @@ import {
   OverlayApp,
 } from "@/common/types";
 import { OverlayModal, Page, RemoveOverlayModal } from "@/components";
-import { useIpcListener, useIpcRequest } from "@/hooks";
+import { PlatformsContext } from "@/context/platforms";
+import { useIpcListener, useIpcRequest, useProfilePlatforms } from "@/hooks";
 import { useState } from "react";
 import { postToOverlay, postToPreviews } from "./helper";
 import { GallerySection } from "./sections/GallerySection";
@@ -21,6 +22,8 @@ export function Overlays() {
   // Overlay waiting for the user to confirm its removal
   const [removing, setRemoving] = useState<OverlayApp | null>(null);
   const editing = overlays.find((overlay) => overlay.id === configId);
+  // For the cards' note on where an overlay works
+  const platforms = useProfilePlatforms();
 
   const closeModal = () => {
     setConfigId(null);
@@ -95,15 +98,17 @@ export function Overlays() {
       )}
 
       <Page width="wide">
-        <GallerySection
-          overlays={overlays}
-          onTest={(id) => window.api.emit(APP_EVENTS.TEST_OVERLAY, { id })}
-          onCustomize={(id) => {
-            window.api.emit(APP_EVENTS.GET_OVERLAY_CONFIG, { id });
-            setConfigId(id);
-          }}
-          onRemove={setRemoving}
-        />
+        <PlatformsContext value={platforms}>
+          <GallerySection
+            overlays={overlays}
+            onTest={(id) => window.api.emit(APP_EVENTS.TEST_OVERLAY, { id })}
+            onCustomize={(id) => {
+              window.api.emit(APP_EVENTS.GET_OVERLAY_CONFIG, { id });
+              setConfigId(id);
+            }}
+            onRemove={setRemoving}
+          />
+        </PlatformsContext>
       </Page>
     </>
   );

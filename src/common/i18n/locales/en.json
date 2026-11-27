@@ -368,6 +368,7 @@
   "components.welcome.skip": "Skip",
   "components.welcome.skipTitle": "Skip setup?",
   "components.welcome.skipDescription": "What you typed won't be saved.",
+  "components.overlayView.worksOn": "Works on {platforms}",
   "settings.language.title": "Language",
   "settings.language.description": "Tokio's menus and messages.",
   "settings.language.system": "System language",

@@ -12,6 +12,7 @@ import {
   gift,
   overlayApp,
   overlayConfig,
+  profileReply,
 } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderApp } from "@test/render";
@@ -80,6 +81,26 @@ async function customize() {
 }
 
 describe("Overlays", () => {
+  it("says where an overlay works when the profile's platforms aren't among them", async () => {
+    await renderApp("/overlays");
+    await overlays(
+      overlayApp("chat", { name: "Chat", platforms: ["youtube"] }),
+      overlayApp("jar", { name: "Jar", platforms: ["tiktok", "youtube"] }),
+    );
+
+    expect(sent(APP_EVENTS.GET_PROFILE)).toHaveLength(1);
+    expect(card("Chat").getByText("Works on YouTube")).toBeInTheDocument();
+    expect(card("Jar").queryByText(/Works on/)).not.toBeInTheDocument();
+
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.platforms = ["youtube"];
+      }),
+    );
+    expect(card("Chat").queryByText(/Works on/)).not.toBeInTheDocument();
+  });
+
   it("asks main for the overlays, the gifts and the official catalog", async () => {
     await renderApp("/overlays");
 

@@ -67,7 +67,15 @@ const config = (): OverlayConfig => ({
 describe("overlays MCP tools", () => {
   describe("overlays", () => {
     const setup = () => {
-      const served = [app(), app({ id: "chat", name: "Chat", external: true })];
+      const served = [
+        app({ platforms: "any" }),
+        app({
+          id: "chat",
+          name: "Chat",
+          external: true,
+          platforms: ["tiktok", "youtube"],
+        }),
+      ];
       const getTestPayloads = vi.fn(() => [
         { type: TOKIO_EVENTS.FOLLOW } as const,
         { type: TOKIO_EVENTS.SHARE } as const,
@@ -108,10 +116,15 @@ describe("overlays MCP tools", () => {
             version: "1.0.0",
             official: false,
             hasSettings: true,
+            platforms: ["tiktok", "youtube"],
             url: "http://tokio-app.local:37891/chat/",
           },
         ],
       });
+      // "any" and a missing list are every platform
+      expect(
+        (await call("list", { kind: "overlays", query: "gift" })).value,
+      ).toMatchObject({ overlays: [{ id: "gift-jar", platforms: null }] });
     });
 
     it("removes one through REMOVE_OVERLAY", async () => {

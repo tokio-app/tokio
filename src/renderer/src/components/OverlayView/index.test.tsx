@@ -1,4 +1,5 @@
-import { OverlayApp } from "@/common/types";
+import { OverlayApp, Platform } from "@/common/types";
+import { PlatformsContext } from "@/context/platforms";
 import { getOverlayURL } from "@/common/util";
 import { overlayApp } from "@test/fixtures";
 import { act, render, screen, within } from "@testing-library/react";
@@ -166,5 +167,34 @@ describe("OverlayView", () => {
     await user.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(onRemove).toHaveBeenCalledWith(overlay);
+  });
+
+  it("says where it works when that's none of the profile's platforms", () => {
+    const shows = (
+      platforms: OverlayApp["platforms"],
+      profile: Platform[] = ["tiktok"],
+    ) => {
+      const { unmount } = render(
+        <PlatformsContext value={profile}>
+          <OverlayView
+            overlay={overlayApp("chat", { platforms })}
+            onTest={vi.fn()}
+            onCustomize={vi.fn()}
+          />
+        </PlatformsContext>,
+      );
+      const line = screen.queryByText(/^Works on/)?.textContent ?? null;
+      unmount();
+      return line;
+    };
+
+    expect(shows(["youtube", "kick"])).toBe("Works on YouTube and Kick");
+    expect(shows(["youtube"], ["tiktok", "twitch"])).toBe("Works on YouTube");
+    expect(shows(["tiktok", "youtube"])).toBeNull();
+    expect(shows(["youtube"], ["youtube"])).toBeNull();
+    expect(shows("any")).toBeNull();
+    expect(shows(undefined)).toBeNull();
+    // Only platforms a newer Tokio knows
+    expect(shows([])).toBeNull();
   });
 });
