@@ -157,7 +157,10 @@ const TRIGGER_VARIABLES = ALERT_TRIGGERS.map((trigger) => {
 
 const StudioChanges = StudioOverlaySchema.omit({ id: true });
 
-const TestOverlayChanges = z.object({ name: z.string().min(1) }).strict();
+// Trimmed: the handler logs a blank name as an error
+const TestOverlayChanges = z
+  .object({ name: z.string().trim().min(1) })
+  .strict();
 
 export const kinds: Kinds = {
   overlays: defineKind({

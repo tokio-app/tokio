@@ -894,6 +894,20 @@ describe("overlays MCP tools", () => {
       ).toEqual({ id: "b2", name: "Browser" });
     });
 
+    it("refuses a blank name before the handler", async () => {
+      const { h } = setup();
+      const invoke = vi.spyOn(h.handler, "invoke");
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("save_item", {
+        kind: "test_overlay",
+        changes: { name: "   " },
+      });
+
+      expect(res.isError).toBe(true);
+      expect(invoke).not.toHaveBeenCalled();
+    });
+
     it("can't rename one", async () => {
       const { h } = setup();
       const { call } = await mcpClient(h.handler);
