@@ -148,7 +148,7 @@ export class OverlayService extends Service {
   }
 
   /**
-   * Saves the gifts, then checks every installed overlay, writes its saved
+   * Saves new gifts, then checks every installed overlay, writes its saved
    * config into its HTML and serves it. Overlays that fail stay stored, so a
    * fix keeps their ID and link, unless their folder is gone.
    */
@@ -162,8 +162,11 @@ export class OverlayService extends Service {
       }
     }
 
-    await this._json.saveArbitraryFile(this._giftsFile, gifts);
-    this._gifts = gifts;
+    // The list getGifts read from the file needs no write back.
+    if (gifts !== this._gifts) {
+      await this._json.saveArbitraryFile(this._giftsFile, gifts);
+      this._gifts = gifts;
+    }
 
     for (const overlay of this._store.getSettings().overlays) {
       const info = await this._writeHTML(overlay.id, gifts);

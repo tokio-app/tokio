@@ -248,6 +248,15 @@ describe("OverlayService", () => {
       expect(await readJSON("gifts.json")).toEqual(gifts);
     });
 
+    it("doesn't write back the gifts it read from the file", async () => {
+      await writeFile(join(root, "gifts.json"), JSON.stringify(gifts));
+      const save = vi.spyOn(JSONManagerService.prototype, "saveArbitraryFile");
+
+      await service.load(await service.getGifts());
+
+      expect(save).not.toHaveBeenCalled();
+    });
+
     it("keeps an overlay whose folder it can't open", async () => {
       // Its files can't be read either, so it fails to load.
       stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
