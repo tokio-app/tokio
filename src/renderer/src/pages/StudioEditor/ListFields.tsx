@@ -76,8 +76,7 @@ export function ListFields({ element, onChange }: Props) {
       source,
       platform:
         source === "giftsubs" && !giftsSubs(element.platform)
-          ? (PLATFORMS.find((p) => platforms.includes(p) && giftsSubs(p)) ??
-            element.platform)
+          ? (platforms.find(giftsSubs) ?? element.platform)
           : element.platform,
     });
 

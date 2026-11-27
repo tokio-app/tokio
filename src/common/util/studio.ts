@@ -16,7 +16,6 @@ import {
 } from "../schemas/studio";
 import {
   EMOTE_TRIGGER,
-  PLATFORMS,
   TOKIO_EVENTS,
   type AlertTrigger,
   type AppEvents,
@@ -526,7 +525,7 @@ export function newStudioElement(
     y: Math.round((canvas.height - box.height) / 2),
     trigger: { type: newRowTrigger(platforms), gifts: [] },
     ...(kind === "list" && {
-      platform: PLATFORMS.find((p) => platforms.includes(p)) ?? "tiktok",
+      platform: platforms[0] ?? "tiktok",
     }),
     ...(kind === "viewer" && { when: "event" }),
     ...(kind === "gift" && {
