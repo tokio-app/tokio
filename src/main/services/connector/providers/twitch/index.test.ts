@@ -513,6 +513,46 @@ describe("TwitchConnector", () => {
       expect(order).toEqual(["cheer", "disconnected"]);
     });
 
+    it("sends what comes before CONNECTED right after it", async () => {
+      const order: string[] = [];
+      connector.on(TOKIO_EVENTS.CONNECTED, () => order.push("connected"));
+      connector.on(TOKIO_EVENTS.CHAT, () => order.push("chat"));
+      connector.on(TOKIO_EVENTS.CHEER, () => order.push("cheer"));
+      let answer: (() => void) | undefined;
+      twitch.override = (url) =>
+        url.includes("/streams?") && !answer
+          ? new Promise((resolve) => {
+              answer = () => resolve(json(200, { data: [] }));
+            })
+          : undefined;
+
+      const connecting = connector.connect("");
+      // Subscribed, with the live check still out
+      await vi.waitFor(() => expect(answer).toBeDefined());
+      notify("channel.chat.message", {
+        chatter_user_id: "4145994",
+        chatter_user_login: "viewer32",
+        chatter_user_name: "Viewer32",
+        message: { text: "hi", fragments: [{ type: "text", text: "hi" }] },
+        badges: [],
+      });
+      // Anonymous: no picture to wait for
+      notify("channel.bits.use", {
+        user_id: null,
+        user_login: null,
+        user_name: null,
+        bits: 500,
+        type: "cheer",
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(order).toEqual([]);
+      answer!();
+      await connecting;
+      await vi.waitFor(() => expect(order).toHaveLength(3));
+
+      expect(order).toEqual(["connected", "chat", "cheer"]);
+    });
+
     it("sends the viewers while live, and ends with the stream", async () => {
       twitch.live = 120;
       const onRoom = capture(TOKIO_EVENTS.ROOM_USER);

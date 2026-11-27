@@ -64,6 +64,8 @@ type Connection = {
   wake?: () => void;
   // Events waiting for their picture, which a stop sends without it
   held: Set<Mapped>;
+  // What came before CONNECTED, sent right after it so it's in the LIVE
+  early: [type: string, event: any][];
 };
 
 /**
@@ -226,6 +228,9 @@ export class TwitchConnector
       this._logFile,
     );
     this.emit(TOKIO_EVENTS.CONNECTED);
+    for (const [type, event] of conn.early.splice(0)) {
+      this._notify(conn, type, event);
+    }
     if (viewers === undefined) this._recheck(conn);
     else if (viewers !== null) this._goLive(conn, viewers);
     return { success: true };
@@ -239,6 +244,7 @@ export class TwitchConnector
       live: false,
       wasLive: false,
       held: new Set(),
+      early: [],
       eventsub: new EventSub(
         this._config.EVENTSUB_URL,
         this._config.KEEPALIVE_GRACE_MS,
@@ -401,6 +407,12 @@ export class TwitchConnector
 
   private _notify(conn: Connection, type: string, event: any) {
     if (this._conn !== conn) return;
+    // Chat comes once its subscription exists, before the live check ends
+    const stream = type === "stream.online" || type === "stream.offline";
+    if (!conn.up && !stream) {
+      conn.early.push([type, event]);
+      return;
+    }
     switch (type) {
       case CHAT: {
         const chat = toChat(event, conn.userId);
