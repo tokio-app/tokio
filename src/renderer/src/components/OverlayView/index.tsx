@@ -1,6 +1,8 @@
+import { listOf } from "@/common/i18n";
 import { OverlayApp } from "@/common/types";
-import { getOverlayURL } from "@/common/util";
-import { useT } from "@/ui/i18n";
+import { getOverlayURL, PLATFORM_LABELS } from "@/common/util";
+import { usePlatforms } from "@/context/platforms";
+import { useLanguage, useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiMaximize2, FiTrash2 } from "react-icons/fi";
 import { GoUnverified, GoVerified } from "react-icons/go";
@@ -23,7 +25,15 @@ interface Props {
 
 export function OverlayView({ onTest, onCustomize, onRemove, overlay }: Props) {
   const t = useT();
+  const language = useLanguage();
+  const profilePlatforms = usePlatforms();
   const [expanded, setExpanded] = useState(false);
+  // Where it works, said only when it's none of the profile's platforms
+  const { platforms } = overlay;
+  const elsewhere =
+    Array.isArray(platforms) &&
+    platforms.length > 0 &&
+    !platforms.some((p) => profilePlatforms.includes(p));
 
   return (
     <div className={styles.container}>
@@ -109,6 +119,17 @@ export function OverlayView({ onTest, onCustomize, onRemove, overlay }: Props) {
         value={getOverlayURL(overlay.id)}
         title={t("common.copyUrl")}
       />
+
+      {elsewhere && (
+        <p className={styles.platforms}>
+          {t("components.overlayView.worksOn", {
+            platforms: listOf(
+              language,
+              platforms.map((p) => PLATFORM_LABELS[p]),
+            ),
+          })}
+        </p>
+      )}
     </div>
   );
 }

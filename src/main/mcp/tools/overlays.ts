@@ -182,7 +182,7 @@ const TestOverlayChanges = z.object({ name: z.string().min(1) }).strict();
 export const kinds: Kinds = {
   overlays: defineKind({
     notes:
-      "Installed overlays, official (from the catalog) or imported. Each is one browser source at its url. Their settings are the overlay_settings kind and save_overlay_settings. Importing a folder is only in the app.",
+      "Installed overlays, official (from the catalog) or imported. Each is one browser source at its url. platforms: where it works (null: every platform). Their settings are the overlay_settings kind and save_overlay_settings. Importing a folder is only in the app.",
     list: ({ overlayService }, { query, limit }) => {
       const found = overlayService
         .getOverlays()
@@ -195,6 +195,7 @@ export const kinds: Kinds = {
           version: o.version,
           official: !o.external,
           hasSettings: o.config,
+          platforms: Array.isArray(o.platforms) ? o.platforms : null,
           url: getOverlayURL(o.id),
         })),
       });

@@ -54,6 +54,12 @@
   gap: var(--space-2);
 }
 
+/* Where it works, when that's none of the profile's platforms */
+.platforms {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
 /* The full size preview */
 .frame {
   overflow: hidden;

@@ -133,6 +133,98 @@ describe("parseCatalog", () => {
     expect(overlays[0].preview).toBeNull();
   });
 
+  describe("versions for newer Tokio builds", () => {
+    const version = (v: string, tokio: string) => ({
+      name: `Gift Jar ${v}`,
+      version: v,
+      config: true,
+      release: `0.2.${v}`,
+      file: "gift-jar.zip",
+      url: `${RELEASES_PREFIX}v${v}/gift-jar.zip`,
+      size: ZIP.length,
+      sha256: "b".repeat(64),
+      preview: `${RELEASES_PREFIX}v${v}/gift-jar.png`,
+      tokio,
+    });
+    const catalog = (versions: unknown[]) => ({
+      schema: 1,
+      overlays: [
+        {
+          ...entry({ version: "1.4.0", platforms: ["tiktok", "youtube"] }),
+          versions,
+        },
+      ],
+    });
+    const gated = catalog([
+      version("1.6.0", "0.4.0"),
+      version("1.5.0", "0.3.0"),
+    ]);
+    const pick = (data: unknown, appVersion: string) =>
+      parseCatalog(data, appVersion);
+
+    it("gives a build the newest version it runs", () => {
+      expect(pick(gated, "0.2.0").overlays[0]).toEqual(
+        entry({ version: "1.4.0", platforms: ["tiktok", "youtube"] }),
+      );
+      // A prerelease comes before its release
+      expect(pick(gated, "0.3.0-beta.1").overlays[0].version).toBe("1.4.0");
+      expect(pick(gated, "0.4.1").overlays[0].version).toBe("1.6.0");
+    });
+
+    it("takes the version's files and the entry's description and platforms", () => {
+      const { overlays, dropped } = pick(gated, "0.3.0");
+
+      expect(dropped).toEqual([]);
+      expect(overlays).toEqual([
+        {
+          ...entry({ platforms: ["tiktok", "youtube"] }),
+          name: "Gift Jar 1.5.0",
+          version: "1.5.0",
+          url: `${RELEASES_PREFIX}v1.5.0/gift-jar.zip`,
+          sha256: "b".repeat(64),
+          preview: `${RELEASES_PREFIX}v1.5.0/gift-jar.png`,
+        },
+      ]);
+      expect(overlays[0]).not.toHaveProperty("tokio");
+      expect(overlays[0]).not.toHaveProperty("versions");
+    });
+
+    it("skips a version it can't read", () => {
+      const { overlays, dropped } = pick(
+        catalog([
+          { ...version("1.7.0", "0.4.0"), sha256: "nope" },
+          { ...version("1.6.5", "0.4.0"), url: "https://example.com/a.zip" },
+          "1.6.2",
+          version("1.6.0", "0.4.0"),
+        ]),
+        "0.4.1",
+      );
+
+      expect(dropped).toEqual([]);
+      expect(overlays[0].version).toBe("1.6.0");
+    });
+
+    it("leaves out quietly an overlay only a newer Tokio runs", () => {
+      const { overlays, dropped } = pick(
+        {
+          schema: 1,
+          overlays: [
+            { ...entry({ id: "next" }), tokio: "0.9.0" },
+            {
+              ...entry({ id: "later", sha256: "nope" }),
+              versions: [version("2.0.0", "0.9.0")],
+            },
+            entry(),
+          ],
+        },
+        "0.4.1",
+      );
+
+      expect(overlays.map((o) => o.id)).toEqual(["gift-jar"]);
+      expect(dropped).toEqual([]);
+    });
+  });
+
   it("refuses another format", () => {
     expect(() => parseCatalog({ schema: 2, overlays: [] })).toThrow();
     expect(() => parseCatalog("<html>")).toThrow();

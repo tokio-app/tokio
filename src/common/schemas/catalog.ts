@@ -51,6 +51,9 @@ export const CatalogOverlaySchema = z.object({
   platforms: z
     .preprocess(knownPlatforms(), z.array(z.enum(PLATFORMS)))
     .optional(),
+  // The first Tokio version that runs it, on an item of the entry's
+  // `versions`. parseCatalog picks by it and leaves it out.
+  tokio: z.string().optional(),
 });
 
 export type CatalogOverlay = z.infer<typeof CatalogOverlaySchema>;

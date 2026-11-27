@@ -9,6 +9,7 @@ import {
   resetOverlayConfig,
   shownFields,
 } from "./overlay";
+import { OverlayMetaSchema } from "./store";
 
 const GIFTS: CustomGift[] = [
   { value: 1, label: "Rose", img: "rose.png", coins: 1 },
@@ -740,5 +741,30 @@ describe("mergeOverlayConfig", () => {
     expect(merged.fields[1].attributes.value).not.toBe(
       saved.fields[1].attributes.value,
     );
+  });
+});
+
+describe("OverlayMetaSchema", () => {
+  const info = { name: "Chat", version: "1.0.0", config: false };
+
+  it("reads where an overlay works, leaving out unknown platforms", () => {
+    const platforms = (value: unknown) =>
+      OverlayMetaSchema.parse({ ...info, platforms: value }).platforms;
+
+    expect(platforms(["tiktok", "someday", "youtube"])).toEqual([
+      "tiktok",
+      "youtube",
+    ]);
+    expect(platforms("any")).toBe("any");
+    expect(platforms(undefined)).toBeUndefined();
+    expect(
+      OverlayMetaSchema.safeParse({ ...info, platforms: "tiktok" }).success,
+    ).toBe(false);
+  });
+
+  it("reads the first Tokio that runs it", () => {
+    expect(
+      OverlayMetaSchema.parse({ ...info, tokio: "0.2.0-beta.2" }).tokio,
+    ).toBe("0.2.0-beta.2");
   });
 });

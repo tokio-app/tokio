@@ -1,6 +1,8 @@
 import { CatalogOverlay, CatalogOverlaySchema } from "@/common/schemas";
+import { compareVersions } from "@/common/util";
 import { isInside } from "@/helper/path";
 import { unzipSync } from "fflate";
+import { app } from "electron";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -42,28 +44,54 @@ export async function fetchCatalog(): Promise<Catalog> {
 }
 
 /**
- * The catalog's overlays. Entries that don't parse, or whose zip isn't in the
- * overlays repo's releases, are dropped. Previews from anywhere else are too.
+ * The catalog's overlays, each at the newest version this Tokio runs: an item
+ * of its `versions` (newest first, each needing a newer Tokio), else its top
+ * level, which builds from before `versions` read alone. Entries that don't
+ * parse, or whose zip isn't in the overlays repo's releases, are dropped.
+ * Previews from anywhere else are too.
  */
-export function parseCatalog(data: unknown): Catalog {
+export function parseCatalog(
+  data: unknown,
+  appVersion = app.getVersion(),
+): Catalog {
   const catalog = CatalogSchema.safeParse(data);
   if (!catalog.success) throw new Error("It isn't a schema 1 catalog.");
 
   const overlays: CatalogOverlay[] = [];
   const dropped: string[] = [];
   catalog.data.overlays.forEach((value, i) => {
-    const entry = CatalogOverlaySchema.safeParse(value);
-    if (!entry.success || !isReleaseURL(entry.data.url)) {
-      dropped.push(entryName(value, i));
+    let readable = false;
+    for (const candidate of versionsOf(value)) {
+      const entry = CatalogOverlaySchema.safeParse(candidate);
+      if (!entry.success || !isReleaseURL(entry.data.url)) continue;
+      readable = true;
+      const { tokio, preview, ...rest } = entry.data;
+      if (tokio && compareVersions(appVersion, tokio) < 0) continue;
+      overlays.push({
+        ...rest,
+        preview: preview && isReleaseURL(preview) ? preview : null,
+      });
       return;
     }
-    const { preview } = entry.data;
-    overlays.push({
-      ...entry.data,
-      preview: preview && isReleaseURL(preview) ? preview : null,
-    });
+    // One only a newer Tokio runs isn't broken
+    if (!readable) dropped.push(entryName(value, i));
   });
   return { overlays, dropped };
+}
+
+// An entry's `versions`, each over the entry's own fields, then the entry.
+function versionsOf(value: unknown): unknown[] {
+  if (typeof value !== "object" || value === null || !("versions" in value)) {
+    return [value];
+  }
+  const { versions, ...entry } = value;
+  if (!Array.isArray(versions)) return [entry];
+  return [
+    ...versions
+      .filter((v) => typeof v === "object" && v !== null)
+      .map((v) => ({ ...entry, ...v })),
+    entry,
+  ];
 }
 
 /**

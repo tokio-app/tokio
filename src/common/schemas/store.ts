@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { PLATFORMS } from "../types/connector";
 import type { ControlAction } from "../types/controls";
-import { AlertSoundSchema } from "./profile";
+import { AlertSoundSchema, knownPlatforms } from "./profile";
 import { StoredStudioOverlaysSchema } from "./studio";
 
 const ProviderSchema = z.object({
@@ -21,6 +22,17 @@ const OverlayMeta = {
   // Chat commands the overlay answers that no setting holds, so Chat
   // translation leaves them as typed. Older versions strip it.
   commands: z.array(z.string()).optional(),
+  // The first Tokio version that runs it. Only the overlays repo's catalog
+  // reads it; Tokio parses it so that repo's copy of the schema stays the same.
+  tokio: z.string().optional(),
+  // The platforms it works on. Missing and "any" mean every platform. A
+  // platform this Tokio doesn't know is left out, so the overlay still loads.
+  platforms: z
+    .union([
+      z.literal("any"),
+      z.preprocess(knownPlatforms(), z.array(z.enum(PLATFORMS))),
+    ])
+    .optional(),
 };
 
 export const OverlayMetaSchema = z.object(OverlayMeta);
