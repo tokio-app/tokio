@@ -241,11 +241,12 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   const settle = async () => {
     await page.mouse.move(1190, 790);
     await page.evaluate(() => document.activeElement?.blur());
-    const toasts = page
-      .locator('[role="status"], [role="alert"]')
-      .filter({ has: page.getByTitle(tr("Close"), { exact: true }) });
-    while ((await toasts.count()) > 0) {
-      await toasts.first().getByTitle(tr("Close"), { exact: true }).click();
+    // Only errors are alerts, so the toasts are found in their viewport
+    const closes = page
+      .getByRole("region", { name: tr("Notifications"), exact: true })
+      .getByTitle(tr("Close"), { exact: true });
+    while ((await closes.count()) > 0) {
+      await closes.first().click();
     }
     await page.waitForTimeout(800);
   };
@@ -349,7 +350,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   );
 
   // Overlays
-  await open(tr("Overlays"), tr("Overlay gallery"));
+  await open(tr("Overlays"), tr("Overlays"));
   await page.getByRole("button", { name: tr("Official overlays") }).click();
   await page.getByRole("heading", { name: tr("Official overlays") }).waitFor();
   for (const name of ["Gift Jar", "Top Likes"]) {
@@ -360,7 +361,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await page.waitForTimeout(3000);
   await crop("overlays-official", card("Like Fountain"));
   await page.getByTitle(tr("Back to Overlays")).click();
-  await page.getByRole("heading", { name: tr("Overlay gallery") }).waitFor();
+  await page.getByRole("heading", { name: tr("Overlays") }).waitFor();
   await page.waitForTimeout(8000);
   // Top Likes' preview keeps liking and slides its rows when the ranking
   // changes, so the gallery's shots wait until no row is sliding
@@ -455,7 +456,9 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
       await crop("alerts-trigger", editor);
     }
     if (alert.gifts) {
-      await editor.getByRole("button", { name: tr("Any gift") }).click();
+      await editor
+        .getByRole("button", { name: tr("Any gift"), exact: true })
+        .click();
       for (const gift of alert.gifts) {
         await picker.getByTitle(gift, { exact: true }).click();
       }
@@ -504,8 +507,10 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     }
 
     if (alert.media) {
-      await editor.getByRole("tab", { name: tr("Media") }).click();
-      await editor.getByRole("button", { name: tr("Choose media...") }).click();
+      await editor.getByRole("tab", { name: tr("Image or video") }).click();
+      await editor
+        .getByRole("button", { name: tr("Choose a file...") })
+        .click();
       await pick(alert.media);
       await picker.getByRole("button", { name: tr("Browse file...") }).click();
       await dialogsOpen(1);
@@ -560,7 +565,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await crop("tts-voices", dialog);
   await dialog.getByRole("button", { name: tr("Cancel") }).click();
   await page
-    .getByPlaceholder(tr("Type a message to test how the TTS sounds..."))
+    .getByPlaceholder(tr("Type a message to hear it..."))
     .fill(say("brb, getting a drink"));
   await crop("tts-voice", body(tr("Voice")));
   // Clone a voice shows once an engine that clones has a key: made-up keys
@@ -713,7 +718,10 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
 
   // The overlay: the gift action on a Rose, and each action with a picture
   // browsed into the Minecraft library (pixel art drawn for these shots)
-  await actions.getByRole("button", { name: tr("Any gift") }).click();
+  // Exact: each row's trash is named after its action, "Remove Any gift"
+  await actions
+    .getByRole("button", { name: tr("Any gift"), exact: true })
+    .click();
   await dialog.getByTitle("Rose", { exact: true }).click();
   await dialog.getByRole("button", { name: tr("Done") }).click();
   await dialog.waitFor({ state: "detached" });
@@ -805,8 +813,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await crop("games-test", follow, { pad: 12 });
 
   // A tool, opened from its row on Tools. Its heading's name starts with
-  // the back button's title, so it's found by how it ends, case and all:
-  // Spanish's "Temporizador" is also in "Aspecto del temporizador".
+  // the back button's title, so it's found by how it ends.
   const toolHeading = (name) =>
     page.getByRole("heading", {
       name: new RegExp(`${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`),
@@ -860,7 +867,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
       name: tr("Show the triggers, one at a time"),
     }),
   );
-  await crop("timer-look", body(tr("Timer look")));
+  await crop("timer-look", body(tr("Look")));
 
   // Overlay Studio: a likes banner and a follow alert, each a group, and the
   // logo the alerts' Media tab browsed
@@ -889,13 +896,18 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
         panel.scrollTop = 0;
       }
     });
+  // The open list under a + button, whose items are plain buttons
+  const addList = (button) => button.locator("xpath=following-sibling::div[1]");
   // Where the + menu puts it: into the selected group or the selected
   // element's group, else on its own
   const addStudio = async (item) => {
-    await page
-      .getByRole("button", { name: tr("Add a group or an element") })
+    const add = page.getByRole("button", {
+      name: tr("Add a group or an element"),
+    });
+    await add.click();
+    await addList(add)
+      .getByRole("button", { name: tr(item), exact: true })
       .click();
-    await page.getByRole("menuitem", { name: tr(item), exact: true }).click();
   };
   // The selected element's box, in px of the canvas
   const placeAt = async (x, y, width, height) => {
@@ -1082,14 +1094,22 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
 
   // Test overlays
   await tool(tr("Test overlays"));
-  await page.getByPlaceholder(tr("Overlay name")).fill(say("My overlay"));
+  await page
+    .getByRole("textbox", { name: tr("Overlay name"), exact: true })
+    .fill(say("My overlay"));
   await page.getByTitle(tr("Create ID")).click();
   await crop("tools-test-overlays", toolSection(tr("Test overlays")));
 
   // LIVE history on All time, once its own request found no LIVEs
   await tool(tr("LIVE history"));
   await page
-    .getByText(tr(en["coinStats.list.empty"], "coinStats.list.empty"))
+    // Its text runs around a link, so it's matched without the tags
+    .getByText(
+      tr(en["coinStats.list.empty"], "coinStats.list.empty").replace(
+        /<\/?link>/g,
+        "",
+      ),
+    )
     .waitFor();
   await push("app:lives:res:get", { data: { lives: LIVES, gifters: GIFTERS } });
   await page
@@ -1111,7 +1131,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
 
   // Settings, with a made-up network address in place of main's, for the
   // overlay server and the remote control's link and QR code
-  await open(tr("Settings"), tr("Live profiles"));
+  await open(tr("Settings"), tr("Profiles"));
   await section(tr("Overlay server"))
     .getByText(/^\d+\.\d+\.\d+\.\d+$/)
     .first()
@@ -1129,7 +1149,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await crop("settings", [section("TikTok LIVE"), section(tr("Updates"))], {
     width: 640,
   });
-  await crop("settings-profiles", section(tr("Live profiles")));
+  await crop("settings-profiles", section(tr("Profiles")));
 
   // Chat translation, tested with a message in another language. Google's
   // answer is pushed after main's, so the shot doesn't depend on it.
@@ -1210,10 +1230,15 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await qr.waitFor();
   // From the switch to the code and its fields
   await crop("settings-remote", [remoteOn, qr.locator("..")]);
-  // The AI assistants' block under it, at Claude Code, the first
+  // AI assistants, the next section, at Claude Code, the first. Its setup
+  // shows with the key.
+  const assistants = section(tr("AI assistants"));
+  await assistants
+    .getByRole("button", { name: tr("Show setup and key") })
+    .click();
   await crop(
     "settings-mcp",
-    remote
+    assistants
       .getByRole("group", { name: tr("AI assistant"), exact: true })
       .locator(".."),
   );
@@ -1222,10 +1247,11 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   // the window, so the menu opens down over its own section.
   const voiceKeys = section(tr("Voice engines"));
   await voiceKeys.evaluate((el) => el.scrollIntoView({ block: "start" }));
-  await voiceKeys
-    .getByRole("button", { name: tr("Add a voice engine") })
-    .click();
-  const engineMenu = voiceKeys.getByRole("menu");
+  const addEngine = voiceKeys.getByRole("button", {
+    name: tr("Add a voice engine"),
+  });
+  await addEngine.click();
+  const engineMenu = addList(addEngine);
   // The other sections hidden: the menu reaches over the next one
   const others = (visibility) =>
     voiceKeys.evaluate((own, value) => {
@@ -1300,14 +1326,14 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   );
   await pick(own);
   // After the gallery's shots, so it stays out of them
-  await open(tr("Overlays"), tr("Overlay gallery"));
+  await open(tr("Overlays"), tr("Overlays"));
   await page.getByTitle(tr("Import overlay"), { exact: true }).click();
   await page
     .getByRole("heading", { name: "Likes Counter", exact: true })
     .waitFor();
   // The gallery's header, with the + that imports
   await crop("overlays-import", [
-    page.getByRole("heading", { name: tr("Overlay gallery"), exact: true }),
+    page.getByRole("heading", { name: tr("Overlays"), exact: true }),
     page.getByText(tr("Browser sources for your streaming app."), {
       exact: true,
     }),
@@ -1326,7 +1352,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     page.getByRole("list", { name: tr("Sounds"), exact: true }),
   ]);
 
-  await open(tr("Settings"), tr("Live profiles"));
+  await open(tr("Settings"), tr("Profiles"));
   await page.getByTitle(tr("Create a profile")).click();
   await page
     .getByPlaceholder(tr("e.g. Chill Stream"))
@@ -1345,7 +1371,13 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
       .locator("main")
       .evaluate((el, value) => (el.style.visibility = value), visibility);
   await settle();
-  const profiles = titleBar.getByRole("button", { name: "Default" }).first();
+  const profiles = titleBar
+    .getByRole("button", {
+      name: tr("Profile: Default", "components.profileDropdown.label", {
+        name: "Default",
+      }),
+    })
+    .first();
   await profiles.click();
   await behind("hidden");
   await crop("profiles-menu", [profiles, menu], { pad: 8, top: 0 });

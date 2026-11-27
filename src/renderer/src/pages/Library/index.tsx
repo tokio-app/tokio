@@ -6,12 +6,13 @@ import {
   Page,
   SearchToggle,
   Section,
+  tabPanel,
   Tabs,
 } from "@/components";
 import { formatStat } from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useLanguage, useT } from "@/ui/i18n";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { FiPlus } from "react-icons/fi";
 import styles from "./library.module.css";
 import { MediaTab } from "./sections/MediaTab";
@@ -29,6 +30,7 @@ function shown<T extends { name: string }>(list: T[], search: string) {
 
 export function Library() {
   const t = useT();
+  const panelId = useId();
   const language = useLanguage();
   const [tab, setTab] = useState<Tab>("sounds");
   const [search, setSearch] = useState("");
@@ -121,21 +123,24 @@ export function Library() {
             ]}
             value={tab}
             onChange={setTab}
+            panelId={panelId}
           />
 
-          {onSounds ? (
-            <SoundsTab
-              sounds={shown(sounds ?? [], search)}
-              empty={!sounds?.length}
-              failed={soundsFailed}
-            />
-          ) : (
-            <MediaTab
-              media={shown(media ?? [], search)}
-              empty={!media?.length}
-              failed={mediaFailed}
-            />
-          )}
+          <div {...tabPanel(panelId, tab)} className={styles.tab_panel}>
+            {onSounds ? (
+              <SoundsTab
+                sounds={shown(sounds ?? [], search)}
+                empty={!sounds?.length}
+                failed={soundsFailed}
+              />
+            ) : (
+              <MediaTab
+                media={shown(media ?? [], search)}
+                empty={!media?.length}
+                failed={mediaFailed}
+              />
+            )}
+          </div>
         </Section>
       </div>
     </Page>

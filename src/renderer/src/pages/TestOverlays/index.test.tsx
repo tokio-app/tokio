@@ -160,8 +160,11 @@ describe("TestOverlays", () => {
 
   it("warns while the overlay server is off", async () => {
     renderWithProviders(<TestOverlays />);
-    const notice =
-      "The overlay server is off. Enable it in Settings to send test events.";
+    // Its text runs around a link to Settings
+    const notice = (_: string, el: Element | null) =>
+      el?.tagName === "P" &&
+      el.textContent ===
+        "The overlay server is off. Enable it in Settings to send test events.";
     expect(screen.queryByText(notice)).not.toBeInTheDocument();
 
     await send(
@@ -170,7 +173,9 @@ describe("TestOverlays", () => {
         s.settings.server.enabled = false;
       }),
     );
-    expect(screen.getByText(notice)).toBeInTheDocument();
+    expect(
+      within(screen.getByText(notice)).getByRole("link", { name: "Settings" }),
+    ).toHaveAttribute("href", "/settings");
     // Above the section
     expect(section("Test overlays").queryByText(notice)).toBeNull();
 

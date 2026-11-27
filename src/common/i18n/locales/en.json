@@ -676,7 +676,7 @@
   "coinStats.gifters.emptyDatesSubs": "No gifted subs on these dates.",
   "tools.back": "Back to Tools",
   "tools.countdown.serverOff": "The overlay server is off. Enable it in <link>Settings</link> to show the countdown on stream.",
-  "tools.test.serverOff": "The overlay server is off. Enable it in Settings to send test events.",
+  "tools.test.serverOff": "The overlay server is off. Enable it in <link>Settings</link> to send test events.",
   "tools.list.fans#one": "fan",
   "tools.list.fans#other": "fans",
   "tools.list.lives#one": "LIVE",

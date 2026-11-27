@@ -7,8 +7,8 @@ import { PLATFORM_ICONS } from "@/helper";
 import { cx } from "@/helper/cx";
 import { Updater } from "@/hooks/useImmerState";
 import { useT } from "@/ui/i18n";
-import { useState } from "react";
-import { Check, ListTextarea, NumberInput, Tabs } from "../Elements";
+import { useId, useState } from "react";
+import { Check, ListTextarea, NumberInput, tabPanel, Tabs } from "../Elements";
 import { Field, Section } from "../Page";
 import styles from "./permissionssection.module.css";
 
@@ -54,6 +54,7 @@ const PLATFORM_ROLES: Record<Exclude<Platform, "tiktok">, Role[]> = {
  */
 export function PermissionsSection({ permissions, update, feature }: Props) {
   const t = useT();
+  const panelId = useId();
   const profilePlatforms = usePlatforms();
   const tabs = PLATFORMS.filter((p) => profilePlatforms.includes(p));
   const [picked, setPicked] = useState<Platform>();
@@ -150,9 +151,13 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
           })}
           value={tab}
           onChange={setPicked}
+          panelId={panelId}
         />
       )}
-      <div className={styles.rules}>
+      <div
+        {...(several ? tabPanel(panelId, tab) : {})}
+        className={styles.rules}
+      >
         {rules}
         {/* The roles and the level pass with any one of them, see
             hasPermission */}

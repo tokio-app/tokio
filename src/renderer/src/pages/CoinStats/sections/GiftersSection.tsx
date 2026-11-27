@@ -7,11 +7,13 @@ import {
   SearchToggle,
   Section,
   Spinner,
+  tabPanel,
   Tabs,
 } from "@/components";
 import { cx } from "@/helper/cx";
 import { amountLabel, giftsLabel } from "@/helper/gifts";
 import { useLanguage, useT } from "@/ui/i18n";
+import { useId } from "react";
 import styles from "../coinstats.module.css";
 
 // What a list ranks: the platform's money, or gifted subs
@@ -113,6 +115,7 @@ export function GiftersSection({
   onSearch,
 }: Props) {
   const t = useT();
+  const panelId = useId();
   const language = useLanguage();
   const top = platform && topOf(platform, by);
   const title = t(top ? top.title : "coinStats.gifters.top");
@@ -194,9 +197,16 @@ export function GiftersSection({
           }))}
           value={by}
           onChange={onBy}
+          panelId={panelId}
         />
       )}
-      {content}
+      {platform && subs ? (
+        <div {...tabPanel(panelId, by)} className={styles.ranked}>
+          {content}
+        </div>
+      ) : (
+        content
+      )}
     </Section>
   );
 }

@@ -18,19 +18,21 @@ import {
   SearchToggle,
   Section,
   Spinner,
+  tabPanel,
   Tabs,
   Toggle,
 } from "@/components";
 import { cx, formatDate, PLATFORM_ICONS } from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useLanguage, useT } from "@/ui/i18n";
-import { useState } from "react";
+import { useId, useState } from "react";
 import styles from "./fans.module.css";
 
 type FansTab = Platform | "all";
 
 export function Fans() {
   const t = useT();
+  const panelId = useId();
   const language = useLanguage();
   // Each platform's in main's order: TikTok's by level, the others' by
   // months, then the most recently seen
@@ -242,11 +244,18 @@ export function Fans() {
                 })}
                 value={tab}
                 onChange={setPicked}
+                panelId={panelId}
               />
               {filters && tiktok && only}
             </div>
           )}
-          {content}
+          {several ? (
+            <div {...tabPanel(panelId, tab)} className={styles.panel}>
+              {content}
+            </div>
+          ) : (
+            content
+          )}
         </Section>
       </div>
     </Page>

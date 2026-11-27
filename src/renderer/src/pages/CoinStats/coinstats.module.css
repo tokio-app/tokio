@@ -176,6 +176,14 @@
   margin-bottom: calc(-1 * var(--space-3));
 }
 
+/* The ranking's panel, which the list scrolls inside */
+.ranked {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
 /* THE LIST */
 
 .side {

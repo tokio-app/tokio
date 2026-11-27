@@ -106,6 +106,24 @@ describe("Library", () => {
     expect(tab(/^Sounds/)).toHaveAttribute("aria-selected", "true");
   });
 
+  it("shows the open tab's library in a panel named by the tab", async () => {
+    const { user } = await setup();
+    expect(
+      within(screen.getByRole("tabpanel", { name: "Sounds 2" })).getByRole(
+        "list",
+        { name: "Sounds" },
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(tab(/^Images and videos/));
+
+    expect(
+      within(
+        screen.getByRole("tabpanel", { name: "Images and videos 2" }),
+      ).getByTitle("Party"),
+    ).toBeInTheDocument();
+  });
+
   describe("sounds", () => {
     it("lists the sounds, newest first", async () => {
       renderWithProviders(<Library />);

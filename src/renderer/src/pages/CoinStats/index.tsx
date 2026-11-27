@@ -23,12 +23,13 @@ import {
   Page,
   Section,
   Spinner,
+  tabPanel,
   Tabs,
 } from "@/components";
 import { formatDate, formatDuration, PLATFORM_ICONS } from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useLanguage, useT } from "@/ui/i18n";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useId, useRef, useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
 import styles from "./coinstats.module.css";
 import {
@@ -86,6 +87,7 @@ function Frame({
 export function CoinStats() {
   const t = useT();
   const language = useLanguage();
+  const panelId = useId();
   const [history, setHistory] = useState<LiveHistory>();
   // A LIVE's startedAt or null for the totals, undefined until LIVES comes
   const [selected, setSelected] = useState<number | null>();
@@ -309,9 +311,13 @@ export function CoinStats() {
               setPicked(next);
               setRanked(undefined);
             }}
+            panelId={panelId}
           />
         )}
-        <div className={styles.dashboard}>
+        <div
+          {...(tabs.length > 1 ? tabPanel(panelId, tab) : {})}
+          className={styles.dashboard}
+        >
           {/* Swapped at once on a new selection, with no motion */}
           <div className={styles.column}>
             {live ? (

@@ -6,9 +6,9 @@ import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
 import { useOptions, useT } from "@/ui/i18n";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { DeleteSoundModal } from "../DeleteModals";
-import { Btn, Tabs } from "../Elements";
+import { Btn, tabPanel, Tabs } from "../Elements";
 import { Modal } from "../Modal";
 import { PREVIEW_VOLUME, type TestState } from "../PlayButton";
 import { LibraryTab } from "./LibraryTab";
@@ -62,6 +62,7 @@ export function SoundPicker({
 }: Props) {
   const t = useT();
   const tabs = useOptions(TABS);
+  const panelId = useId();
   const { id } = alert;
   // Chosen once the library loads: the library if it has sounds. An alert
   // that speaks opens on its message.
@@ -139,41 +140,43 @@ export function SoundPicker({
           </>
         }
       >
-        <Tabs tabs={tabs} value={tab} onChange={setTab} />
+        <Tabs tabs={tabs} value={tab} onChange={setTab} panelId={panelId} />
 
-        {tab === "library" && (
-          <LibraryTab
+        <div {...tabPanel(panelId, tab)} className={styles.panel}>
+          {tab === "library" && (
+            <LibraryTab
+              library={library}
+              current={alert.tts ? undefined : alert.sound?.file}
+              testing={testing}
+              onTest={onTest}
+              onSelect={onSelect}
+              onRemove={setRemoving}
+            />
+          )}
+
+          <MyInstantsTab
+            id={id}
+            hidden={tab !== "myinstants"}
             library={library}
-            current={alert.tts ? undefined : alert.sound?.file}
             testing={testing}
+            lengths={lengths}
             onTest={onTest}
+            onRequest={request}
             onSelect={onSelect}
             onRemove={setRemoving}
           />
-        )}
 
-        <MyInstantsTab
-          id={id}
-          hidden={tab !== "myinstants"}
-          library={library}
-          testing={testing}
-          lengths={lengths}
-          onTest={onTest}
-          onRequest={request}
-          onSelect={onSelect}
-          onRemove={setRemoving}
-        />
-
-        {speaking && (
-          <TtsTab
-            alertId={id}
-            triggers={triggersOf(alert)}
-            value={tts}
-            onChange={setTts}
-            testing={testing}
-            onTest={onTest}
-          />
-        )}
+          {speaking && (
+            <TtsTab
+              alertId={id}
+              triggers={triggersOf(alert)}
+              value={tts}
+              onChange={setTts}
+              testing={testing}
+              onTest={onTest}
+            />
+          )}
+        </div>
 
         {saveFailed && (
           <p className={styles.error}>

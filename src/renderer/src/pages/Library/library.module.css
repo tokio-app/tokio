@@ -21,6 +21,15 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* What the tabs show, its list scrolling inside, spaced as the section */
+.tab_panel {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-height: 0;
+}
+
 .panel {
   flex: 0 1 auto;
   min-height: 0;
