@@ -277,10 +277,18 @@ export class YouTubeConnector extends ConnectorProvider {
     if (this._conn !== conn || !answer) return null;
     conn.continuation = answer.continuation;
     for (const mapped of this._events(conn, answer.actions)) {
-      if (mapped.event === TOKIO_EVENTS.CHAT) {
-        this.emitChat(mapped.data, () => this._conn === conn);
-      } else {
-        this.emit(mapped.event, mapped.data);
+      // A listener's throw would fail the poll and drop the rest of it
+      try {
+        if (mapped.event === TOKIO_EVENTS.CHAT) {
+          this.emitChat(mapped.data, () => this._conn === conn);
+        } else {
+          this.emit(mapped.event, mapped.data);
+        }
+      } catch (err) {
+        this._logOnce(
+          `send:${mapped.event}`,
+          `Couldn't send a ${mapped.event} -- ${formatError(err)}`,
+        );
       }
     }
     return this._wait(answer.timeoutMs);

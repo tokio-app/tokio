@@ -23,5 +23,6 @@ Builds on `.claude/rules/platforms.md`.
   - A handle with neither keeps `youtube:@handle`, with no lookup, since Gifts come in bursts. That viewer then has two ids.
 - A gifted membership counts once, from its purchase announcement, with the count read right after its text's "Sent" (a channel's name can hold digits), else 1; each recipient's redemption is dropped.
 - Super Chat amounts stay as YouTube shows them (`amount`); their dollars are in `.claude/rules/live-session.md`.
+- A listener's throw is logged (`_logOnce`) and drops only that event, never failing the poll, which would read as a drop.
 - Placeholder items (`liveChatPlaceholderItemRenderer`) are messages held from readers and never filled in: ignored.
 - A member's months (`subMonths`) come from the member badge's tooltip, in English since requests ask `hl=en`. "Member (1 year)" is 12, and "New member" sets none.

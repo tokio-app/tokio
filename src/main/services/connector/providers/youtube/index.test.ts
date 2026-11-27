@@ -307,6 +307,28 @@ describe("YouTubeConnector", () => {
       expect(onGift.mock.calls[0][0].gift.coins).toBe(0);
     });
 
+    it("logs a listener's throw and goes on with the poll and the chat", async () => {
+      const warn = vi.spyOn(Logger, "warn");
+      const onChat = capture(TOKIO_EVENTS.CHAT);
+      onChat.mockImplementation(({ comment }) => {
+        if (comment.content === "boom") throw new Error("a listener's bug");
+      });
+      youtube.state.polls = [
+        { actions: [] },
+        { actions: [chatAction("boom"), chatAction("same poll")] },
+        { actions: [chatAction("next poll")] },
+      ];
+      await connector.connect("madeup");
+
+      await vi.waitFor(() => expect(chats(onChat)).toContain("next poll"));
+      expect(chats(onChat)).toEqual(["boom", "same poll", "next poll"]);
+      expect(states).toEqual([]);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("a listener's bug"),
+        expect.anything(),
+      );
+    });
+
     it("sends chat through the chat stage", async () => {
       connector.setChatStage((chat) =>
         Promise.resolve({

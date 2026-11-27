@@ -469,6 +469,33 @@ describe("TwitchConnector", () => {
       expect(onChat.mock.calls[0][0].comment.content).toBe("hi");
     });
 
+    it("logs a listener's throw and goes on reading", async () => {
+      const warn = vi.spyOn(Logger, "warn");
+      const onChat = capture(TOKIO_EVENTS.CHAT);
+      onChat.mockImplementation(({ comment }) => {
+        if (comment.content === "boom") throw new Error("a listener's bug");
+      });
+      await connector.connect("");
+      const chat = (text: string) =>
+        notify("channel.chat.message", {
+          chatter_user_id: "4145994",
+          chatter_user_login: "viewer32",
+          chatter_user_name: "Viewer32",
+          message: { text, fragments: [{ type: "text", text }] },
+          badges: [],
+        });
+
+      chat("boom");
+      chat("after");
+
+      await vi.waitFor(() => expect(onChat).toHaveBeenCalledTimes(2));
+      expect(onChat.mock.calls[1][0].comment.content).toBe("after");
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("a listener's bug"),
+        expect.anything(),
+      );
+    });
+
     it("looks up at most PICTURE_LOOKUPS pictures a minute, sending every event", async () => {
       make({ PICTURE_LOOKUPS: 10 });
       const onFollow = capture(TOKIO_EVENTS.FOLLOW);

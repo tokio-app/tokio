@@ -405,7 +405,20 @@ export class TwitchConnector
     if (conn.wasLive) this._stop(conn, "ended");
   }
 
+  // A listener's throw would stall the socket until its watchdog, with an
+  // error box: dropped and logged instead, as Kick's socket does
   private _notify(conn: Connection, type: string, event: any) {
+    try {
+      this._handle(conn, type, event);
+    } catch (err) {
+      this._logOnce(
+        `notify:${type}`,
+        `Couldn't send a ${type} -- ${formatError(err)}`,
+      );
+    }
+  }
+
+  private _handle(conn: Connection, type: string, event: any) {
     if (this._conn !== conn) return;
     // Chat comes once its subscription exists, before the live check ends
     const stream = type === "stream.online" || type === "stream.offline";
