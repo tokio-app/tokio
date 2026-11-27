@@ -442,6 +442,31 @@ describe("GamesService", () => {
       expect(minecraft.sent).toEqual(["2", "2", "3", "3", "3"]);
     });
 
+    it("counts the gifts a pause skipped, so they don't run once it ends", async () => {
+      vi.useFakeTimers();
+      const minecraft = fakeMinecraft();
+      const games = service(minecraft);
+      const actions = profileGames({
+        every: action({
+          trigger: trigger(TOKIO_EVENTS.GIFT, { every_gift: true }),
+          steps: [say("{count}")],
+        }),
+      });
+      const before = games.handle(TOKIO_EVENTS.GIFT, gift(10), actions);
+      await vi.runAllTimersAsync();
+      await before;
+      // The pause
+      games.stopRuns();
+      games.skip(TOKIO_EVENTS.GIFT, gift(50));
+
+      const after = games.handle(TOKIO_EVENTS.GIFT, gift(51), actions);
+      await vi.runAllTimersAsync();
+      await after;
+      vi.useRealTimers();
+
+      expect(minecraft.sent.slice(10)).toEqual(["51"]);
+    });
+
     describe("backlogs", () => {
       afterEach(() => vi.useRealTimers());
 

@@ -365,6 +365,7 @@ function setup() {
     setSpeaker: vi.fn(),
     setServer: vi.fn(),
     handle: vi.fn(async (..._args: Parameters<AlertsService["handle"]>) => {}),
+    skip: vi.fn((..._args: Parameters<AlertsService["skip"]>) => {}),
     clear: vi.fn(),
   };
   const updaterService = {
@@ -443,6 +444,7 @@ function setup() {
     onRun: vi.fn((..._args: Parameters<GamesService["onRun"]>) => {}),
     setPicturesFolder: vi.fn(),
     handle: vi.fn(async (..._args: Parameters<GamesService["handle"]>) => {}),
+    skip: vi.fn((..._args: Parameters<GamesService["skip"]>) => {}),
     clear: vi.fn(),
   };
   const yamlManagerService = { setLogFile: vi.fn() };
@@ -3540,7 +3542,7 @@ describe("init events", () => {
       expect(s.musicService.clearHandler).not.toHaveBeenCalled();
     });
 
-    it("ignores alerts and game actions while paused", async () => {
+    it("ignores alerts and game actions while paused, counting their streaks", async () => {
       const s = await live();
       s.controlsService.setPaused(true);
 
@@ -3549,6 +3551,33 @@ describe("init events", () => {
 
       expect(s.alertsService.handle).not.toHaveBeenCalled();
       expect(s.gamesService.handle).not.toHaveBeenCalled();
+      expect(s.alertsService.skip).toHaveBeenCalledExactlyOnceWith(
+        TOKIO_EVENTS.FOLLOW,
+        { user },
+      );
+      expect(s.gamesService.skip).toHaveBeenCalledExactlyOnceWith(
+        TOKIO_EVENTS.FOLLOW,
+        { user },
+      );
+    });
+
+    it("skips an event whose profile read ended after the pause came", async () => {
+      const s = await live();
+      // The alerts' read and the games'
+      const reads: (() => void)[] = [];
+      s.storeManagerService.getProfileData.mockImplementation(
+        () => new Promise((resolve) => reads.push(() => resolve(profile))),
+      );
+      s.conn.emit(TOKIO_EVENTS.FOLLOW, { user });
+
+      s.controlsService.setPaused(true);
+      for (const read of reads) read();
+      await flushPromises();
+
+      expect(s.alertsService.handle).not.toHaveBeenCalled();
+      expect(s.gamesService.handle).not.toHaveBeenCalled();
+      expect(s.alertsService.skip).toHaveBeenCalled();
+      expect(s.gamesService.skip).toHaveBeenCalled();
     });
 
     it("drops a spoken alert made after the pause came", async () => {

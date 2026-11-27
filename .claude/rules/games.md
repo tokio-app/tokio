@@ -32,7 +32,7 @@ The **Games** page connects Minecraft to Tokio: Bedrock Edition by itself, Java 
 - A game replaced midway by one of its edition fails only the unanswered commands (`dropped`), with no notice: the run counts as done and the backlog goes on in the new game.
 - `_pump` awaits `settled()` after a dropped run and before each run, so a game in its handshake, or one that took over, gets the backlog once ready.
 - `handle` resolves once its own batches are served or dropped. `dispatchGames` isn't awaited, so a backlog never holds up other events.
-- The connector's `DISCONNECTED` calls `clear`, which forgets streaks and counted likes, not backlogs.
+- The connector's `DISCONNECTED` calls `clear`, which forgets streaks and counted likes, not backlogs. While paused, `skip` counts an event in the streaks, and nothing else (`.claude/rules/controls.md`).
 - An action runs only while a game of its `edition` is connected (`_unreachable`); a game of the other edition counts as none, for `handle` and `test` alike, and mid-run `send(command, edition)` drops a command for it. A failure that leaves no game of the edition (it left, the other edition replaced it, Minecraft was turned off) stops `_send` there without waiting out its waits, so the backlog drops before Minecraft can come back.
 - **Test** (`TEST_GAME_ACTION`, `notify: false`, carries `edition`) runs the steps once with `generateTriggerSample` (Emote uses a chat with an emote) on the platform the page or MCP resolved (`platform`, `samplePlatform`) and returns each command with the game's reply. It fails with no game or the other edition. The reply carries the action's `id`.
 

@@ -59,7 +59,8 @@ const CONTROLS: Record<
     // Nothing from before the pause plays later
     if (next) {
       stopTts(handler);
-      alertsService.clear();
+      // The streaks go on counting while paused
+      alertsService.clear({ streaks: false });
       if (!win.isDestroyed()) {
         win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
       }

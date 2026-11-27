@@ -218,6 +218,13 @@ export class GamesService extends Service {
     await Promise.all(runs);
   }
 
+  // Counts a live event that a pause holds back, so the gifts of a streak
+  // sent during it don't run once it ends
+  public skip<K extends AppEvents>(type: K, payload: TokioEventMap[K]) {
+    if (this._unusable()) return;
+    streakOf(this._streaks, type, payload);
+  }
+
   /**
    * Runs the steps once with a sample of the trigger's event, as the
    * platform sends it.

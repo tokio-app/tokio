@@ -108,7 +108,10 @@ describe("CONTROL", () => {
 
     expect(controlsService.isPaused()).toBe(true);
     expect(ttsService.clearTalk).toHaveBeenCalledOnce();
-    expect(alertsService.clear).toHaveBeenCalledOnce();
+    // The streaks go on counting while paused
+    expect(alertsService.clear).toHaveBeenCalledExactlyOnceWith({
+      streaks: false,
+    });
     expect(gamesService.stopRuns).toHaveBeenCalledOnce();
     expect(h.pushed(APP_EVENTS_RESPONSE.TTS_CLEAR)).toHaveLength(1);
     expect(h.pushed(APP_EVENTS_RESPONSE.ALERT_CLEAR)).toHaveLength(1);

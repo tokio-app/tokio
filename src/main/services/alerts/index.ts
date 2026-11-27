@@ -396,17 +396,24 @@ export class AlertsService extends Service {
    * Stops the alert messages waiting to be spoken, drops the one being made,
    * the sounds being read and the media waiting for its turn, hides the media
    * on the overlays and forgets the gift streaks, as their ends may be missed.
+   * A pause keeps the streaks, which skip goes on counting.
    */
-  public clear() {
+  public clear({ streaks = true }: { streaks?: boolean } = {}) {
     this._run++;
     this._speech.stop();
-    this._streaks.clear();
+    if (streaks) this._streaks.clear();
     for (const timer of this._shows) clearTimeout(timer);
     this._shows.clear();
     for (const id of this._shown) {
       this._server?.sendToClient(id, { type: CLEAR_MEDIA });
     }
     this._shown.clear();
+  }
+
+  // Counts a live event that a pause holds back, so the gifts of a streak
+  // sent during it don't play once it ends
+  public skip<K extends AppEvents>(type: K, payload: TokioEventMap[K]) {
+    streakOf(this._streaks, type, payload);
   }
 
   /**

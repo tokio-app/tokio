@@ -224,11 +224,15 @@ const registerConnectorEvents = ({
     type: K,
     payload: TokioEventMap[K],
   ) => {
-    // Ignored while paused, and never played later
-    if (controls.isPaused()) return;
     if (!store.getActiveFeatures().alerts) return;
     const profile = await store.getProfileData();
     if (!profile) return;
+    // Ignored while paused, and never played later, but counted: a streak's
+    // gifts sent during the pause don't play once it ends
+    if (controls.isPaused()) {
+      alerts.skip(type, payload);
+      return;
+    }
     // This event's sounds, media and spoken messages, which a replay plays
     const group: AlertAudio[] = [];
     await alerts.handle(
@@ -297,10 +301,14 @@ const registerConnectorEvents = ({
     type: K,
     payload: TokioEventMap[K],
   ) => {
-    // The pause dropped the waiting runs, and takes no new ones
-    if (controls.isPaused()) return;
     const profile = await store.getProfileData();
     if (!profile) return;
+    // The pause dropped the waiting runs, and takes no new ones, but counts
+    // them as alerts do
+    if (controls.isPaused()) {
+      games.skip(type, payload);
+      return;
+    }
     await games.handle(type, payload, profile.games);
   };
 
