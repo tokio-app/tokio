@@ -105,7 +105,7 @@ export const STUDIO_LIST_SOURCES = [
 
 // What YouTube's top gifters rank by: its money, the Super Chats' US
 // dollars, or its Gifts' Jewels. Other platforms have one currency.
-export const STUDIO_LIST_RANKS = ["money", "jewels"] as const;
+const STUDIO_LIST_RANKS = ["money", "jewels"] as const;
 
 // The most groups an overlay holds
 export const STUDIO_MAX_GROUPS = 100;
