@@ -2047,6 +2047,24 @@ describe("settings events", () => {
       },
     );
 
+    it("shows the window turning it off from the tray, which has no other way back", async () => {
+      const { h } = setup();
+      h.win.hide();
+
+      await h.invoke(settings, APP_EVENTS.SET_TRAY, { enabled: false });
+
+      expect(h.win.isVisible()).toBe(true);
+    });
+
+    it("leaves a hidden window hidden turning it on", async () => {
+      const { h } = setup();
+      h.win.hide();
+
+      await h.invoke(settings, APP_EVENTS.SET_TRAY, { enabled: true });
+
+      expect(h.win.show).not.toHaveBeenCalled();
+    });
+
     it("replies and notifies when the setting can't be saved", async () => {
       const setEnabled = vi.fn();
       const h = createHandler({

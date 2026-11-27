@@ -732,9 +732,15 @@ events.push(
 
 events.push(
   APP_EVENTS.SET_TRAY,
-  async ({ storeManagerService, trayService, notifier }, e, { enabled }) => {
+  async (
+    { storeManagerService, trayService, notifier, win },
+    e,
+    { enabled },
+  ) => {
     const saved = await storeManagerService.updateTraySettings(enabled);
     trayService.setEnabled(enabled);
+    // Hidden in the tray (an AI can turn it off), it would have no way back
+    if (!enabled && !win.isVisible()) win.show();
     replySettings(e, storeManagerService);
     if (!saved) throw saveFailure();
     e.reply(APP_EVENTS_RESPONSE.SET_TRAY, {
