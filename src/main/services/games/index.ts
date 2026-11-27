@@ -56,6 +56,9 @@ type Batch = {
   edition: MinecraftEdition;
   commands: GameCommand[];
   times: number;
+  // _switches when it was queued: a batch from before a switch or a pause
+  // is dropped
+  switches: number;
   resolve: () => void;
   reject: (error: unknown) => void;
 };
@@ -126,8 +129,9 @@ export class GamesService extends Service {
     if (switched) this.stopRuns();
   }
 
-  // Drops every run still waiting, as a switch does: a pause plays nothing
-  // from before it later
+  // Drops every run still waiting, and stops the one being sent at its next
+  // gap between mobs, as a switch does: a pause plays nothing from before it
+  // later
   public stopRuns(): void {
     this._switches++;
   }
@@ -322,8 +326,13 @@ export class GamesService extends Service {
   // rest go once those are answered and the wait is over. A oneOf is picked
   // here, so each run of a batch gets its own. Stops when the game left,
   // Minecraft was turned off or a game of the other edition took over,
-  // leaving out what wasn't sent.
-  private async _send(commands: GameCommand[], edition: MinecraftEdition) {
+  // leaving out what wasn't sent, or after a gap once stale says a switch or
+  // a pause came. Never in a launch's wait: its teleport stops the climb.
+  private async _send(
+    commands: GameCommand[],
+    edition: MinecraftEdition,
+    stale?: () => boolean,
+  ) {
     const results: CommandResult[] = [];
     let sending: { command: string; mayFail?: boolean }[] = [];
     // False once a failure leaves no game of the edition: the rest would go
@@ -357,6 +366,7 @@ export class GamesService extends Service {
       } else {
         if (!(await answers())) return results;
         await delay(command.wait);
+        if (command.gap && stale?.()) return results;
       }
     }
     await answers();
@@ -374,7 +384,8 @@ export class GamesService extends Service {
         ? undefined
         : this._backlogs
             .get(action.id)
-            ?.reduce((runs, batch) => runs + batch.times, 0);
+            ?.filter((batch) => batch.switches === this._switches)
+            .reduce((runs, batch) => runs + batch.times, 0);
     if (waiting !== undefined && waiting + times > MAX_BACKLOG) {
       this._onError?.(action, {
         offline: false,
@@ -388,6 +399,7 @@ export class GamesService extends Service {
         edition: action.edition,
         commands,
         times,
+        switches: this._switches,
         resolve,
         reject,
       };
@@ -401,19 +413,22 @@ export class GamesService extends Service {
   // until the backlog is empty. Each action has its own, side by side.
   private async _pump(id: string, backlog: Batch[]) {
     this._backlogs.set(id, backlog);
-    const switches = this._switches;
     try {
       for (let first = true; backlog.length > 0; first = false) {
         if (!first) await delay(RUN_GAP_MS);
         // A Bedrock game that took over in the gap is still in its handshake
         await this._minecraft.settled();
-        if (this._switches !== switches) break;
         // Stopped when the latest profile removed or disabled the action; runs
         // it accepted keep their commands if only steps changed
         const action = this._games.actions.find((a) => a.id === id);
         if (!action?.enabled) break;
-        // Runs accepted for the action's old edition are dropped, the rest go on
-        while (backlog.length > 0 && backlog[0].edition !== action.edition) {
+        // Runs accepted before a switch or a pause, or for the action's old
+        // edition, are dropped; the rest go on
+        while (
+          backlog.length > 0 &&
+          (backlog[0].switches !== this._switches ||
+            backlog[0].edition !== action.edition)
+        ) {
           backlog.shift()?.resolve();
         }
         const batch = backlog[0];
@@ -426,9 +441,10 @@ export class GamesService extends Service {
           break;
         }
         this._onRun?.(action);
-        const failed = (await this._send(batch.commands, batch.edition)).find(
-          (r) => !r.ok,
-        );
+        const stale = () => batch.switches !== this._switches;
+        const failed = (
+          await this._send(batch.commands, batch.edition, stale)
+        ).find((r) => !r.ok);
         if (failed) {
           // A Bedrock game that took over is connected once its handshake ends
           if (failed.dropped) await this._minecraft.settled();

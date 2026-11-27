@@ -16,7 +16,7 @@ const step = (input: Record<string, unknown>): GameStep =>
   GameStepSchema.parse(input);
 const none = (text: string) => text;
 // Between two mobs of a step
-const gap = { wait: SPAWN_GAP_MS };
+const gap = { wait: SPAWN_GAP_MS, gap: true };
 
 describe("commandValue", () => {
   it("drops what could break out of a command", () => {

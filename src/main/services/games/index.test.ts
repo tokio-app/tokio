@@ -663,6 +663,96 @@ describe("GamesService", () => {
         expect(minecraft.sent).toEqual(["each 300", "each 300"]);
       });
 
+      const cows = (amount: number, id = "cows") =>
+        action({
+          id,
+          trigger: trigger(TOKIO_EVENTS.GIFT, { every_gift: true }),
+          steps: [GameStepSchema.parse({ type: "spawn", mob: "cow", amount })],
+        });
+
+      it("stops a spawn at its next gap between mobs on stopRuns", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(1), {
+          actions: [cows(100)],
+        });
+        await vi.advanceTimersByTimeAsync(SPAWN_GAP_MS + 1);
+        games.stopRuns();
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toHaveLength(2);
+      });
+
+      it("runs the gifts that came after a pause and resume, during a run", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const actions = { actions: [cows(10)] };
+        const first = games.handle(TOKIO_EVENTS.GIFT, gift(1), actions);
+        await vi.advanceTimersByTimeAsync(SPAWN_GAP_MS + 1);
+        // Pause, then Resume and a new viewer's gift before the next mob
+        games.stopRuns();
+        const other = { ...gift(1), user: { ...user, handle: "other" } };
+        const second = games.handle(TOKIO_EVENTS.GIFT, other, actions);
+        await vi.runAllTimersAsync();
+        await Promise.all([first, second]);
+        // The first run's 2 cows, then the new gift's 10
+        expect(minecraft.sent).toHaveLength(12);
+      });
+
+      it("sends a launch's teleport through a pause in its climb", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const launch = action({
+          trigger: trigger(TOKIO_EVENTS.GIFT, { every_gift: true }),
+          steps: [GameStepSchema.parse({ type: "hazard", hazard: "launch" })],
+        });
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(2), {
+          actions: [launch],
+        });
+        await vi.advanceTimersByTimeAsync(500);
+        expect(minecraft.sent.at(-1)).toMatch(/^effect @p levitation/);
+        games.stopRuns();
+        await vi.runAllTimersAsync();
+        await run;
+        // The second launch never goes
+        expect(minecraft.sent).toHaveLength(6);
+        expect(minecraft.sent.at(-1)).toBe("teleport @p ~ ~ ~");
+      });
+
+      it("counts only the runs from after a pause toward MAX_BACKLOG", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        let answerFirst = () => {};
+        minecraft.send.mockImplementationOnce(
+          (command) =>
+            new Promise((resolve) => {
+              minecraft.sent.push(command);
+              answerFirst = () => resolve({ command, ok: true, message: "" });
+            }),
+        );
+        const games = service(minecraft);
+        const onError = vi.fn();
+        games.onError(onError);
+        const actions = { actions: [action()] };
+        const runs = Array.from({ length: MAX_BACKLOG }, () =>
+          games.handle(TOKIO_EVENTS.FOLLOW, { user }, actions),
+        );
+        // The first run is out, unanswered
+        await vi.advanceTimersByTimeAsync(0);
+        games.stopRuns();
+
+        const after = games.handle(TOKIO_EVENTS.FOLLOW, { user }, actions);
+        answerFirst();
+        await vi.runAllTimersAsync();
+        await Promise.all([...runs, after]);
+        expect(onError).not.toHaveBeenCalled();
+        // The run the pause found going, then the one after it
+        expect(minecraft.sent).toHaveLength(2);
+      });
+
       it("drops the backlog when the game leaves, reporting it once", async () => {
         vi.useFakeTimers();
         const minecraft = fakeMinecraft();

@@ -24,9 +24,13 @@ const RING = [
 // A command for the game, or a wait before the rest: they go once the
 // commands before it are answered and its milliseconds have passed. A
 // mayFail's failure counts as done (a clear that found nothing to take), and
-// a oneOf sends one of its commands, picked as it's sent.
+// a oneOf sends one of its commands, picked as it's sent. A gap's wait is
+// between two mobs, where a pause can stop the run.
 export type GameCommand =
-  string | { wait: number } | { mayFail: string } | { oneOf: string[] };
+  | string
+  | { wait: number; gap?: true }
+  | { mayFail: string }
+  | { oneOf: string[] };
 
 // The time between the mobs of a step, so they come one at a time
 export const SPAWN_GAP_MS = 250;
@@ -34,7 +38,7 @@ export const SPAWN_GAP_MS = 250;
 // The groups' commands, a wait apart
 const spaced = (groups: GameCommand[][]): GameCommand[] =>
   groups.flatMap((group, i) =>
-    i === 0 ? group : [{ wait: SPAWN_GAP_MS }, ...group],
+    i === 0 ? group : [{ wait: SPAWN_GAP_MS, gap: true as const }, ...group],
   );
 
 // The strongest levitation the effect command takes (amplifier 255). Both
