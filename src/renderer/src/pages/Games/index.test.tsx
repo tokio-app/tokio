@@ -855,6 +855,21 @@ describe("Games", () => {
     });
 
     expect(screen.getByText(notConnected)).toBeInTheDocument();
+    expect(screen.queryByText("0 commands ran")).not.toBeInTheDocument();
+  });
+
+  it("says no command ran for steps that make none", async () => {
+    const { user } = await load([action("a1", { steps: [command("")] })]);
+
+    await user.click(screen.getByRole("button", { name: "Test" }));
+    await send(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, {
+      success: true,
+      id: "a1",
+      request: asked(),
+      results: [],
+    });
+
+    expect(screen.getByText("0 commands ran")).toBeInTheDocument();
   });
 
   it("can't test an action without steps", async () => {

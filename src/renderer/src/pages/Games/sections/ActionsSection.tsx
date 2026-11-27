@@ -463,7 +463,9 @@ function ActionItem({
           {result.error && (
             <p className={styles.result_error}>{result.error}</p>
           )}
-          {result.results.length > 0 && (
+          {/* A test that ran says how many commands did, 0 for steps
+              that make none; a failed one has its error */}
+          {(result.results.length > 0 || !result.error) && (
             // Opens with the first results; once folded, later tests keep it
             <details open className={styles.result_log}>
               <summary className={styles.result_summary}>
