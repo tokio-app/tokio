@@ -253,12 +253,16 @@ events.push(
   APP_EVENTS.SET_PLATFORMS,
   async (services, e, { platforms }) => {
     const { storeManagerService, connectorService, timerService } = services;
-    // Known ones once each, in Home's order. One that's on stays: it's
-    // disconnected first.
+    // Known ones once each, in the order sent: Home's tabs'. One that's on
+    // stays, after them: it's disconnected first.
     const on = connectorService.status();
+    const rank = (p: Platform) => {
+      const at = platforms.indexOf(p);
+      return at === -1 ? platforms.length : at;
+    };
     const picked = PLATFORMS.filter(
       (p) => platforms.includes(p) || on[p] !== undefined,
-    );
+    ).sort((a, b) => rank(a) - rank(b));
     if (!(await storeManagerService.updateProfileData({ platforms: picked }))) {
       throw saveFailure();
     }

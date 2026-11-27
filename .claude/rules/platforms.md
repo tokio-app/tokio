@@ -15,7 +15,7 @@ Tokio connects to TikTok, Twitch, YouTube and Kick (`PLATFORMS`, `src/common/typ
 ## What the user chose
 
 - One LIVE session spans every platform the profile uses (the user's call): one feed, one LIVE history record, one timer, one Studio, alerts, TTS, music and games for all.
-- The profile picks its platforms on Home, with the `+` after the tabs and each tab's remove (`SET_PLATFORMS`). A platform can be added while live and connected alone; one that's on stays until it's disconnected (main keeps it). Its `platforms` and `channels` are the profile's own, so each profile can use different ones.
+- The profile picks its platforms on Home, with the `+` after the tabs and each tab's remove, and their order by dragging the tabs (`SET_PLATFORMS`, which keeps the order sent). A platform can be added while live and connected alone; one that's on stays until it's disconnected (main keeps it, after the others). Its `platforms` and `channels` are the profile's own, so each profile can use different ones.
 
 ## The session across platforms
 

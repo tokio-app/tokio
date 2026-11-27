@@ -147,7 +147,7 @@ describe("live MCP tools", () => {
       });
     });
 
-    it("saves them through SET_PLATFORMS, then sends the profile", async () => {
+    it("saves them in their order through SET_PLATFORMS, then sends the profile", async () => {
       const { h, updateProfileData, setPlatforms } = setup();
       const { call } = await mcpClient(h.handler);
 
@@ -158,7 +158,7 @@ describe("live MCP tools", () => {
 
       expect(res).toMatchObject({ isError: false, text: "Saved." });
       expect(updateProfileData).toHaveBeenCalledExactlyOnceWith({
-        platforms: ["tiktok", "twitch"],
+        platforms: ["twitch", "tiktok"],
       });
       expect(setPlatforms).toHaveBeenCalledOnce();
       expect(h.pushed(APP_EVENTS_RESPONSE.GET_PROFILE)).toHaveLength(1);
@@ -178,7 +178,7 @@ describe("live MCP tools", () => {
         text: "Disconnect from TikTok before removing it; the rest was saved.",
       });
       expect(updateProfileData).toHaveBeenCalledExactlyOnceWith({
-        platforms: ["tiktok", "twitch"],
+        platforms: ["twitch", "tiktok"],
       });
     });
 

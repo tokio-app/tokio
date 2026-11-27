@@ -13,7 +13,7 @@ import {
 } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderApp } from "@test/render";
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 const page = () => within(screen.getByRole("main"));
@@ -107,6 +107,32 @@ describe("Home's platforms", () => {
     });
 
     expect(page().queryByText("Twitch", { selector: "span" })).toBeNull();
+  });
+
+  it("saves the order the tabs are moved to, and adds a platform last", async () => {
+    const { user } = await renderApp();
+    await usingPlatforms(["tiktok", "kick"]);
+
+    fireEvent.dragStart(tab("Kick"), { dataTransfer: {} });
+    fireEvent.dragEnter(tab("TikTok"));
+    fireEvent.drop(tab("TikTok"));
+    expect(sent(APP_EVENTS.SET_PLATFORMS)).toEqual([
+      { platforms: ["kick", "tiktok"] },
+    ]);
+    expect(tabNames()).toEqual(["Kick", "TikTok"]);
+
+    await user.click(tab("Kick"));
+    await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
+    expect(sent(APP_EVENTS.SET_PLATFORMS).at(-1)).toEqual({
+      platforms: ["tiktok", "kick"],
+    });
+    expect(tab("Kick")).toHaveFocus();
+
+    await user.click(page().getByRole("button", { name: "Add a platform" }));
+    await user.click(page().getByRole("button", { name: "Twitch" }));
+    expect(sent(APP_EVENTS.SET_PLATFORMS).at(-1)).toEqual({
+      platforms: ["tiktok", "kick", "twitch"],
+    });
   });
 
   it("gives each platform a tab, the first one open, and All only while LIVE on two", async () => {

@@ -15,7 +15,7 @@ import {
 const totals = (gifts: number, coins: number) => liveTotals({ gifts, coins });
 
 describe("livePlatforms", () => {
-  it("lists the platforms up now or with numbers, in Home's order", () => {
+  it("lists the platforms up now or with numbers, in PLATFORMS order", () => {
     const session = liveSession({
       platforms: { youtube: { totals: totals(1, 0), viewers: [] } },
     });

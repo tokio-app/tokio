@@ -31,7 +31,7 @@ interface Props {
   needsKey: boolean;
   // When the LIVE was connected, null until main says
   startedAt: number | null;
-  // The profile's, in Home's order
+  // The profile's, in the order of its tabs
   platforms: Platform[];
   // How each platform that's on is doing, missing when it's down
   status: Partial<Record<Platform, PlatformStatus>>;
@@ -235,12 +235,9 @@ export function DashboardSection(props: Props) {
     menu.toggleRef.current?.focus();
   };
 
+  // After the others, by the + it came from
   const add = (platform: Platform) => {
-    flushSync(() =>
-      onPlatformsChange(
-        PLATFORMS.filter((p) => p === platform || platforms.includes(p)),
-      ),
-    );
+    flushSync(() => onPlatformsChange([...platforms, platform]));
     open(platform);
   };
 
@@ -431,6 +428,8 @@ export function DashboardSection(props: Props) {
               const name = PLATFORM_LABELS[value];
               return {
                 value,
+                // Dragging one saves the profile's order; All stays last
+                movable: several,
                 // Closing a tab removes the platform, never one that's on
                 // or the only one
                 onClose:
@@ -454,6 +453,7 @@ export function DashboardSection(props: Props) {
             })}
             value={tab}
             onChange={onTab}
+            onReorder={(order) => onPlatformsChange(order.filter(isPlatform))}
           />
           <AddPlatform platforms={platforms} onAdd={add} menu={menu} />
         </div>

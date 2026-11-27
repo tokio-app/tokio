@@ -161,7 +161,7 @@ describe("allTime", () => {
 describe("historyPlatforms and statsTabs", () => {
   const part = { amount: 1, gifts: 1, giftSubs: 0 };
 
-  it("gives the platforms the LIVEs were on in Home's order, an older one as TikTok's", () => {
+  it("gives the platforms the LIVEs were on in PLATFORMS order, an older one as TikTok's", () => {
     const platforms = historyPlatforms([
       liveSummary(2, { platforms: { kick: part, twitch: part } }),
       liveSummary(1, { coins: 5 }),
