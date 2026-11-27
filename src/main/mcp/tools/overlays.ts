@@ -73,6 +73,38 @@ const findTestOverlay = ({ overlayService }: Handler, id: string) =>
 const elementSchema = (kind: unknown) =>
   StudioElementSchema.options.find((o) => o.shape.kind.value === kind);
 
+// Filters the editor has no field for, so the streamer couldn't see or
+// clear them (triggers.md): reactions show the minimum only, counters
+// neither. A default passes, since a copy of a stored overlay sends them.
+const NO_FIELD = { min_coins: 0, roles: [] };
+
+function hiddenKeys(
+  item: unknown,
+  prefix: string,
+  fields: (keyof typeof NO_FIELD)[],
+): string[] {
+  if (!isRecord(item)) return [];
+  const also: unknown[] = Array.isArray(item.also_triggers)
+    ? item.also_triggers
+    : [];
+  const rows: [string, unknown][] = [
+    ["trigger", item.trigger],
+    ...also.map((row, i): [string, unknown] => [`also_triggers.${i}`, row]),
+  ];
+  return rows.flatMap(([path, row]) =>
+    isRecord(row)
+      ? fields
+          .filter(
+            (f) =>
+              Object.hasOwn(row, f) && !isDeepStrictEqual(row[f], NO_FIELD[f]),
+          )
+          .map(
+            (f) => `${prefix}${path}.${f} (Overlay Studio has no such filter)`,
+          )
+      : [],
+  );
+}
+
 const unknownElementKeys = (element: unknown, prefix: string) => [
   ...unknownKeys(
     elementSchema(isRecord(element) ? element.kind : undefined) ??
@@ -81,11 +113,13 @@ const unknownElementKeys = (element: unknown, prefix: string) => [
     prefix,
   ),
   ...unknownTriggerKeys(StudioTriggerSchema, element, prefix),
+  ...hiddenKeys(element, prefix, ["roles"]),
 ];
 
 const unknownGroupKeys = (group: unknown, prefix: string) => [
   ...unknownKeys(StudioGroupSchema, group, prefix),
   ...unknownTriggerKeys(StudioTriggerSchema, group, prefix),
+  ...hiddenKeys(group, prefix, ["roles"]),
 ];
 
 // unknownKeys stops at arrays, and a studio overlay is mostly its items: a
@@ -114,9 +148,10 @@ const CounterSchema = StudioOverlaySchema.shape.counters.unwrap().element;
 
 const unknownCounterKeys = (counters: unknown): string[] =>
   Array.isArray(counters)
-    ? counters.flatMap((counter: unknown, i) =>
-        unknownKeys(CounterSchema, counter, `counters.${i}.`),
-      )
+    ? counters.flatMap((counter: unknown, i) => [
+        ...unknownKeys(CounterSchema, counter, `counters.${i}.`),
+        ...hiddenKeys(counter, `counters.${i}.`, ["min_coins", "roles"]),
+      ])
     : [];
 
 // The names a text already fills: a counter named so would never show
@@ -268,7 +303,7 @@ export const kinds: Kinds = {
       "Every element can have a shadow (shadow_x and shadow_y 0 make a glow) and a blur. Texts take an outline, letter_spacing and line_height (% of size), italic and caps; texts and shapes a gradient from color into gradient_color at gradient_angle (CSS degrees: 90 runs left to right).",
       "when: always (on screen), event (hidden until its trigger, then shows for seconds with its entrance and exit), animate (on screen, plays its animation on each trigger) or loop (on screen, plays idle forever). A group reacts as one, its elements keep their own when. On Like it reacts every likes_every likes from all viewers.",
       `It also reacts to each of also_triggers (up to 4 more), and waits delay seconds (0 to 10) before it plays. A trigger of type ${GOAL_TRIGGER} reacts once per LIVE when number (a LIVE number but uptime, or a counter's name) reaches goal. counters (up to 10) count a trigger during the LIVE, a gift by its gifts and a Like by its likes, and texts show each as {name}: a name of word characters, not empty, taken or a LIVE number's.`,
-      `Texts can say ${STUDIO_NUMBERS.map((n) => `{${n}}`).join(" ")} (the LIVE's numbers; each currency is its platform's, never added up: {coins} TikTok's coins, {kicks} Kick's Kicks, {bits} Twitch's Bits, {superchats} YouTube's Super Chats in US dollars, a dash until the exchange rates load; {giftsubs} counts the subs gifted on Twitch, YouTube and Kick) and, while they react, their trigger's variables: ${TRIGGER_VARIABLES}. Trigger values and fields are the alert kind's (describe alert), min_coins's units included.`,
+      `Texts can say ${STUDIO_NUMBERS.map((n) => `{${n}}`).join(" ")} (the LIVE's numbers; each currency is its platform's, never added up: {coins} TikTok's coins, {kicks} Kick's Kicks, {bits} Twitch's Bits, {superchats} YouTube's Super Chats in US dollars, a dash until the exchange rates load; {giftsubs} counts the subs gifted on Twitch, YouTube and Kick) and, while they react, their trigger's variables: ${TRIGGER_VARIABLES}. Trigger values and fields are the alert kind's (describe alert), min_coins's units included, but reactions take no roles, and counters neither roles nor min_coins: the editor has no field for them.`,
       "test plays every reacting element and group once on stream, with samples.",
       "To change single items, use edit_studio_overlay instead of resending items.",
       "preview_studio_overlay returns a picture of the overlay.",

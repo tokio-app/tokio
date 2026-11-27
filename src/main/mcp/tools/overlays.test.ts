@@ -578,6 +578,49 @@ describe("overlays MCP tools", () => {
       expect(store.saveStudioOverlay).not.toHaveBeenCalled();
     });
 
+    it("refuses the filters the editor has no field for, keeping a reaction's minimum", async () => {
+      const { h, held, store } = setup();
+      const { call } = await mcpClient(h.handler);
+      const gift = { type: "tokio:event:gift", gifts: [] };
+
+      const res = await call("save_item", {
+        kind: "studio_overlay",
+        id: ID,
+        changes: {
+          counters: [{ name: "big", trigger: { ...gift, min_coins: 100 } }],
+          items: [
+            {
+              kind: "group",
+              id: "g",
+              also_triggers: [{ ...gift, roles: ["moderator"] }],
+              elements: [{ ...text, trigger: { ...gift, roles: ["vip"] } }],
+            },
+          ],
+        },
+      });
+
+      expect(res.isError).toBe(true);
+      for (const path of [
+        "items.0.also_triggers.0.roles",
+        "items.0.elements.0.trigger.roles",
+        "counters.0.trigger.min_coins",
+      ]) {
+        expect(res.text).toContain(path);
+      }
+      expect(store.saveStudioOverlay).not.toHaveBeenCalled();
+
+      const kept = await call("save_item", {
+        kind: "studio_overlay",
+        id: ID,
+        changes: {
+          counters: [{ name: "big", trigger: { ...gift, roles: [] } }],
+          items: [{ ...text, trigger: { ...gift, min_coins: 100 } }],
+        },
+      });
+      expect(kept.isError).toBe(false);
+      expect(held[0].items[0]).toMatchObject({ trigger: { min_coins: 100 } });
+    });
+
     it("refuses a counter with no name, a taken one or a repeated one", async () => {
       const { h, held, store } = setup();
       const { call } = await mcpClient(h.handler);
@@ -779,6 +822,10 @@ describe("overlays MCP tools", () => {
 
       it.each([
         [[{ op: "remove", id: "nope" }], "No item nope"],
+        [
+          [{ op: "change", id: "a", set: { trigger: { roles: ["vip"] } } }],
+          "ops.0.set.trigger.roles",
+        ],
         [
           [{ op: "change", id: "a", set: { colour: "#fff" } }],
           "ops.0.set.colour",
