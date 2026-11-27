@@ -51,7 +51,7 @@ Every provider but TikTok's namespaces the ids it sends: `twitch:<id>` for `User
 
 ## Money
 
-- Each platform's currency is named and counted on its own, never added to another or ranked against it (the user's call): TikTok's coins, Kick's Kicks, Twitch's Bits, YouTube's Super Chats in US dollars.
+- Each platform's currency is named and counted on its own, never added to another or ranked against it (the user's call): TikTok's coins, Kick's Kicks, Twitch's Bits, YouTube's Super Chats in US dollars, and YouTube's Gifts in Jewels.
 - **What names each currency:**
   - `PLATFORM_CURRENCY` (`src/common/util/platforms.ts`) names each platform's money, which Home, LIVE history and MCP count it in: `coins`, `kicks`, `bits` or `usd`.
   - `GIFT_CURRENCY` says what each platform's gifts cost in: `coins` for TikTok, `jewels` for YouTube, none for Twitch and Kick, which send no gifts. `giftCurrencies(platforms)` gives the ones a profile pays in.

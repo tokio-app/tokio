@@ -61,8 +61,8 @@ export interface Fan {
 
 // A viewer in tokio:gifters' top 10s, with their coins and gifts in this LIVE
 // (0 when they sent none in it) and in all the profile's LIVEs, this one
-// included. Only TikTok's gifters, by coins: Bits, Kicks and Super Chats
-// aren't coins, and YouTube's Gifts have no price.
+// included. Only TikTok's gifters, by coins: Bits, Kicks, Super Chats and
+// YouTube's Jewels aren't coins.
 export interface TopGifter {
   userId: string;
   username: string;

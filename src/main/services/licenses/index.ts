@@ -42,6 +42,11 @@ const DOCUMENTS: (LicenseDocument & { title: MessageKey; file: string })[] = [
     title: "main.licenses.mcpBundled",
     file: "LICENSES/MCP-SDK-bundled.txt",
   },
+  {
+    id: "YouTube-gift-prices",
+    title: "main.licenses.youtubeGiftPrices",
+    file: "LICENSES/YouTube-gift-prices.txt",
+  },
 ];
 
 const PACKAGE_NAME = /^(@[\w.-]+\/)?[\w.-]+$/;

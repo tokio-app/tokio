@@ -1603,6 +1603,7 @@
   "main.licenses.apache2": "Apache License 2.0",
   "main.licenses.ccBy4": "Creative Commons Attribution 4.0",
   "main.licenses.mcpBundled": "Code bundled in the MCP SDK",
+  "main.licenses.youtubeGiftPrices": "YouTube's Gift prices",
   "main.spotify.unknownTrack": "Unknown track",
   "main.spotify.unknownArtist": "Unknown artist",
   "main.licenses.noFile": "This package doesn't include a license file. Its package.json declares the license: {license}.",
