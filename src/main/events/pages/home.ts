@@ -183,8 +183,12 @@ events.push(
         t("main.home.connected", { handle: handleOf(platforms[0]) }),
       );
     };
+    // The session's CONNECTED can be another platform's, like TikTok's look
+    const onConnected = () => {
+      if (several || isUp(connectorService.status()[platforms[0]])) answer();
+    };
     // Answers this connect only, so connects don't pile up listeners.
-    connectorService.on(TOKIO_EVENTS.CONNECTED, answer);
+    connectorService.on(TOKIO_EVENTS.CONNECTED, onConnected);
 
     try {
       if (!several) {
@@ -234,7 +238,7 @@ events.push(
         replyState();
       });
     } finally {
-      connectorService.off(TOKIO_EVENTS.CONNECTED, answer);
+      connectorService.off(TOKIO_EVENTS.CONNECTED, onConnected);
     }
   },
   {
