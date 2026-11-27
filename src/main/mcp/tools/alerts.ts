@@ -38,6 +38,7 @@ import {
   invalid,
   invokeOk,
   ok,
+  profileOf,
   pushProfile,
   refuseKeys,
   unknownTriggerKeys,
@@ -67,8 +68,6 @@ const AlertsSettingsSchema = ProfileSchema.shape.alerts
 
 // What save_item can change: the id is the alert's for good
 const AlertChangesSchema = AlertItemSchema.omit({ id: true });
-
-const NO_PROFILE = "The active profile isn't loaded.";
 
 /**
  * Saves the alerts section through its handler, then sends the window the
@@ -217,16 +216,14 @@ export const sections: Sections = {
   alerts: defineSection({
     schema: AlertsSettingsSchema,
     read: async (handler) => {
-      const profile = await activeProfile(handler);
-      if (!profile) throw new Error(NO_PROFILE);
+      const profile = await profileOf(handler);
       const { simultaneous, queue_length } = profile.alerts;
       return { simultaneous, queue_length };
     },
     write: async (handler, values) => {
       // The read below waits: check again right before the invoke
       const changed = guardProfile(handler);
-      const profile = await activeProfile(handler);
-      if (!profile) return fail(NO_PROFILE);
+      const profile = await profileOf(handler);
       const error =
         changed() ??
         (await saveAlerts(handler, {
@@ -252,8 +249,7 @@ export const kinds: Kinds = {
       `tts: { voice, message, speed, pitch }, voice from list_voices ({ engine, name, lang, id }). The message can hold its trigger's variables: ${VARIABLES}. {count} is a gift streak's total, or a like batch's likes. volume (0–100) is the sound's or message's.`,
     ].join("\n"),
     list: async (handler, { query, limit }) => {
-      const profile = await activeProfile(handler);
-      if (!profile) return fail(NO_PROFILE);
+      const profile = await profileOf(handler);
       const wanted = query?.toLowerCase();
       const found = profile.alerts.items.filter(
         (a) => !wanted || a.name.toLowerCase().includes(wanted),
@@ -264,8 +260,8 @@ export const kinds: Kinds = {
       });
     },
     get: async (handler, id) => {
-      const profile = await activeProfile(handler);
-      const alert = profile?.alerts.items.find((a) => a.id === id);
+      const profile = await profileOf(handler);
+      const alert = profile.alerts.items.find((a) => a.id === id);
       if (!alert) return fail(`No alert has the id ${id}.`);
       return ok({
         ...AlertItemSchema.parse(alert),
@@ -277,8 +273,7 @@ export const kinds: Kinds = {
       if (unknown) return unknown;
       const changed = guardProfile(handler);
       const { storeManagerService } = handler;
-      const profile = await activeProfile(handler);
-      if (!profile) return fail(NO_PROFILE);
+      const profile = await profileOf(handler);
       const { items } = profile.alerts;
       const index =
         id === undefined ? items.length : items.findIndex((a) => a.id === id);
@@ -303,8 +298,7 @@ export const kinds: Kinds = {
     },
     remove: async (handler, id) => {
       const changed = guardProfile(handler);
-      const profile = await activeProfile(handler);
-      if (!profile) return fail(NO_PROFILE);
+      const profile = await profileOf(handler);
       const { items } = profile.alerts;
       if (!items.some((a) => a.id === id)) {
         return fail(`No alert has the id ${id}.`);
@@ -318,9 +312,9 @@ export const kinds: Kinds = {
       return error ?? ok("Removed.");
     },
     test: async (handler, id) => {
-      const profile = await activeProfile(handler);
-      const alert = profile?.alerts.items.find((a) => a.id === id);
-      if (!profile || !alert) return fail(`No alert has the id ${id}.`);
+      const profile = await profileOf(handler);
+      const alert = profile.alerts.items.find((a) => a.id === id);
+      if (!alert) return fail(`No alert has the id ${id}.`);
       const { tts, sound, media, volume } = alert;
       if (!tts && !sound && !media) {
         return fail("The alert has no sound, message or media to test.");
@@ -458,8 +452,7 @@ export const kinds: Kinds = {
     notes:
       "The emotes viewers used in the active profile's LIVEs (TikTok can't list them otherwise), oldest first. An emote trigger takes their ids.",
     list: async (handler, { query, limit }) => {
-      const profile = await activeProfile(handler);
-      if (!profile) return fail(NO_PROFILE);
+      const profile = await profileOf(handler);
       const found = profile.emotes.filter(
         (e) => !query || e.id.includes(query),
       );

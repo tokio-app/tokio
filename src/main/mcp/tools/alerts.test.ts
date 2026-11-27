@@ -467,6 +467,20 @@ describe("alerts MCP tools", () => {
       expect(res.isError).toBe(true);
     });
 
+    it("says the profile couldn't be read, not that the alert is missing", async () => {
+      const s = setup();
+      s.storeManagerService.getProfileData = async () => null as never;
+      const { call } = await mcpClient(s.h.handler);
+
+      for (const res of [
+        await call("get", { kind: "alert", id: "a1" }),
+        await call("test", { kind: "alert", id: "a1" }),
+      ]) {
+        expect(res.isError).toBe(true);
+        expect(res.text).toContain("The active profile couldn't be read.");
+      }
+    });
+
     it("refuses a save when the profile switched meanwhile", async () => {
       const s = setup();
       let reads = 0;
