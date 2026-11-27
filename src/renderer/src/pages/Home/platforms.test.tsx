@@ -329,16 +329,24 @@ describe("Home's platforms", () => {
     [
       ["tiktok"],
       ["Likes", "Total views", "Shares", "Gifts", "Coins"],
-      ["Gifted subs", "Kicks", "Bits", "Super Chats"],
+      ["Gifted subs", "Jewels", "Kicks", "Bits", "Super Chats"],
     ],
     [
       ["twitch"],
       ["Gifted subs", "Bits"],
-      ["Likes", "Total views", "Shares", "Gifts", "Coins", "Super Chats"],
+      [
+        "Likes",
+        "Total views",
+        "Shares",
+        "Gifts",
+        "Coins",
+        "Jewels",
+        "Super Chats",
+      ],
     ],
     [
       ["youtube"],
-      ["Gifts", "Gifted subs", "Super Chats"],
+      ["Gifts", "Gifted subs", "Jewels", "Super Chats"],
       ["New followers", "Likes", "Total views", "Shares", "Coins", "Bits"],
     ],
     [
@@ -351,6 +359,7 @@ describe("Home's platforms", () => {
         "Shares",
         "Gifts",
         "Coins",
+        "Jewels",
         "Bits",
       ],
     ],
@@ -373,12 +382,15 @@ describe("Home's platforms", () => {
       const tops: Record<Platform, string[]> = {
         tiktok: ["Top gifters"],
         twitch: ["Top Bits", "Top gifted subs"],
-        youtube: ["Top Super Chats", "Top gifted subs"],
+        youtube: ["Top gifters", "Top Super Chats", "Top gifted subs"],
         kick: ["Top Kicks", "Top gifted subs"],
       };
-      for (const title of tops[platforms[0]]) {
-        expect(page().getByRole("heading", { name: title })).toBeVisible();
-      }
+      // In that order
+      expect(
+        page()
+          .getAllByRole("heading", { name: /^Top / })
+          .map((heading) => heading.textContent),
+      ).toEqual(tops[platforms[0]]);
     },
   );
 
@@ -486,11 +498,14 @@ describe("Home's platforms", () => {
       send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
         data: liveSession({
           startedAt: Date.now(),
-          totals: liveTotals({ bits: 1500, superChats: 3 }),
+          totals: liveTotals({ bits: 1500, superChats: 3, jewels: 20 }),
           usd,
           platforms: {
             twitch: { totals: liveTotals({ bits: 1500 }), viewers: [] },
-            youtube: { totals: liveTotals({ superChats: 3 }), viewers: [] },
+            youtube: {
+              totals: liveTotals({ superChats: 3, jewels: 20 }),
+              viewers: [],
+            },
           },
         }),
       });
@@ -519,7 +534,9 @@ describe("Home's platforms", () => {
         youtube: [gifter("Yui", 57.4, 0, { platform: "youtube" })],
       },
       subsByPlatform: { twitch: [bo, di] },
-      jewelsByPlatform: {},
+      jewelsByPlatform: {
+        youtube: [gifter("Mia", 0, 3, { platform: "youtube", jewels: 20 })],
+      },
     });
     const top = (name: string) =>
       within(page().getByRole("list", { name }))
@@ -537,12 +554,16 @@ describe("Home's platforms", () => {
     await user.click(tab("YouTube"));
     expect(value("Super Chats")).toHaveTextContent("$1.23K");
     expect(stat("Bits")).toBeNull();
+    // Jewels and Super Chats each on its own
+    expect(value("Jewels")).toHaveTextContent("20");
+    expect(top("Top gifters")).toEqual(["1MMia20 Jewels"]);
     expect(top("Top Super Chats")).toEqual(["1YYui$57.40"]);
     expect(page().getByText("No gifted subs yet")).toBeVisible();
 
     // None on All, which would rank one currency against another
     await user.click(tab("All"));
     expect(page().queryByText("Top Bits")).toBeNull();
+    expect(page().queryByText("Top gifters")).toBeNull();
     expect(page().queryByText("Top gifted subs")).toBeNull();
   });
 
@@ -639,7 +660,7 @@ describe("Home's platforms", () => {
     ]);
   });
 
-  it("renders YouTube's gifts, Super Chats and Super Stickers", async () => {
+  it("renders YouTube's gifts in Jewels, Super Chats and Super Stickers", async () => {
     await renderApp();
     const user = (name: string) => ({
       handle: name,
@@ -651,10 +672,16 @@ describe("Home's platforms", () => {
       data: liveSession({
         activity: [
           {
+            id: 4,
+            type: "gift",
+            user: user("Di"),
+            gift: { name: "Heart", image: "", count: 2, coins: 20 },
+          },
+          {
             id: 3,
             type: "gift",
             user: user("Cy"),
-            gift: { name: "Heart", image: "", count: 1, coins: 0 },
+            gift: { name: "Elote", image: "", count: 1, coins: 0 },
           },
           {
             id: 2,
@@ -680,12 +707,13 @@ describe("Home's platforms", () => {
       page().getByRole("list", { name: "Activity" }),
     ).getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual([
-      // No "0 coins" for a gift without a price
-      "CCy sent Heart ",
+      "DDi sent Heart ×2 20 Jewels",
+      // No "0 Jewels" for a gift without a known price
+      "CCy sent Elote ",
       "AAnn sent a €5.00 Super Sticker ",
       "BBo sent a $4.99 Super Chathello",
     ]);
-    expect(items[1].querySelector("img")).toHaveAttribute(
+    expect(items[2].querySelector("img")).toHaveAttribute(
       "src",
       "https://example.com/sticker.png",
     );

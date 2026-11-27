@@ -5,7 +5,7 @@ import { Avatar, Section } from "@/components";
 import { amountLabel } from "@/helper/gifts";
 import { useLanguage, useT } from "@/ui/i18n";
 import styles from "../home.module.css";
-import { LiveGifters, liveView, HomeTab, Views } from "../helper";
+import { LiveGifters, liveView, HomeTab, sentIn, Views } from "../helper";
 import { StatValue } from "./StatValue";
 import { ViewersChart } from "./ViewersChart";
 
@@ -42,7 +42,7 @@ interface Props {
 export function LiveSection({ tab, platforms, ...numbers }: Props) {
   const t = useT();
   const language = useLanguage();
-  const { viewers, minutes, stats, gifters, subGifters } = liveView(
+  const { viewers, minutes, stats, tops, subGifters } = liveView(
     tab,
     platforms,
     numbers,
@@ -81,14 +81,19 @@ export function LiveSection({ tab, platforms, ...numbers }: Props) {
         ))}
       </div>
 
-      {gifters && (
+      {tops && (
         <div className={styles.tops}>
-          <TopList
-            title={t(MONEY_TOPS[gifters.currency].title)}
-            empty={t(MONEY_TOPS[gifters.currency].empty)}
-            list={gifters.list}
-            label={(g) => amountLabel(g.coins, gifters.currency, language)}
-          />
+          {tops.map(({ currency, list }) => (
+            <TopList
+              key={currency}
+              title={t(MONEY_TOPS[currency].title)}
+              empty={t(MONEY_TOPS[currency].empty)}
+              list={list}
+              label={(g) =>
+                amountLabel(sentIn(g, currency), currency, language)
+              }
+            />
+          ))}
           {subGifters && (
             <TopList
               title={t("home.gifters.subs")}
