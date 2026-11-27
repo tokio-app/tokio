@@ -24,8 +24,8 @@ paths:
   - A viewer gets a record with an amount, gifted subs or Jewels. A gift without a price (a YouTube Gift Tokio has none for) adds to a record they already have, else counts in the LIVE only, so no one shows as a gifter with nothing. What comes without an id counts in the LIVE only.
 - **Minutes:**
   - Everything also goes in its clock minute (`GiftMinute`), so dates that cut a LIVE count only what came in them.
-  - Each key holds `[amount, gifts, giftSubs, jewels?]`; older files have two numbers, read as no gifted subs, or three, read as no Jewels.
-  - The 4th number is written only when the key has Jewels: an older Tokio's tuple refuses a 4th number, and then the whole LIVE file doesn't load. Reading drops any number past the 4th, so a newer Tokio's don't do that here.
+  - Each key holds `[amount, gifts, giftSubs]`; older files have two numbers, read as no gifted subs.
+  - YouTube's Jewels go in the minute's own `jewels` record, by the same keys, only those with some (missing is none). Never a 4th number: an older Tokio's tuple refuses one and then the whole LIVE file doesn't load, while its `z.object` drops an unknown key. Reading drops any number past the 3rd, so a newer Tokio's extra numbers don't break this one.
   - The key is the viewer's id, or without one their platform's (`""` for TikTok, then `"kick:"`, `"twitch:"` and `"youtube:"`). A key's platform comes from its prefix (`idPlatform`), so the minutes keep the currencies apart with no new field.
   - A Super Chat that waited for the rates goes back to its own minute, which is copied first: a save in flight may still hold it.
 - Pictures are saved although TikTok's links expire within days (the user's call): overlays and the page fall back to the initial.

@@ -147,14 +147,14 @@ export type GiftMinute = {
   // Counted from the minute the LIVE started in
   minute: number;
   // What each viewer sent in it, by user id: the amount in their platform's
-  // currency (PLATFORM_CURRENCY), gifts, gifted subs and YouTube's Jewels.
-  // What came without an id goes under its platform's: "" for TikTok, then
-  // "kick:", "twitch:" and "youtube:". Older files have two numbers, read as
-  // no gifted subs, or three, read as no Jewels.
-  gifters: Record<
-    string,
-    [amount: number, gifts: number, giftSubs: number, jewels?: number]
-  >;
+  // currency (PLATFORM_CURRENCY), gifts and gifted subs. What came without
+  // an id goes under its platform's: "" for TikTok, then "kick:", "twitch:"
+  // and "youtube:". Older files have two numbers, read as no gifted subs.
+  gifters: Record<string, [amount: number, gifts: number, giftSubs: number]>;
+  // YouTube's Jewels in it, by the same keys, only those with some. Missing
+  // is none. Apart from gifters, as an older Tokio drops an unknown key but
+  // refuses a 4th number.
+  jewels?: Record<string, number>;
 };
 
 // A LIVE with every viewer who sent gifts in it, the most first, and

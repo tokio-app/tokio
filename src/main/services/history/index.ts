@@ -108,21 +108,17 @@ const LiveSummarySchema = z.object({
 
 const GiftMinuteSchema = z.object({
   minute: z.number(),
-  // Entries saved before gifted subs counted have two numbers, before
-  // Jewels three. A newer Tokio's extra numbers are dropped: a tuple refuses
-  // them, and the whole LIVE wouldn't load.
+  // Entries saved before gifted subs counted have two numbers. A newer
+  // Tokio's extra numbers are dropped: a tuple refuses them, and the whole
+  // LIVE wouldn't load.
   gifters: z.record(
     z.string(),
     z.preprocess(
-      (value) => (Array.isArray(value) ? value.slice(0, 4) : value),
-      z.tuple([
-        z.number(),
-        z.number(),
-        z.number().default(0),
-        z.number().optional(),
-      ]),
+      (value) => (Array.isArray(value) ? value.slice(0, 3) : value),
+      z.tuple([z.number(), z.number(), z.number().default(0)]),
     ),
   ),
+  jewels: z.record(z.string(), z.number()).optional(),
 }) satisfies z.ZodType<GiftMinute>;
 
 const LiveRecordSchema: z.ZodType<LiveRecord> = LiveSummarySchema.extend({
@@ -232,6 +228,14 @@ const ranked = (sorted: Gifter[], named: (gifter: Gifter) => boolean) => {
 const LIVE_FILE = /^(\d+)\.json$/;
 const MINUTE = 60_000;
 
+// A minute the LIVE in progress still changes, so a save in flight keeps
+// its own
+const copyMinute = ({ minute, gifters, jewels }: GiftMinute): GiftMinute => ({
+  minute,
+  gifters: { ...gifters },
+  ...(jewels && { jewels: { ...jewels } }),
+});
+
 // A LIVE's gift minutes that are partly in the dates, each with when it
 // starts, so the minutes the dates start and end in count alike
 const minutesIn = (
@@ -248,10 +252,12 @@ const minutesIn = (
 const giftersIn = (record: LiveRecord, range: DateRange): Gifter[] => {
   const known = new Map(record.gifters.map((g) => [g.userId, g]));
   const sent = new Map<string, Gifter>();
-  for (const { at, gifters } of minutesIn(record, range)) {
-    for (const [userId, [coins, gifts, giftSubs, jewels = 0]] of Object.entries(
-      gifters,
-    )) {
+  for (const { at, gifters, jewels: minuteJewels } of minutesIn(
+    record,
+    range,
+  )) {
+    for (const [userId, [coins, gifts, giftSubs]] of Object.entries(gifters)) {
+      const jewels = minuteJewels?.[userId] ?? 0;
       const gifter = known.get(userId);
       if (!gifter) continue;
       const past = sent.get(userId);
@@ -619,10 +625,14 @@ export class HistoryService extends Service {
         continue;
       }
       const record = await this._readLive(dir, live.startedAt);
-      for (const { gifters } of minutesIn(record, range)) {
-        for (const [key, [amount, gifts, giftSubs, jewels]] of Object.entries(
+      for (const { gifters, jewels: minuteJewels } of minutesIn(
+        record,
+        range,
+      )) {
+        for (const [key, [amount, gifts, giftSubs]] of Object.entries(
           gifters,
         )) {
+          const jewels = minuteJewels?.[key];
           // Bare ids, "" included, are TikTok's
           const platform = idPlatform(key);
           addPart(totals.platforms, platform, {
@@ -837,7 +847,7 @@ export class HistoryService extends Service {
       // The minute now still changes before the save writes it, the others
       // never do
       minutes: this._minutes.map((m, i, all) =>
-        i < all.length - 1 ? m : { ...m, gifters: { ...m.gifters } },
+        i < all.length - 1 ? m : copyMinute(m),
       ),
     };
   }
@@ -858,7 +868,7 @@ export class HistoryService extends Service {
     // a save still writing may hold it
     const found = this._minutes[i];
     const same = found.minute === minute;
-    const copy = { minute, gifters: same ? { ...found.gifters } : {} };
+    const copy = same ? copyMinute(found) : { minute, gifters: {} };
     this._minutes.splice(i, same ? 1 : 0, copy);
     return copy;
   }
@@ -889,16 +899,17 @@ export class HistoryService extends Service {
         : "";
     // Without one, in the platform's own: "" for TikTok, "kick:" for Kick
     const id = gifter || (platform === "tiktok" ? "" : `${platform}:`);
-    const { gifters } = this._minute(live, at);
-    const [amount, gifts, giftSubs, jewels = 0] = gifters[id] ?? [0, 0, 0];
-    const counted: GiftMinute["gifters"][string] = [
+    const minute = this._minute(live, at);
+    const [amount, gifts, giftSubs] = minute.gifters[id] ?? [0, 0, 0];
+    minute.gifters[id] = [
       amount + sent.amount,
       gifts + sent.gifts,
       giftSubs + sent.giftSubs,
     ];
-    // A 4th number only with Jewels: an older Tokio refuses one
-    if (jewels + sentJewels > 0) counted[3] = jewels + sentJewels;
-    gifters[id] = counted;
+    if (sentJewels > 0) {
+      const jewels = (minute.jewels ??= {});
+      jewels[id] = (jewels[id] ?? 0) + sentJewels;
+    }
     if (gifter) {
       this._liveGifters.set(gifter, {
         userId: gifter,
