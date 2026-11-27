@@ -2,6 +2,7 @@ import {
   PLATFORMS,
   Platform,
   PlatformStatus,
+  LivePlatform,
   RoomUserEvent,
   TOKIO_EVENTS,
   TokioEventMap,
@@ -239,6 +240,14 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
     );
   }
 
+  /** The platforms up now, reconnecting ones included, with their channels. */
+  public livePlatforms(): LivePlatform[] {
+    return PLATFORMS.filter((p) => this._up.has(p)).map((platform) => ({
+      platform,
+      channel: this._provider(platform)?.channel() || this.channel(platform),
+    }));
+  }
+
   public async fetchGifts(): Promise<GiftResponse> {
     const res = await this._current.provider.fetchGifts();
     if (!res.success) {
@@ -444,13 +453,19 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
     this._sendRoom();
   }
 
-  // TikTok's ranks, everyone's viewers
+  // TikTok's ranks, everyone's viewers, and each platform's
   private _sendRoom() {
     const rooms = [...this._rooms.values()];
     this._events.send(TOKIO_EVENTS.ROOM_USER, {
       ranks: this._rooms.get("tiktok")?.ranks ?? [],
       viewers: rooms.reduce((sum, room) => sum + room.viewers, 0),
       views: rooms.reduce((sum, room) => sum + room.views, 0),
+      platforms: PLATFORMS.flatMap((platform) => {
+        const room = this._rooms.get(platform);
+        return room
+          ? [{ platform, viewers: room.viewers, views: room.views }]
+          : [];
+      }),
     });
   }
 }

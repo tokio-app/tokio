@@ -258,6 +258,9 @@ function setup() {
     ),
     status: vi.fn((): ReturnType<ConnectorService["status"]> => ({})),
     viewers: vi.fn((): ReturnType<ConnectorService["viewers"]> => ({})),
+    livePlatforms: vi.fn(
+      (): ReturnType<ConnectorService["livePlatforms"]> => [],
+    ),
     isConnected: vi.fn(() => false),
     isReconnecting: vi.fn(() => false),
     isWaiting: vi.fn(() => false),
@@ -1817,6 +1820,65 @@ describe("init events", () => {
       ]);
     });
 
+    describe("the platforms the LIVE is on", () => {
+      const onLive = [
+        { platform: "tiktok" as const, channel: "streamer" },
+        { platform: "kick" as const, channel: "streamer" },
+      ];
+      const message = (platforms = onLive) => ({
+        type: "tokio:live",
+        data: { platforms },
+      });
+      const sentToAll = (s: Setup) =>
+        s.serverService.sendToAll.mock.calls.filter(
+          ([sent]) => sent.type === "tokio:live",
+        );
+
+      it("sends them to each overlay as it connects", async () => {
+        const s = await live();
+        s.connectorService.livePlatforms.mockReturnValue(onLive);
+        s.serverService.sendToClient.mockClear();
+
+        for (const [listener] of s.serverService.onConnect.mock.calls) {
+          listener("gift-jar");
+        }
+
+        expect(
+          s.serverService.sendToClient.mock.calls.filter(
+            ([, sent]) => sent.type === "tokio:live",
+          ),
+        ).toEqual([["gift-jar", message()]]);
+      });
+
+      it("sends them to every overlay when the LIVE starts and ends", async () => {
+        const s = await live();
+        s.connectorService.livePlatforms.mockReturnValue(onLive);
+        connect(s);
+        expect(sentToAll(s)).toEqual([[message()]]);
+
+        s.connectorService.livePlatforms.mockReturnValue([]);
+        s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
+        expect(sentToAll(s)).toEqual([[message()], [message([])]]);
+      });
+
+      it("sends them again when a platform comes up or goes down", async () => {
+        const s = await live();
+        const [changed] = s.connectorService.onPlatform.mock.calls[0];
+        connect(s);
+        s.serverService.sendToAll.mockClear();
+
+        s.connectorService.livePlatforms.mockReturnValue(onLive);
+        changed("kick", "up");
+        s.connectorService.livePlatforms.mockReturnValue(onLive.slice(0, 1));
+        changed("kick", "lost");
+
+        expect(sentToAll(s)).toEqual([
+          [message()],
+          [message(onLive.slice(0, 1))],
+        ]);
+      });
+    });
+
     it("pushes the LIVE's events at most every 250ms, with the latest session", async () => {
       vi.useFakeTimers();
       const s = await live();
@@ -2100,15 +2162,19 @@ describe("init events", () => {
 
     it("sends the timer to its overlay when it connects", async () => {
       const s = await live();
-      const connected = s.serverService.onConnect.mock.calls[0][0];
+      const connected = s.serverService.onConnect.mock.calls.map(
+        ([listener]) => listener,
+      );
       s.serverService.sendToClient.mockClear();
 
-      connected("other");
-      connected("timer");
+      for (const listener of connected) listener("other");
+      for (const listener of connected) listener("timer");
 
-      expect(s.serverService.sendToClient.mock.calls).toEqual([
-        ["timer", overlayState(s, 0)],
-      ]);
+      expect(
+        s.serverService.sendToClient.mock.calls.filter(
+          ([, sent]) => sent.type === overlayState(s, 0).type,
+        ),
+      ).toEqual([["timer", overlayState(s, 0)]]);
     });
 
     it.each([true, false])(

@@ -389,12 +389,22 @@ const registerConnectorEvents = ({
       if (live.record(type, d)) sendSession();
     });
   }
+  // The platforms the LIVE is on, read when it goes: the connector changes
+  // them before CONNECTED, DISCONNECTED and onPlatform fire
+  const liveMessage = (): TokioPayload => ({
+    type: "tokio:live",
+    data: { platforms: conn.livePlatforms() },
+  });
+  const sendLive = () => server.sendToAll(liveMessage());
+  server.onConnect((id) => server.sendToClient(id, liveMessage()));
+
   // Added when the app loads, before any connect, so the session has started
   // by the time the connect is answered.
   conn.on(TOKIO_EVENTS.CONNECTED, () => {
     live.start();
     sendSession.cancel();
     pushSession();
+    sendLive();
     // So YouTube's Super Chats show in dollars from the first one
     if (conn.status().youtube) void rates.refresh();
   });
@@ -416,6 +426,7 @@ const registerConnectorEvents = ({
   };
 
   conn.on(TOKIO_EVENTS.DISCONNECTED, (d) => {
+    sendLive();
     // After an abnormal stop TikTok looks for its LIVE again, which says
     // nothing about another platform's end
     const by = conn.endedBy();
@@ -508,6 +519,7 @@ const registerConnectorEvents = ({
   // A platform up or down while the session goes on with the others. Coming
   // up says nothing: its connect or its reconnect already did.
   conn.onPlatform((platform, change) => {
+    sendLive();
     if (platform === "youtube" && change === "up") void rates.refresh();
     // LIVE history lists the LIVE under it, even if it sends nothing
     if (change === "up") history.join(platform);

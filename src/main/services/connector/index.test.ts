@@ -495,18 +495,75 @@ describe("ConnectorService", () => {
       const { tiktok, twitch, rooms } = both();
       tiktok.fire(TOKIO_EVENTS.CONNECTED);
       twitch.fire(TOKIO_EVENTS.CONNECTED);
+      const tiktokRoom = { platform: "tiktok", viewers: 10, views: 100 };
 
       tiktok.fire(TOKIO_EVENTS.ROOM_USER, room(10, 100, 2));
       // TikTok alone comes out as it was sent
-      expect(rooms).toHaveBeenLastCalledWith(room(10, 100, 2));
+      expect(rooms).toHaveBeenLastCalledWith({
+        ...room(10, 100, 2),
+        platforms: [tiktokRoom],
+      });
       twitch.fire(TOKIO_EVENTS.ROOM_USER, room(5, 0));
-      expect(rooms).toHaveBeenLastCalledWith(room(15, 100, 2));
+      expect(rooms).toHaveBeenLastCalledWith({
+        ...room(15, 100, 2),
+        platforms: [tiktokRoom, { platform: "twitch", viewers: 5, views: 0 }],
+      });
 
       // A platform that goes down leaves the count
       twitch.fire(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
-      expect(rooms).toHaveBeenLastCalledWith(room(10, 100, 2));
+      expect(rooms).toHaveBeenLastCalledWith({
+        ...room(10, 100, 2),
+        platforms: [tiktokRoom],
+      });
       tiktok.fire(TOKIO_EVENTS.DISCONNECTED, undefined);
       expect(rooms).toHaveBeenCalledTimes(3);
+    });
+
+    it("lists each platform's room in PLATFORMS order, whoever sent first", () => {
+      const { tiktok, twitch, rooms } = both();
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+
+      twitch.fire(TOKIO_EVENTS.ROOM_USER, room(5, 0));
+      expect(rooms).toHaveBeenLastCalledWith({
+        ...room(5, 0),
+        platforms: [{ platform: "twitch", viewers: 5, views: 0 }],
+      });
+      tiktok.fire(TOKIO_EVENTS.ROOM_USER, room(10, 100));
+      expect(rooms.mock.lastCall?.[0].platforms).toEqual([
+        { platform: "tiktok", viewers: 10, views: 100 },
+        { platform: "twitch", viewers: 5, views: 0 },
+      ]);
+    });
+
+    it("lists the platforms the LIVE is on, with their channels", async () => {
+      const { service, tiktok, twitch } = both();
+      expect(service.livePlatforms()).toEqual([]);
+      await service.connect({ twitch: "mia", tiktok: "streamer" });
+
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+      expect(service.livePlatforms()).toEqual([
+        { platform: "twitch", channel: "mia" },
+      ]);
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+      // The provider's name for the channel wins over the one connected to
+      vi.spyOn(twitch, "channel").mockReturnValue("Mia");
+      expect(service.livePlatforms()).toEqual([
+        { platform: "tiktok", channel: "streamer" },
+        { platform: "twitch", channel: "Mia" },
+      ]);
+
+      // Coming back, still on
+      vi.spyOn(tiktok, "isReconnecting").mockReturnValue(true);
+      expect(service.status().tiktok).toBe("reconnecting");
+      expect(service.livePlatforms()).toHaveLength(2);
+
+      twitch.fire(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+      expect(service.livePlatforms()).toEqual([
+        { platform: "tiktok", channel: "streamer" },
+      ]);
+      tiktok.fire(TOKIO_EVENTS.DISCONNECTED, undefined);
+      expect(service.livePlatforms()).toEqual([]);
     });
 
     it("gives each platform's viewers, for as long as it's up", () => {

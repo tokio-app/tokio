@@ -95,6 +95,10 @@ export class YouTubeConnector extends ConnectorProvider {
     return this._conn?.reconnecting ?? false;
   }
 
+  public override channel(): string {
+    return this._conn?.name ?? "";
+  }
+
   public async fetchGifts(): Promise<GiftResponse> {
     return { success: true, data: [] };
   }

@@ -416,6 +416,7 @@ const roomUserEventFactory = (): RoomUserEvent => {
     ranks,
     views,
     viewers,
+    platforms: [{ platform: "tiktok", viewers, views }],
   };
 };
 
@@ -564,7 +565,8 @@ const fewViewers = (
  * platform's shape, then the top gifters and the fans, and carries on from
  * the call before: the same viewers come back, likes and coins add up, and a
  * gift streak grows over a few presses before it ends, the way TikTok sends
- * it. The gifters and fans are TikTok's, empty without it.
+ * it. The gifters and fans are TikTok's, empty without it. Last come the
+ * platforms the LIVE is on.
  */
 export const createTestLive = (platforms: readonly Platform[]) => {
   const tiktok = platforms.includes("tiktok");
@@ -590,8 +592,17 @@ export const createTestLive = (platforms: readonly Platform[]) => {
   const twitch = fewViewers(twitchViewer, twitchChatter);
   const youtube = fewViewers(youtubeViewer, youtubeChatter);
   const kick = fewViewers(kickViewer, kickChatter);
-  let viewers = randomInt(20, 200);
-  let views = viewers + randomInt(50, 2000);
+  // Each platform's room, in PLATFORMS order. Only TikTok's providers send
+  // views; the others send 0.
+  const rooms = PLATFORMS.filter((p) => platforms.includes(p)).map(
+    (platform) => {
+      const viewers = randomInt(20, 200);
+      const views = platform === "tiktok" ? viewers + randomInt(50, 2000) : 0;
+      return { platform, viewers, views };
+    },
+  );
+  // The streamer's channel, the same on every platform
+  const channel = userFactory().handle;
   let totalLikes = randomInt(500, 20000);
 
   // A viewer with a name the room doesn't have yet
@@ -730,8 +741,12 @@ export const createTestLive = (platforms: readonly Platform[]) => {
 
   return (): TokioPayload[] => {
     const events = platforms.flatMap((platform) => presses[platform]());
-    viewers += randomInt(0, 5);
-    views += randomInt(5, 15);
+    for (const room of rooms) {
+      room.viewers += randomInt(0, 5);
+      if (room.platform === "tiktok") room.views += randomInt(5, 15);
+    }
+    const sum = (key: "viewers" | "views") =>
+      rooms.reduce((total, room) => total + room[key], 0);
 
     // Ranks carry only these fields, from the coins of the gifts that ended.
     const gifters = [...tally].sort(([, a], [, b]) => b.coins - a.coins);
@@ -794,7 +809,15 @@ export const createTestLive = (platforms: readonly Platform[]) => {
     return [
       ...events,
       { type: TOKIO_EVENTS.MUSIC_CHANGE, data: musicFactory() },
-      { type: TOKIO_EVENTS.ROOM_USER, data: { viewers, views, ranks } },
+      {
+        type: TOKIO_EVENTS.ROOM_USER,
+        data: {
+          viewers: sum("viewers"),
+          views: sum("views"),
+          ranks,
+          platforms: rooms.map((room) => ({ ...room })),
+        },
+      },
       {
         type: "tokio:gifters",
         data: {
@@ -803,6 +826,12 @@ export const createTestLive = (platforms: readonly Platform[]) => {
         },
       },
       { type: "tokio:fans", data: { fans } },
+      {
+        type: "tokio:live",
+        data: {
+          platforms: rooms.map(({ platform }) => ({ platform, channel })),
+        },
+      },
     ];
   };
 };
