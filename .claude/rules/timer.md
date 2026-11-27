@@ -25,7 +25,7 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
 ## Triggers
 
 - `TIMER_EVENTS` turns each live event into seconds × `multiplier`, kept in ms.
-- Gifts go through a `GiftStreaks` even while the clock doesn't count, so a streak begun before Start adds only what comes after. A gift adds `added × max(0, coins)` times `coin`, and a gift without a currency (YouTube's) adds nothing, as `LiveService` counts them.
+- Gifts go through a `GiftStreaks` even while the clock doesn't count, so a streak begun before Start adds only what comes after. A gift adds `added × max(0, coins)` times its currency's row: `coin` for TikTok's, `jewel` for YouTube's (priced in Jewels, a combo whole). A YouTube Gift without a known price (0) adds nothing.
 - Twitch adds `sub` (per subscription), `gift_sub` (per gifted sub) and `bit` (per Bit). YouTube's memberships use `sub` and `gift_sub`, and `superchat` adds the same seconds per Super Chat or Super Sticker whatever it cost, since currencies differ. Kick's `KICKS` add `kick` per Kick.
 - The rows and carousel items follow the profile's platforms (`TIMER_TRIGGERS`, `triggersFor`, `.claude/rules/platforms.md`): `TimerService` gets them from `load(timer, file, platforms)` and `setPlatforms`, which sends the overlay again, and the page from one page-level `GET_PROFILE`.
 - Chat adds time only for messages with `chat.keyword` (`hasKeyword`, like chat alerts), once per viewer (by handle) in `chat.cooldown` seconds. A message without the keyword doesn't start the cooldown.
