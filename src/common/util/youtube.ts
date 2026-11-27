@@ -2,14 +2,19 @@
  * What each YouTube Gift costs in Jewels, by its picture's name (its gift id
  * without "youtube:"). From YouTube's "Send a gift" panel as
  * iKhunsa/tiktok-tts (MIT) copied it on 2026-11-02, plus yes_jp and heart
- * from the combos in Agash/YTLiveChat's test data (MIT).
+ * from the combos in Agash/YTLiveChat's test data (MIT). Checked against the
+ * panel on a Mexican LIVE on 2026-11-26, which fixed one price and added the
+ * pictures seen there.
  *
- * YouTube adds and retires gifts, and regional ones (Mexico's elote, Japan's
- * ohagi) aren't here: they count no Jewels unless a combo says what they cost.
+ * A picture's name isn't its Gift's: guitar is Rock star, trophy_cake is
+ * Victory spin, its_cake is Trophy cake. YouTube adds and retires gifts, and
+ * countries have their own (Japan's ohagi): one not here counts no Jewels
+ * unless YOUTUBE_GIFT_NAMES or a combo says what it costs.
  */
 export const YOUTUBE_GIFT_JEWELS: Record<string, number> = {
   silver_star_v2_320x320: 2,
   sparkles_v2_320x320: 2,
+  one_hundred_v2_320x320: 2,
   yes_jp: 2,
   go_team: 5,
   treat: 5,
@@ -25,20 +30,23 @@ export const YOUTUBE_GIFT_JEWELS: Record<string, number> = {
   press_f: 10,
   w_key: 10,
   heart: 10,
+  dog_wrestler: 10,
   garlic: 20,
   ggez: 20,
   party_hat_320x320: 20,
   pepero_heart_eyes: 20,
   pepero_yummy: 20,
+  conchas: 20,
+  gaming_capybara: 20,
+  vicecity_heart_v2: 20,
   clutch: 30,
   one_of_a_kind: 30,
+  elote: 30,
   fox_donut: 60,
   six_seven: 67,
   clock_it: 80,
   hi_there: 100,
   high_five: 100,
-  // "100": another list (tubemetrix.net) says 2; check it in the gift panel
-  one_hundred_v2_320x320: 100,
   sweet_treat: 100,
   pepero_look_at_me: 111,
   pepero_so_sweet: 111,
@@ -127,8 +135,50 @@ export const YOUTUBE_GIFT_JEWELS: Record<string, number> = {
   seaside: 22500,
 };
 
-/** A Gift's price in Jewels by its picture's name, if Tokio knows it */
-export const jewelsOf = (key: string): number | undefined =>
-  Object.hasOwn(YOUTUBE_GIFT_JEWELS, key)
-    ? YOUTUBE_GIFT_JEWELS[key]
-    : undefined;
+/**
+ * What the Gifts whose pictures Tokio hasn't seen cost, by their English name
+ * as the chat gives it (requests ask hl=en). From the same panel, 2026-11-26.
+ * Names it cut short are left out.
+ */
+export const YOUTUBE_GIFT_NAMES: Record<string, number> = {
+  "Holi!": 2,
+  Amooo: 5,
+  X1: 6,
+  Soccerball: 20,
+  Picante: 60,
+  "Goooool!": 80,
+  "Vice City logo": 100,
+  "Glass rose": 100,
+  Churro: 100,
+  Órale: 100,
+  Tacos: 180,
+  Guacamole: 200,
+  KO: 200,
+  "Laughing disco": 250,
+  "Sad chihuahua": 250,
+  Jamaaaás: 320,
+  "Y la queso": 360,
+  "Cat wrestler": 380,
+  "Wanted Stars": 400,
+  Wanted: 400,
+  "Ya valió": 440,
+  Axolotl: 440,
+  Migajera: 480,
+  "Axolotl bill": 500,
+  "No manches": 500,
+  Chismecito: 500,
+  "Ay ora": 550,
+  Flex: 900,
+  Guitar: 1000,
+  "Macca the Gator": 1000,
+};
+
+const own = (prices: Record<string, number>, key: string) =>
+  Object.hasOwn(prices, key) ? prices[key] : undefined;
+
+/**
+ * A Gift's price in Jewels by its picture's name, else by its own name, if
+ * Tokio knows either. The picture wins, since names and pictures differ.
+ */
+export const jewelsOf = (key: string, name = ""): number | undefined =>
+  own(YOUTUBE_GIFT_JEWELS, key) ?? own(YOUTUBE_GIFT_NAMES, name);

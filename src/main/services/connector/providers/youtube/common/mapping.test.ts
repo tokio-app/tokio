@@ -278,8 +278,8 @@ describe("fromAction", () => {
 
   it("maps a YouTube Gift it has no price for, with its picture", () => {
     const action = add("giftMessageViewModel", {
-      text: { content: "sent Vice City heart" },
-      giftImageA11yLabel: "@viewer32 sent a gift, Vice City heart",
+      text: { content: "sent Ohagi" },
+      giftImageA11yLabel: "@viewer32 sent a gift, Ohagi",
       authorName: { content: "@viewer32 " },
       authorAvatar: {
         avatarViewModel: { image: { sources: photo.thumbnails } },
@@ -287,11 +287,11 @@ describe("fromAction", () => {
       giftImage: {
         sources: [
           {
-            url: "//www.gstatic.com/youtube/img/pdg/gift/assets/vicecity_heart_v2.png=w480-h480",
+            url: "//www.gstatic.com/youtube/img/pdg/gift/assets/ohagi.png=w480-h480",
             width: 480,
           },
           {
-            url: "//www.gstatic.com/youtube/img/pdg/gift/assets/vicecity_heart_v2.png=w640-h640",
+            url: "//www.gstatic.com/youtube/img/pdg/gift/assets/ohagi.png=w640-h640",
             width: 640,
           },
         ],
@@ -310,10 +310,10 @@ describe("fromAction", () => {
           platform: "youtube",
         },
         gift: {
-          id: "youtube:vicecity_heart_v2",
-          name: "Vice City heart",
+          id: "youtube:ohagi",
+          name: "Ohagi",
           image:
-            "https://www.gstatic.com/youtube/img/pdg/gift/assets/vicecity_heart_v2.png=w640-h640",
+            "https://www.gstatic.com/youtube/img/pdg/gift/assets/ohagi.png=w640-h640",
           coins: 0,
           type: 0,
           comboCount: 1,
@@ -369,6 +369,16 @@ describe("fromAction", () => {
     expect(
       giftOf(gift("sent Gold coin", "gold_coin_v2_320x320")),
     ).toMatchObject({ name: "Gold coin", coins: 10 });
+  });
+
+  it("prices a Gift whose picture it doesn't know by its name", () => {
+    expect(
+      giftOf(gift("sent Tacos", "tacos", "@viewer32 sent a gift, Tacos")),
+    ).toMatchObject({ name: "Tacos", coins: 180 });
+    // The picture wins: guitar's is Rock star's, at 7800, not Guitar's 1000
+    expect(
+      giftOf(gift("sent Rock star", "guitar", "@viewer32 sent a gift, Guitar")),
+    ).toMatchObject({ coins: 7800 });
   });
 
   it("maps a combo with its count, at each gift's price", () => {
