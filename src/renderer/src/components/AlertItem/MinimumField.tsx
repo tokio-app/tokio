@@ -8,7 +8,7 @@ import { NumberInput } from "../Elements";
 import { Field } from "../Page";
 import styles from "./alertitem.module.css";
 
-export type MinUnit = "coins" | "kicks" | "bits" | "usd" | "subs";
+export type MinUnit = "coins" | "jewels" | "kicks" | "bits" | "usd" | "subs";
 
 /**
  * What a row's minimum (min_coins) is in: Bits for Bits, Kicks for Kicks, US
@@ -34,6 +34,7 @@ export function minUnit(
 // The minimum's input in its unit: "{input} coins"
 const MIN_INPUT: Record<MinUnit, MessageKey> = {
   coins: "alerts.editor.minCoinsInput",
+  jewels: "alerts.editor.minJewelsInput",
   kicks: "alerts.editor.minKicksInput",
   bits: "alerts.editor.minBitsInput",
   usd: "alerts.editor.minUsdInput",

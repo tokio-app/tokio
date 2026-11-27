@@ -22,6 +22,7 @@ export const NO_SESSION: LiveSession = {
     shares: 0,
     gifts: 0,
     coins: 0,
+    jewels: 0,
     kicks: 0,
     bits: 0,
     superChats: 0,

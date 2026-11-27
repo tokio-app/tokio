@@ -406,6 +406,7 @@ events.push(
     e.reply(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
       byPlatform: historyService.topByPlatform(),
       subsByPlatform: historyService.topSubGifters(),
+      jewelsByPlatform: historyService.topJewelGifters(),
     });
   },
   { notify: false },

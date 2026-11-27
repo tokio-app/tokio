@@ -12,10 +12,11 @@ import { ViewersChart } from "./ViewersChart";
 // The tiles in a row, as home.module.css's .stats sets it
 const STATS_ROW = 6;
 
-// Each currency's top, named by what it ranks: TikTok's gifts, Kick's Kicks,
-// Twitch's Bits, YouTube's Super Chats
+// Each currency's top, named by what it ranks: TikTok's and YouTube's
+// gifts, Kick's Kicks, Twitch's Bits, YouTube's Super Chats
 const MONEY_TOPS: Record<Currency, { title: MessageKey; empty: MessageKey }> = {
   coins: { title: "home.gifters.title", empty: "home.gifters.empty" },
+  jewels: { title: "home.gifters.title", empty: "home.gifters.empty" },
   kicks: { title: "home.gifters.kicks", empty: "home.gifters.emptyKicks" },
   bits: { title: "home.gifters.bits", empty: "home.gifters.emptyBits" },
   usd: {

@@ -56,6 +56,7 @@ const GIFT_PLAYS: { value: "streak" | "gift"; label: MessageKey }[] = [
 // As the summary names them, keys translated where they show
 const WORTH: Record<MinUnit, MessageKey> = {
   coins: "components.alertItem.worth",
+  jewels: "components.alertItem.worthJewels",
   kicks: "components.alertItem.worthKicks",
   bits: "components.alertItem.worthBits",
   usd: "components.alertItem.worthUsd",

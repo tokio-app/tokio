@@ -32,6 +32,12 @@ const TOPS: Record<
     empty: "coinStats.gifters.empty",
     dates: "coinStats.gifters.emptyDates",
   },
+  jewels: {
+    title: "coinStats.gifters.top",
+    tab: "coinStats.stats.jewels",
+    empty: "coinStats.gifters.empty",
+    dates: "coinStats.gifters.emptyDates",
+  },
   kicks: {
     title: "coinStats.gifters.kicks",
     tab: "coinStats.stats.kicks",

@@ -430,6 +430,7 @@ describe("Home's platforms", () => {
     await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
       byPlatform: { tiktok: [ana], kick: [kai] },
       subsByPlatform: {},
+      jewelsByPlatform: {},
     });
     const value = (label: string) =>
       page().getByText(label, { selector: "span" }).previousElementSibling;
@@ -518,6 +519,7 @@ describe("Home's platforms", () => {
         youtube: [gifter("Yui", 57.4, 0, { platform: "youtube" })],
       },
       subsByPlatform: { twitch: [bo, di] },
+      jewelsByPlatform: {},
     });
     const top = (name: string) =>
       within(page().getByRole("list", { name }))

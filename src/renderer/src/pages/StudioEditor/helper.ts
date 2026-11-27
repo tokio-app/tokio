@@ -98,6 +98,7 @@ type NameContext = {
 // The money each platform's top list ranks by, as its source's name says it
 const MONEY_TOPS: Record<Currency, MessageKey> = {
   coins: "studio.list.sources.gifters",
+  jewels: "studio.list.sources.gifters",
   bits: "studio.list.sources.bits",
   kicks: "studio.list.sources.kicks",
   usd: "studio.list.sources.superChats",

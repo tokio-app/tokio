@@ -504,6 +504,21 @@ export class HistoryService extends Service {
     );
   }
 
+  /**
+   * This LIVE's top senders of YouTube's Gifts, by their Jewels, for Home's
+   * own top of them: only who sent some, the most first.
+   */
+  public topJewelGifters(): Partial<Record<Platform, Gifter[]>> {
+    return this._tops(
+      [...this._liveGifters.values()]
+        .filter((g) => (g.jewels ?? 0) > 0)
+        .sort(
+          (a, b) =>
+            (b.jewels ?? 0) - (a.jewels ?? 0) || a.giftedAt - b.giftedAt,
+        ),
+    );
+  }
+
   // Each platform's first TOP_GIFTERS of the sorted gifters
   private _tops(sorted: Gifter[]): Partial<Record<Platform, Gifter[]>> {
     const tops: Partial<Record<Platform, Gifter[]>> = {};

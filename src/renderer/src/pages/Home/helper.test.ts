@@ -46,7 +46,11 @@ describe("liveView", () => {
     }),
     views: { current: 60, total: 900, platformViewers: { kick: 20 } },
     likes: 7,
-    gifters: { byPlatform: { tiktok: [ana], kick: [kai] }, subsByPlatform: {} },
+    gifters: {
+      byPlatform: { tiktok: [ana], kick: [kai] },
+      subsByPlatform: {},
+      jewelsByPlatform: {},
+    },
   };
   const labels = (view: ReturnType<typeof liveView>) =>
     view.stats.map((stat) => stat.label);
@@ -125,6 +129,7 @@ describe("liveView", () => {
       gifters: {
         byPlatform: { twitch: [yui, sam] },
         subsByPlatform: { twitch: [sam, yui] },
+        jewelsByPlatform: {},
       },
     });
 

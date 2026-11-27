@@ -77,6 +77,7 @@ export function allTime(
 // Each currency's tile
 const MONEY: Record<Currency, MessageKey> = {
   coins: "coinStats.stats.coins",
+  jewels: "coinStats.stats.jewels",
   kicks: "coinStats.stats.kicks",
   bits: "coinStats.stats.bits",
   usd: "coinStats.stats.superChats",
