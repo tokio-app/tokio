@@ -29,10 +29,10 @@ import {
   viewerMatcher,
 } from "@/common/util";
 import { parseAmount } from "@/helper/amount";
-import { isMissing, renameWithRetry } from "@/helper/fs";
+import { isMissing, removeWithRetry, renameWithRetry } from "@/helper/fs";
 import { GiftStreaks } from "@/helper/streaks";
 import Logger from "@/logger";
-import { mkdir, readdir, rm } from "node:fs/promises";
+import { mkdir, readdir } from "node:fs/promises";
 import { join, parse } from "node:path";
 import { z } from "zod";
 import type { JSONManagerService } from "../json";
@@ -61,6 +61,13 @@ export const MAX_GIFTERS = 10_000;
 export const TOP_GIFTERS = 10;
 // LIVE history gets this many of each platform's
 const SHOWN_GIFTERS = 100;
+
+// clear() renames a profile's folder to <name>.cleared-<digits>
+const CLEARED = ".cleared-";
+/** Whether a history folder's entry is what clear() left of profile `name`. */
+export const isCleared = (name: string, entry: string) =>
+  entry.startsWith(name + CLEARED) &&
+  /^\d+$/.test(entry.slice(name.length + CLEARED.length));
 
 const GifterSchema: z.ZodType<Gifter> = z.object({
   userId: z.string(),
@@ -656,7 +663,7 @@ export class HistoryService extends Service {
     const dir = this._dir;
     if (dir === null) return false;
     // Moved away in one step, so a crash can't leave half of it
-    const away = `${dir}.cleared-${Date.now()}`;
+    const away = `${dir}${CLEARED}${Date.now()}`;
     try {
       await renameWithRetry(dir, away);
     } catch (error) {
@@ -1009,31 +1016,14 @@ export class HistoryService extends Service {
     return record;
   }
 
-  // Leftovers of clear(): <name>.cleared-<digits>
   private async _removeCleared(name: string) {
-    const prefix = `${name}.cleared-`;
     for (const entry of await readdir(this._folder).catch(() => [])) {
-      if (
-        !entry.startsWith(prefix) ||
-        !/^\d+$/.test(entry.slice(prefix.length))
-      )
-        continue;
-      await this._remove(join(this._folder, entry));
+      if (isCleared(name, entry)) await this._remove(join(this._folder, entry));
     }
   }
 
-  // With a few tries, for files Windows holds a moment. False when it failed.
-  private async _remove(path: string): Promise<boolean> {
-    return rm(path, { recursive: true, force: true, maxRetries: 3 }).then(
-      () => true,
-      (error: unknown) => {
-        Logger.warn(
-          `<History> Couldn't remove ${path}: ${formatError(error)}`,
-          this._logFile,
-        );
-        return false;
-      },
-    );
+  private _remove(path: string): Promise<boolean> {
+    return removeWithRetry(path, "<History>", this._logFile);
   }
 
   private _emit() {

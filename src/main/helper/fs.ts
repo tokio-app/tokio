@@ -1,3 +1,5 @@
+import { formatError } from "@/common/util";
+import Logger from "@/logger";
 import { rename, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { track } from "./quit";
@@ -26,6 +28,27 @@ export async function renameWithRetry(from: string, to: string): Promise<void> {
     }
   }
   return rename(from, to);
+}
+
+/**
+ * Deletes a file or folder, with a few tries for one Windows holds a moment.
+ * False when it's still there, logged as a warning with the caller's prefix.
+ */
+export function removeWithRetry(
+  path: string,
+  prefix: string,
+  logFile?: string,
+): Promise<boolean> {
+  return rm(path, { recursive: true, force: true, maxRetries: 3 }).then(
+    () => true,
+    (error: unknown) => {
+      Logger.warn(
+        `${prefix} Unable to delete ${path} -- ${formatError(error)}`,
+        logFile,
+      );
+      return false;
+    },
+  );
 }
 
 // The last write queued for each file: writes to one file share its temp file.

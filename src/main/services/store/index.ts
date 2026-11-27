@@ -35,18 +35,19 @@ import {
 } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
-import { isMissing, writeFileAtomic } from "@/helper/fs";
+import { isMissing, removeWithRetry, writeFileAtomic } from "@/helper/fs";
 import { t } from "@/helper/i18n";
 import { isInside } from "@/helper/path";
 import { track } from "@/helper/quit";
 import Logger from "@/logger";
 import { ConnectorService } from "@/services/connector";
+import { isCleared } from "@/services/history";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
 import { TranslationService } from "@/services/translation";
 import { TTSService } from "@/services/tts";
 import { safeStorage } from "electron";
-import { access, readdir, readFile, rm, unlink } from "fs/promises";
+import { access, readdir, readFile, unlink } from "fs/promises";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, extname, join, parse, resolve } from "path";
 import { z } from "zod";
@@ -1369,13 +1370,9 @@ export class StoreManagerService extends Service {
     const { fansFolder, historyFolder, profilesFolder } =
       this._pathManagerService.folders;
     const { name } = parse(file);
-    // clear()'s leftovers too: <name>.cleared-<digits>
-    const prefix = `${name}.cleared-`;
+    // clear()'s leftovers too
     const cleared = (await readdir(historyFolder).catch(() => []))
-      .filter(
-        (entry) =>
-          entry.startsWith(prefix) && /^\d+$/.test(entry.slice(prefix.length)),
-      )
+      .filter((entry) => isCleared(name, entry))
       .map((entry) => join(historyFolder, entry));
     const gone = await Promise.all(
       [join(fansFolder, file), join(historyFolder, name), ...cleared].map(
@@ -1395,19 +1392,8 @@ export class StoreManagerService extends Service {
     return "deleted";
   }
 
-  // A file or folder, with a few tries for one Windows holds a moment. False
-  // when it's still there.
   private _remove(path: string): Promise<boolean> {
-    return rm(path, { recursive: true, force: true, maxRetries: 3 }).then(
-      () => true,
-      (error: unknown) => {
-        Logger.warn(
-          `<System> Unable to delete ${path} -- ${formatError(error)}`,
-          this._logFile,
-        );
-        return false;
-      },
-    );
+    return removeWithRetry(path, "<System>", this._logFile);
   }
 
   public async addProfile(
