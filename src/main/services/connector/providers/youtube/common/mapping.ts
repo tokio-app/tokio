@@ -248,14 +248,15 @@ function fromGiftMessage(e: GiftMessage): Mapped {
   const text = (e.text?.content ?? "").trim();
   const [, digits, comboName, total] = text.match(COMBO) ?? [];
   const size = count(digits);
-  // A combo it can't read is a single gift
-  const [comboCount, coins] =
-    size > 0 ? [size, count(total) / size] : [1, jewelsOf(file) ?? 0];
   // "@handle sent a gift, Yes", a combo's too
-  const name =
+  const name = (
     e.giftImageA11yLabel?.split(" sent a gift, ")[1] ??
     comboName ??
-    text.replace(/^sent /i, "");
+    text.replace(/^sent /i, "")
+  ).trim();
+  // A combo it can't read is a single gift
+  const [comboCount, coins] =
+    size > 0 ? [size, count(total) / size] : [1, jewelsOf(file, name) ?? 0];
   return {
     event: TOKIO_EVENTS.GIFT,
     data: {
@@ -269,7 +270,7 @@ function fromGiftMessage(e: GiftMessage): Mapped {
       },
       gift: {
         id: `youtube:${file}`,
-        name: name.trim(),
+        name,
         image,
         // Each gift's, as TikTok's coins are
         coins,

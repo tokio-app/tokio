@@ -297,14 +297,14 @@ describe("YouTubeConnector", () => {
     it("keeps a combo's price for the LIVE, and logs a Gift without one once", async () => {
       const info = vi.spyOn(Logger, "info");
       const onGift = capture(TOKIO_EVENTS.GIFT);
-      const elote = (text: string) => giftAction("viewer32", text, "elote");
+      const ohagi = (text: string) => giftAction("viewer32", text, "ohagi");
       youtube.state.polls = [
         { actions: [] },
-        { actions: [elote("sent Elote"), elote("sent Elote")] },
+        { actions: [ohagi("sent Ohagi"), ohagi("sent Ohagi")] },
         {
           actions: [
-            elote("comboed x2 Elote for 30 Jewels"),
-            elote("sent Elote"),
+            ohagi("comboed x2 Ohagi for 30 Jewels"),
+            ohagi("sent Ohagi"),
           ],
         },
       ];
@@ -323,7 +323,7 @@ describe("YouTubeConnector", () => {
         line.includes("No price"),
       );
       expect(logged).toEqual([
-        ["<YouTube> No price for the Gift Elote (elote).", expect.anything()],
+        ["<YouTube> No price for the Gift Ohagi (ohagi).", expect.anything()],
       ]);
     });
 
