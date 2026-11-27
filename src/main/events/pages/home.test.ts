@@ -1059,10 +1059,17 @@ describe("home events", () => {
         giftedAt: 1000,
       };
       const subber = { ...gifter, userId: "kick:2", platform: "kick" as const };
+      const sender = {
+        ...gifter,
+        userId: "youtube:3",
+        platform: "youtube" as const,
+        jewels: 20,
+      };
       const h = createHandler({
         historyService: {
           topByPlatform: () => ({ tiktok: [gifter] }),
           topSubGifters: () => ({ kick: [subber] }),
+          topJewelGifters: () => ({ youtube: [sender] }),
         },
       });
 
@@ -1072,6 +1079,7 @@ describe("home events", () => {
         {
           byPlatform: { tiktok: [gifter] },
           subsByPlatform: { kick: [subber] },
+          jewelsByPlatform: { youtube: [sender] },
         },
       ]);
       expect(h.notices).toEqual([]);
