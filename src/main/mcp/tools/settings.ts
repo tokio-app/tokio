@@ -147,7 +147,7 @@ export const sections: Sections = {
       return error ?? ok("Saved.");
     },
     notes:
-      "The kinds of events Home's activity feed keeps from each platform, for every profile: kick.chat false hides Kick's chats and keeps the others'. Hiding one drops its items already in the feed; they still count toward the LIVE's totals. A platform sends only some kinds: tiktok chat, gift, follow, share, superfan and join; twitch chat, follow, sub, giftsub, cheer, raid and redeem; youtube chat, gift, sub and giftsub (its memberships) and superchat; kick chat, sub, giftsub, raid, redeem and kicks.",
+      "The kinds of events Home's activity feed keeps from each platform, for every profile: kick.chat false hides Kick's chats and keeps the others'. Hiding one drops its items already in the feed; they still count toward the LIVE's totals.",
   }),
 
   app: defineSection({
