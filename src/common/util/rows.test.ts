@@ -25,8 +25,8 @@ describe("rows on their platforms", () => {
       "gift",
       "count",
     ]);
-    // YouTube's gifts come one at a time
-    expect(vars(gift, "youtube")).toEqual(["username", "handle", "gift"]);
+    // YouTube's combos say how many
+    expect(vars(gift, "youtube")).toEqual(ALERT_MESSAGE_VARIABLES[gift]);
     // Kick's Kicks say how many and their message, as Bits do
     expect(vars(TOKIO_EVENTS.KICKS, "kick")).toEqual(
       ALERT_MESSAGE_VARIABLES[TOKIO_EVENTS.KICKS],

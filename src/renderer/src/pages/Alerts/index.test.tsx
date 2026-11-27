@@ -1465,7 +1465,7 @@ describe("Alerts", () => {
       expect(opened.getByRole("group", { name: "From" })).toBeInTheDocument();
     });
 
-    it("takes the minimum in the row's currency, and none on YouTube", async () => {
+    it("takes the minimum in the row's currency", async () => {
       const worth = (patch: Partial<Alert["trigger"]>) => ({
         trigger: { ...trigger(TOKIO_EVENTS.GIFT), min_coins: 100, ...patch },
       });
@@ -1476,20 +1476,22 @@ describe("Alerts", () => {
             "alert-2",
             worth({ type: TOKIO_EVENTS.KICKS, platform: "kick" }),
           ),
-          alert("alert-3", worth({ platform: "youtube", min_coins: 0 })),
+          alert("alert-3", worth({ platform: "youtube" })),
         ],
         (p) => {
           p.platforms = ["tiktok", "kick", "youtube"];
         },
       );
 
-      // Kick sends no gifts: its Kicks are a row of their own
-      expect(summary(0)).toHaveTextContent("worth 100+ coins");
+      // Kick sends no gifts: its Kicks are a row of their own. A row for any
+      // platform holds each gift to the number in its own currency.
+      expect(summary(0)).toHaveTextContent("worth 100+ coins or Jewels");
       expect(summary(1)).toHaveTextContent("Worth 100+ Kicks");
+      expect(summary(2)).toHaveTextContent("worth 100+ Jewels");
       const opened = await edit(user, 0);
       expect(
         opened.getByRole("group", { name: "Worth at least" }),
-      ).toHaveTextContent(/^Worth at least coinsThe/);
+      ).toHaveTextContent(/^Worth at least coins or JewelsThe/);
       await user.keyboard("{Escape}");
 
       // A Kicks row has no gifts, and its minimum is in Kicks
@@ -1500,12 +1502,12 @@ describe("Alerts", () => {
       ).toHaveTextContent(/Kicks/);
       await user.keyboard("{Escape}");
 
-      // YouTube's Gifts have no price
+      // YouTube's Gifts are priced in Jewels, with no streaks
       const youtube = await edit(user, 2);
       expect(youtube.queryByText("Any gift")).toBeNull();
       expect(
-        youtube.queryByRole("group", { name: "Worth at least" }),
-      ).toBeNull();
+        youtube.getByRole("group", { name: "Worth at least" }),
+      ).toHaveTextContent(/^Worth at least Jewels$/);
     });
 
     it("tests a message next to it, and sets its volume", async () => {

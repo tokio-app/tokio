@@ -542,10 +542,10 @@ describe("SoundPicker", () => {
         ...gift,
         trigger: { ...gift.trigger, platform: "youtube" },
       });
-      // YouTube's gifts come one at a time
+      // YouTube's combos say how many
       expect(
-        screen.queryByRole("button", { name: "{count}" }),
-      ).not.toBeInTheDocument();
+        screen.getByRole("button", { name: "{count}" }),
+      ).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "{gift}" }),
       ).toBeInTheDocument();

@@ -23,7 +23,7 @@ Alerts, game actions and Overlay Studio share the trigger rows.
 - A trigger's `platform` limits it to that platform's events. It's missing for any platform, and one a newer Tokio saved that this one doesn't know reads as any (`.catch`). `matchesTrigger` skips a row whose platform isn't the event's, and Music change matches only a row for any.
 - A new alert, game action or Studio element starts on Follow where the profile's platforms send follows, else a subscription (`newRowTrigger`), a new Studio counter on gifts where they come, and a new list ranks the profile's first platform's gifters. MCP's new alerts, actions and Studio elements do the same.
 - Changing a row's platform to one without its event moves it to that platform's first event (`withPlatform`; Studio's rows through `retype`).
-- Only TikTok's gifts come in combos: YouTube's arrive one at a time (`comboCount` 1, `repeatEnd` true), so their rows have no **When it plays** choice, streak note or streak summary (`rowStreaks`).
+- Only TikTok's gifts come in streaks: a YouTube Gift arrives whole, a combo as one event with its count (`comboCount`, `repeatEnd` true), so their rows have no **When it plays** choice, streak note or streak summary (`rowStreaks`).
 
 ## Matching
 
@@ -38,7 +38,7 @@ Alerts, game actions and Overlay Studio share the trigger rows.
 The user's call. `rowPlatforms` gives them: the row's own platform, else the profile's that send its event. Alerts, Overlay Studio and Games follow it:
 
 - The emote picker lists the emotes of those platforms, told by their id's prefix (`idPlatform`), and keeps picked ones to clear.
-- The variables are the event's minus the ones no such platform fills (`rowVariables`): YouTube's gifts have no `{count}`, and Kick's subs no `{comment}`. Studio's texts are still filled with every variable; only the editor's offer follows the row.
+- The variables are the event's minus the ones no such platform fills (`rowVariables`): Kick's subs have no `{comment}`. Studio's texts are still filled with every variable; only the editor's offer follows the row.
 - A Like alert offers `{username}`, `{handle}` and `{count}` (the batch's likes), since it plays each viewer's batch. Game actions and Overlay Studio, which count likes from every viewer, take `countedVariables`: the same lists with none on Like (the user's call). A text there that already has them still gets the last batch's, since `messageValues` reads the payload.
 - The Alerts and Games pages read TikTok's gift list and the custom gifts through `useTriggerChoices` (`pages/Alerts`), with the emotes; `giftOptions` merges them. Overlay gift settings use TikTok's list only. Picked gifts match TikTok's ids only, so `TriggerFilter` offers the picker on TikTok rows, on rows for any platform when the profile has TikTok, and wherever gifts are already picked, so they can be cleared.
 
@@ -47,12 +47,12 @@ The user's call. `rowPlatforms` gives them: the row's own platform, else the pro
 Only the Alerts editor offers these, and Overlay Studio's reaction rows the minimum too; game actions keep the defaults, which match everything.
 
 - `min_coins` is a row's minimum in its event's own unit (the user's call: each money event its own). The saved name stays, for older files and an older Tokio. The matcher reads it through `worthOf`, and every other trigger ignores it.
-  - **Gift:** the streak's worth when it ends (`gift.coins × total`), or each gift's with `every_gift`, in TikTok's coins. It applies only to any gift: picked gifts are the alert's choice, so the matcher, the editor and the summary ignore it then.
+  - **Gift:** the streak's worth when it ends (`gift.coins × total`), or each gift's with `every_gift`, in each gift's own currency: TikTok's coins, YouTube's Jewels (a combo's whole). A row for any platform compares the same number with each. It applies only to any gift: picked gifts are the alert's choice, so the matcher, the editor and the summary ignore it then.
   - **Bits:** the cheer's Bits.
   - **Kicks:** the Kicks sent, like Bits (the user's call).
   - **Super Chat:** its `usd`. One without dollars (null or missing) fires, so a missing rate never silences an alert.
   - **Gifted subs:** the event's `count`.
-- The editor and the summary name the unit by the row (`minUnit`): coins on a gift row that can get TikTok's gifts, none on a YouTube gift row (its gifts have no price) unless a minimum is already saved, and Bits, Kicks, US dollars ("worth $5+", without cents, since a minimum is whole) or gifted subs on those events' rows.
+- The editor and the summary name the unit by the row (`minUnit`): on a gift row, the currencies of the gifts it can get (`giftCurrencies`): coins, Jewels, or "coins or Jewels" on a row for both, none where no gifts come unless a minimum is already saved; and Bits, Kicks, US dollars ("worth $5+", without cents, since a minimum is whole) or gifted subs on those events' rows.
 - `MinimumField` (`components/AlertItem`) draws it under a row, in the Alerts editor and Overlay Studio's reaction rows alike (the user's call).
 - `roles` (`[]` is anyone): only Chat, Emote and Gift carry the viewer's roles, so `takesRoles` (`src/common/util/alerts.ts`, shared by the matcher, the editor and the summary) allows only them. Other triggers' saved roles are ignored.
   - The editor offers a row the roles its platforms' events say (`rowRoles`): TikTok's chat, emotes and gifts say followers, moderators and Super Fans; Twitch's, YouTube's and Kick's chat and emotes say Moderators and their subscribers or members, from badges, and Twitch's and Kick's VIPs (`vip`, the user's call), but never who follows; their gifts say none.

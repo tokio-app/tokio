@@ -8,13 +8,15 @@ import { NumberInput } from "../Elements";
 import { Field } from "../Page";
 import styles from "./alertitem.module.css";
 
-export type MinUnit = "coins" | "jewels" | "kicks" | "bits" | "usd" | "subs";
+export type MinUnit =
+  "coins" | "jewels" | "coinsOrJewels" | "kicks" | "bits" | "usd" | "subs";
 
 /**
  * What a row's minimum (min_coins) is in: Bits for Bits, Kicks for Kicks, US
- * dollars for Super Chats, subs for gifted subs, and coins for gifts the
- * row's platforms price (TikTok's). Null for other events and gifts without
- * a price (YouTube's), unless a gift minimum is saved, so it stays to fix.
+ * dollars for Super Chats, subs for gifted subs, and for gifts the currency
+ * the row's platforms price them in: TikTok's coins, YouTube's Jewels, or
+ * either on a row for both, each gift in its own. Null for other events and
+ * gifts without a price, unless a gift minimum is saved, so it stays to fix.
  */
 export function minUnit(
   trigger: Trigger,
@@ -28,6 +30,7 @@ export function minUnit(
   const currencies = giftCurrencies(
     trigger.platform ? [trigger.platform] : profilePlatforms,
   );
+  if (currencies.length > 1) return "coinsOrJewels";
   return currencies[0] ?? (trigger.min_coins > 0 ? "coins" : null);
 }
 
@@ -35,6 +38,7 @@ export function minUnit(
 const MIN_INPUT: Record<MinUnit, MessageKey> = {
   coins: "alerts.editor.minCoinsInput",
   jewels: "alerts.editor.minJewelsInput",
+  coinsOrJewels: "alerts.editor.minCoinsOrJewelsInput",
   kicks: "alerts.editor.minKicksInput",
   bits: "alerts.editor.minBitsInput",
   usd: "alerts.editor.minUsdInput",
