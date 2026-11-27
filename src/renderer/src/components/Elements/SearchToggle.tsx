@@ -18,7 +18,8 @@ type Props = {
  */
 export function SearchToggle({ value, onChange, placeholder }: Props) {
   const t = useT();
-  const [open, setOpen] = useState(false);
+  // A search kept by the page, as after switching tabs, stays shown
+  const [open, setOpen] = useState(value !== "");
   const ref = useRef<HTMLInputElement>(null);
 
   return (
