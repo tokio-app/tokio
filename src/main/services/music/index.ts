@@ -166,10 +166,12 @@ export class MusicService extends ProviderService<MusicProvider> {
   /**
    * Searches `query` and queues it, for the host (MCP): behind the song
    * searches, with no cooldown, permissions or one-per-viewer. False when not
-   * connected or the search queue is full.
+   * connected, or the search queue or the song queue is full.
    */
   public request(query: string, by: string): boolean {
     if (!this.isActive() || !query.trim()) return false;
+    // play() would drop it
+    if (this._music_queue.full()) return false;
     return this._queue.enqueue(() =>
       this._request({ query, by, unique: false, refund: () => {} }),
     );
