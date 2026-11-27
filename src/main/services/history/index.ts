@@ -773,6 +773,8 @@ export class HistoryService extends Service {
   private _record(live: LiveSummary, now: number): LiveRecord {
     return {
       ...live,
+      // Counted into while the save waits, as the minute now is
+      platforms: structuredClone(live.platforms),
       endedAt: now,
       gifters: [...this._liveGifters.values()].sort(byAmount),
       // The minute now still changes before the save writes it, the others
