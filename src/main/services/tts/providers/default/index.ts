@@ -43,12 +43,6 @@ export class TikTokTTS extends TTSProvider {
     return data.data;
   }
 
-  private checkStatusCode(statusCode?: number) {
-    if (statusCode !== undefined && statusCode !== 0) {
-      handleStatusError(statusCode);
-    }
-  }
-
   private async generateB64TTS(
     text: string,
     lang: string,
@@ -73,7 +67,7 @@ export class TikTokTTS extends TTSProvider {
       throw new Error(`TikTok TTS request failed: ${formatError(error)}`);
     }
 
-    this.checkStatusCode(data?.status_code);
+    if (data?.status_code) handleStatusError(data.status_code);
     if (!res.ok || !data?.data) {
       throw new Error(`TikTok TTS request failed: HTTP ${res.status}`);
     }
