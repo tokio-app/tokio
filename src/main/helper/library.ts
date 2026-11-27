@@ -38,7 +38,8 @@ export async function importFile(
   if ((await stat(srcPath)).size > maxBytes) {
     throw new Error(`The file is over ${maxBytes} bytes.`);
   }
-  const data = new Uint8Array(await readFile(srcPath));
+  // A Buffer is a Uint8Array, a copy would double a big video in memory
+  const data = await readFile(srcPath);
   const file = `${hash(data)}.${ext}`;
   // Whole or not at all: names are hashes, so a half-written file would pass
   // for the file forever
