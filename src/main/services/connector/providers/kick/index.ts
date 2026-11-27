@@ -18,8 +18,6 @@ import defaults, { type KickConfig } from "./config";
 
 type Connection = {
   slug: string;
-  channelId: number;
-  chatroomId: number;
   // The realtime client Kick knows this connection by; a new one after a
   // terminal close
   clientId: string;
@@ -152,8 +150,6 @@ export class KickConnector extends ConnectorProvider {
   private _connection(slug: string): Connection {
     const conn: Connection = {
       slug,
-      channelId: 0,
-      chatroomId: 0,
       clientId: randomUUID(),
       up: false,
       reconnecting: false,
@@ -181,8 +177,6 @@ export class KickConnector extends ConnectorProvider {
   private async _start(conn: Connection): Promise<number | null> {
     const channel = await lookup(this._config, conn.slug);
     conn.slug = channel.slug;
-    conn.channelId = channel.channelId;
-    conn.chatroomId = channel.chatroomId;
     const url = await realtime(this._config, conn.clientId);
     const token = await guestToken(this._config, conn.clientId);
     // A stop meanwhile already closed the socket: opening it would leak it
