@@ -801,20 +801,20 @@ describe("live MCP tools", () => {
         { name: "Game night", file: "game-night.json" },
       ];
       let active = profiles[0];
-      const add = async (file: string, name: string) => {
-        const made = { file, name };
+      // Named as the store names a new profile's file
+      const add = async (name: string) => {
+        const made = {
+          file: `${name.toLowerCase().replaceAll(" ", "-")}.json`,
+          name,
+        };
         profiles.push(made);
         return made;
       };
       const store = {
         getProfiles: () => profiles,
         getSettings: () => ({ activeProfile: active }),
-        profileFileFor: async (name: string) =>
-          `${name.toLowerCase().replaceAll(" ", "-")}.json`,
         createNewProfile: vi.fn(add),
-        cloneProfile: vi.fn(async (_ref: string, file: string, name: string) =>
-          add(file, name),
-        ),
+        cloneProfile: vi.fn(async (_ref: string, name: string) => add(name)),
         renameProfile: vi.fn(async (file: string, name: string) => {
           const index = profiles.findIndex((p) => p.file === file);
           profiles[index] = { file, name };
@@ -930,10 +930,7 @@ describe("live MCP tools", () => {
       const res = await call("profile", { action: "create", name: " Chill " });
 
       expect(res.value).toEqual({ id: "chill.json", name: "Chill" });
-      expect(store.createNewProfile).toHaveBeenCalledWith(
-        "chill.json",
-        "Chill",
-      );
+      expect(store.createNewProfile).toHaveBeenCalledWith("Chill");
       expect(h.pushed(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
     });
 
@@ -950,7 +947,6 @@ describe("live MCP tools", () => {
       expect(res.value).toEqual({ id: "chill.json", name: "Chill" });
       expect(store.cloneProfile).toHaveBeenCalledWith(
         "game-night.json",
-        "chill.json",
         "Chill",
       );
       const outside = await call("profile", {

@@ -100,24 +100,21 @@ const gamesOf = ({
 // can't write the profile, "unsaved" when it can't save the list.
 function profileStore({ fail }: { fail?: null | "unsaved" } = {}) {
   const profiles = [defaultProfile, streamProfile];
-  const add = (file: string, name: string) => {
+  // Named as the store names a new profile's file
+  const add = (name: string) => {
     if (fail !== undefined) return fail;
-    const profile = { file, name };
+    const profile = {
+      file: `${name.toLowerCase().replace(/ /g, "-")}.json`,
+      name,
+    };
     profiles.push(profile);
     return profile;
   };
   return {
     getSettings: () => appSettings,
     getProfiles: () => [...profiles],
-    profileFileFor: vi.fn(
-      async (name: string) => `${name.toLowerCase().replace(/ /g, "-")}.json`,
-    ),
-    createNewProfile: vi.fn(async (file: string, name: string) =>
-      add(file, name),
-    ),
-    cloneProfile: vi.fn(async (_ref: string, file: string, name: string) =>
-      add(file, name),
-    ),
+    createNewProfile: vi.fn(async (name: string) => add(name)),
+    cloneProfile: vi.fn(async (_ref: string, name: string) => add(name)),
     renameProfile: vi.fn(async (file: string, name: string) => {
       if (fail !== undefined) return fail;
       const index = profiles.findIndex((p) => p.file === file);
@@ -180,7 +177,6 @@ describe("settings events", () => {
       });
 
       expect(store.createNewProfile).toHaveBeenCalledExactlyOnceWith(
-        "chill-stream.json",
         "Chill Stream",
       );
       expect(log).toEqual([
@@ -316,7 +312,6 @@ describe("settings events", () => {
 
       expect(store.cloneProfile).toHaveBeenCalledExactlyOnceWith(
         "stream.json",
-        "chill-stream.json",
         "Chill Stream",
       );
       expect(log).toEqual([

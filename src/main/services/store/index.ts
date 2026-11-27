@@ -104,6 +104,8 @@ export class StoreManagerService extends Service {
   private _keys = new Map<string, string>();
   // The active profile's last update, which memory holds once it's written
   private _profileWrite: Promise<unknown> = Promise.resolve();
+  // New profiles' files, from their pick until they're listed
+  private _reservedFiles = new Set<string>();
   // The active file's last failed load, so live events don't read it each time
   private _failedLoad: { file: string; at: number } | null = null;
   // The last failed emote save, so chats don't write a broken file each time
@@ -1050,105 +1052,39 @@ export class StoreManagerService extends Service {
   }
 
   /**
-   * Writes a new profile's file and lists it. "unsaved" when only the store
-   * couldn't be saved, null for any other failure.
+   * Writes a new profile's file, named after it, and lists it. "unsaved" when
+   * only the store couldn't be saved, null for any other failure.
    */
   public async createNewProfile(
-    fileName: string,
-    profileName: string,
+    name: string,
   ): Promise<EntityMetadata | "unsaved" | null> {
     this._ensureInitialized();
-    if (!fileName || !profileName) return null;
-
-    if (!(await this._isFreeProfileFile(fileName))) {
-      Logger.error(
-        `<System> Refused to create the profile file ${fileName}, it isn't a free file name.`,
-        this._logFile,
-      );
-      return null;
-    }
-
-    const newPath = join(
-      this._pathManagerService.folders.profilesFolder,
-      fileName,
-    );
-    const newProfileData = { ...defaultProfile, name: profileName };
-
-    const saved = await this._jsonManagerService.saveFile(
-      newPath,
-      ProfileSchema,
-      newProfileData,
-    );
-
-    if (!saved) {
-      Logger.error(
-        `<System> Failed to write new profile file: ${fileName}`,
-        this._logFile,
-      );
-      return null;
-    }
-
-    return this._listNewProfile({ file: fileName, name: profileName });
+    if (!name) return null;
+    return this._writeNewProfile(name, { ...defaultProfile, name });
   }
 
   // As createNewProfile, with a copy of another profile's file.
   public async cloneProfile(
-    referenceFileName: string,
-    newFileName: string,
-    newProfileName: string,
+    ref: string,
+    name: string,
   ): Promise<EntityMetadata | "unsaved" | null> {
     this._ensureInitialized();
-    if (!referenceFileName || !newFileName || !newProfileName) return null;
-    if (!(await this._isFreeProfileFile(newFileName))) {
-      Logger.error(
-        `<System> Refused to clone into the profile file ${newFileName}, it isn't a free file name.`,
-        this._logFile,
-      );
-      return null;
-    }
-
-    const refPath = join(
-      this._pathManagerService.folders.profilesFolder,
-      referenceFileName,
-    );
-    const newPath = join(
-      this._pathManagerService.folders.profilesFolder,
-      newFileName,
-    );
-
+    if (!ref || !name) return null;
+    const refPath = join(this._pathManagerService.folders.profilesFolder, ref);
     // Any profile can have updates queued, like the timer's or a sweep's
     await this._jsonManagerService.whenWritten(refPath);
-    const existingData = await this._jsonManagerService.loadFile(
+    const data = await this._jsonManagerService.loadFile(
       refPath,
       ProfileSchema,
     );
-    if (!existingData) {
+    if (!data) {
       Logger.error(
-        `<System> Clone failed: Reference profile ${referenceFileName} not found.`,
+        `<System> Clone failed: Reference profile ${ref} not found.`,
         this._logFile,
       );
       return null;
     }
-
-    const clonedData = {
-      ...structuredClone(existingData),
-      name: newProfileName,
-    };
-    const saved = await this._jsonManagerService.saveFile(
-      newPath,
-      ProfileSchema,
-      clonedData,
-    );
-
-    if (!saved) {
-      Logger.error(
-        `<System> Failed to write cloned profile file: ${newFileName}`,
-        this._logFile,
-      );
-      return null;
-    }
-
-    return this._listNewProfile({ file: newFileName, name: newProfileName });
+    return this._writeNewProfile(name, { ...structuredClone(data), name });
   }
 
   public async exportProfile(ref: string, path: string): Promise<boolean> {
@@ -1192,17 +1128,14 @@ export class StoreManagerService extends Service {
     return true;
   }
 
-  // Copied to a file named after its file as profileFileFor names a new one's,
-  // and listed under its own name, numbered when another profile has it.
+  // Copied to a file named after its file, as a new profile's is named after
+  // it, and listed under its own name, numbered when another profile has it.
   // Fails as createNewProfile.
   public async importProfile(
     ref: string,
   ): Promise<EntityMetadata | "unsaved" | null> {
     this._ensureInitialized();
     if (!ref) return null;
-    const file = await this.profileFileFor(basename(ref, extname(ref)));
-    const newPath = join(this._pathManagerService.folders.profilesFolder, file);
-
     const data = await this._jsonManagerService.loadFile(
       resolve(ref),
       ProfileSchema,
@@ -1222,20 +1155,35 @@ export class StoreManagerService extends Service {
         ? t("main.store.importedProfile")
         : trimmed,
     );
-    const saved = await this._jsonManagerService.saveFile(
-      newPath,
-      ProfileSchema,
-      { ...data, name },
-    );
-    if (!saved) {
-      Logger.error(
-        `<System> Failed to write imported profile file: ${newPath}`,
-        this._logFile,
-      );
-      return null;
-    }
+    return this._writeNewProfile(basename(ref, extname(ref)), {
+      ...data,
+      name,
+    });
+  }
 
-    return this._listNewProfile({ file, name });
+  // Writes the profile to a free file named after `name` and lists it. The
+  // file stays reserved until then, so two new profiles at once never get
+  // the same one.
+  private async _writeNewProfile(
+    name: string,
+    data: Profile,
+  ): Promise<EntityMetadata | "unsaved" | null> {
+    const file = await this._freeProfileFile(profileSlug(name));
+    try {
+      const path = join(this._pathManagerService.folders.profilesFolder, file);
+      if (
+        !(await this._jsonManagerService.saveFile(path, ProfileSchema, data))
+      ) {
+        Logger.error(
+          `<System> Failed to write the new profile file ${file}`,
+          this._logFile,
+        );
+        return null;
+      }
+      return await this._listNewProfile({ file, name: data.name });
+    } finally {
+      this._reservedFiles.delete(file);
+    }
   }
 
   // A profile whose file the store can't list is deleted, so it doesn't take
@@ -1257,20 +1205,16 @@ export class StoreManagerService extends Service {
     return "unsaved";
   }
 
-  /**
-   * A free file for a new profile, named after it in lowercase ASCII letters,
-   * digits, "-" and "_", with a number added when another profile has it.
-   */
-  public async profileFileFor(name: string): Promise<string> {
-    this._ensureInitialized();
-    return this._freeProfileFile(profileSlug(name));
-  }
-
   // `base`.json, or `base`-2.json and on when it's taken
+  // Reserved before its check, so another pick can't take it meanwhile; the
+  // caller frees it once the profile is written and listed.
   private async _freeProfileFile(base: string): Promise<string> {
     for (let n = 1; n <= 1000; n++) {
       const file = n === 1 ? `${base}.json` : `${base}-${n}.json`;
+      if (this._reservedFiles.has(file)) continue;
+      this._reservedFiles.add(file);
       if (await this._isFreeProfileFile(file)) return file;
+      this._reservedFiles.delete(file);
     }
     return `${randomUUID()}.json`;
   }

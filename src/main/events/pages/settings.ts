@@ -114,19 +114,10 @@ const addProfile = async (
   input: string,
   response:
     APP_EVENTS_RESPONSE.CREATE_PROFILE | APP_EVENTS_RESPONSE.CLONE_PROFILE,
-  write: (
-    file: string,
-    name: string,
-  ) => ReturnType<StoreManagerService["createNewProfile"]>,
+  write: (name: string) => ReturnType<StoreManagerService["createNewProfile"]>,
 ) => {
   const name = checkName(store, input);
-  const file = await store.profileFileFor(name);
-  assertListed(
-    e,
-    store,
-    await write(file, name),
-    `Writing the profile ${file}`,
-  );
+  assertListed(e, store, await write(name), `Writing the profile "${name}"`);
 
   e.reply(response, {
     success: true,
@@ -143,7 +134,7 @@ events.push(
       store,
       input,
       APP_EVENTS_RESPONSE.CREATE_PROFILE,
-      (file, name) => store.createNewProfile(file, name),
+      (name) => store.createNewProfile(name),
     );
     notifier.success(
       "system",
@@ -168,7 +159,7 @@ events.push(
       store,
       input,
       APP_EVENTS_RESPONSE.CLONE_PROFILE,
-      (file, name) => store.cloneProfile(ref, file, name),
+      (name) => store.cloneProfile(ref, name),
     );
     notifier.success(
       "system",
