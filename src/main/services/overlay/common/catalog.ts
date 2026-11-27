@@ -18,6 +18,8 @@ export const RELEASES_PREFIX =
 
 // Overlays weigh a few KB, this only stops a wrong catalog.
 export const MAX_ZIP_BYTES = 50 * 1024 * 1024;
+// What its files may add up to once unzipped, so a zip bomb can't fill memory.
+export const MAX_UNZIPPED_BYTES = 4 * MAX_ZIP_BYTES;
 const CATALOG_TIMEOUT_MS = 15_000;
 const DOWNLOAD_TIMEOUT_MS = 60_000;
 
@@ -126,14 +128,26 @@ export async function downloadOverlay(
 
 /**
  * Writes a zip's files into `folder`. Throws before writing anything when an
- * entry would land outside it.
+ * entry would land outside it, or the files add up to more than
+ * `MAX_UNZIPPED_BYTES`.
  */
 export async function extractZip(
   data: Uint8Array,
   folder: string,
 ): Promise<void> {
+  let total = 0;
+  const unzipped = unzipSync(data, {
+    // Each file is unzipped into a buffer of the size the zip lists for it.
+    filter: ({ originalSize }) => {
+      total += originalSize;
+      if (total > MAX_UNZIPPED_BYTES) {
+        throw new Error("The zip's files are too big once unzipped.");
+      }
+      return true;
+    },
+  });
   // Folders are made along with their files.
-  const files = Object.entries(unzipSync(data)).filter(
+  const files = Object.entries(unzipped).filter(
     ([name]) => !name.endsWith("/"),
   );
   for (const [name] of files) {
