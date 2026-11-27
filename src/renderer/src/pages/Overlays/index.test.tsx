@@ -410,6 +410,20 @@ describe("Overlays", () => {
     );
   });
 
+  it("keeps the settings open when another save of their overlay comes, from MCP", async () => {
+    const { user } = await customize();
+    await loadConfig();
+    await user.type(dialog().getByPlaceholderText("Type a title"), "!");
+
+    await send(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG, {
+      success: true,
+      id: "gift-jar",
+      data: { title: "Goal", size: 50, show: true },
+    });
+
+    expect(dialog().getByPlaceholderText("Type a title")).toHaveValue("Goal!");
+  });
+
   it("stops saving when the settings close", async () => {
     const { user } = await customize();
     await loadConfig();
@@ -428,8 +442,9 @@ describe("Overlays", () => {
   });
 
   it("plays test events on the live overlay and its card", async () => {
-    await renderApp("/overlays");
+    const { user } = await renderApp("/overlays");
     await overlays(GIFT_JAR, TOP_LIKES);
+    await user.click(card("Gift Jar").getByRole("button", { name: "Test" }));
     const cardPreview = spyPreview(cardOf("Gift Jar"));
     const otherPreview = spyPreview(cardOf("Top Likes"));
 
@@ -470,20 +485,51 @@ describe("Overlays", () => {
     }
   });
 
-  it("warns when an overlay has no preview to post to", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("keeps a test from the settings off the stream when they close before its reply", async () => {
+    const { user } = await customize();
+    await loadConfig();
+    await user.click(dialog().getByRole("button", { name: "Test" }));
+    await user.click(dialog().getByRole("button", { name: "Cancel" }));
+    const cardPreview = spyPreview(cardOf("Gift Jar"));
+
+    await send(APP_EVENTS_RESPONSE.TEST_OVERLAY, {
+      id: "gift-jar",
+      payloads: PAYLOADS,
+    });
+
+    expect(sent(APP_EVENTS.SEND_OVERLAY_DATA)).toEqual([]);
+    expect(cardPreview).toHaveBeenCalledWith(preview(PAYLOADS[0]), "*");
+  });
+
+  it("plays only the tests the page asked for on stream", async () => {
     await renderApp("/overlays");
     await overlays(GIFT_JAR);
 
     await send(APP_EVENTS_RESPONSE.TEST_OVERLAY, {
-      id: "removed",
+      id: "gift-jar",
+      payloads: PAYLOADS,
+    });
+
+    expect(sent(APP_EVENTS.SEND_OVERLAY_DATA)).toEqual([]);
+  });
+
+  it("warns when an overlay has no preview to post to", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { user } = await renderApp("/overlays");
+    await overlays(GIFT_JAR);
+    await user.click(card("Gift Jar").getByRole("button", { name: "Test" }));
+    // Removed before the reply
+    await overlays();
+
+    await send(APP_EVENTS_RESPONSE.TEST_OVERLAY, {
+      id: "gift-jar",
       payloads: [PAYLOADS[0]],
     });
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("removed"));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("gift-jar"));
     // The live overlay still gets it
     expect(sent(APP_EVENTS.SEND_OVERLAY_DATA)).toEqual([
-      { id: "removed", payload: PAYLOADS[0] },
+      { id: "gift-jar", payload: PAYLOADS[0] },
     ]);
   });
 
