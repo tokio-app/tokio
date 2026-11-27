@@ -19,7 +19,7 @@ Tokio connects to TikTok, Twitch, YouTube and Kick (`PLATFORMS`, `src/common/typ
 
 ## The session across platforms
 
-`ConnectorService` (`src/main/services/connector`) owns one `SessionEvents` emitter that consumers (`init.ts`, the services) listen to, and wires each provider to it once. TikTok's backends stay in `ProviderService`'s pool, so Settings' picker and the store never list Twitch; other platforms are added with `_addPlatform`. A pool backend forwards only while it's `_current`.
+`ConnectorService` (`src/main/services/connector`) owns one `SessionEvents` emitter that consumers (`init.ts`, the services) listen to, and wires each provider to it once. TikTok's backends stay in `ProviderService`'s pool, so Settings' picker and the store never list Twitch; other platforms are added with `_addPlatform`, in the constructor only, so the setters that come later (log file, chat stage, Twitch's account listener) reach them. `ConnectorProvider`'s `setKey` and `fetchGifts` do nothing by default: only TikTok's provider overrides them. A pool backend forwards only while it's `_current`.
 
 - First up, last down: the first platform's `CONNECTED` sends the session's `CONNECTED`, the last `DISCONNECTED` sends its `DISCONNECTED`. In between, `onPlatform(platform, "up" | "ended" | "lost" | "stopped")` and `onReconnect(state, platform)` tell the one platform. With TikTok alone nothing changes from before.
 - `disconnect()` stops every platform at once and each stop arrives on `setImmediate`, so `_stopping` keeps them from being told one by one ("TikTok disconnected" in the middle of a Disconnect). It clears when the last one is down or at the next `connect()`.

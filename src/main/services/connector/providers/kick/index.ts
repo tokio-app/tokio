@@ -7,7 +7,6 @@ import {
   ConnectorProvider,
   ConnectorResponse,
   fail,
-  GiftResponse,
   keepNewest,
   kindOf,
   toFailure,
@@ -65,9 +64,6 @@ export class KickConnector extends ConnectorProvider {
     this._config = { ...defaults, ...options };
   }
 
-  // Kick's chat needs no key
-  public setKey() {}
-
   public connect(channel: string): Promise<ConnectorResponse> {
     // A connect a Disconnect stopped can still be finishing its requests: a
     // new Connect starts over instead of getting its "canceled"
@@ -95,10 +91,6 @@ export class KickConnector extends ConnectorProvider {
 
   public override channel(): string {
     return this._conn?.slug ?? "";
-  }
-
-  public async fetchGifts(): Promise<GiftResponse> {
-    return { success: true, data: [] };
   }
 
   // --- PRIVATE ---

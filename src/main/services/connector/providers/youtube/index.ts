@@ -6,7 +6,6 @@ import {
   ConnectorProvider,
   ConnectorResponse,
   fail,
-  GiftResponse,
   keepNewest,
   kindOf,
   toFailure,
@@ -69,9 +68,6 @@ export class YouTubeConnector extends ConnectorProvider {
     this._config = { ...defaults, ...options };
   }
 
-  // YouTube's chat needs no key
-  public setKey() {}
-
   public connect(channel: string): Promise<ConnectorResponse> {
     // A connect a Disconnect stopped can still be finishing its requests: a
     // new Connect starts over instead of getting its "canceled"
@@ -99,10 +95,6 @@ export class YouTubeConnector extends ConnectorProvider {
 
   public override channel(): string {
     return this._conn?.name ?? "";
-  }
-
-  public async fetchGifts(): Promise<GiftResponse> {
-    return { success: true, data: [] };
   }
 
   // --- PRIVATE ---

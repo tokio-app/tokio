@@ -125,11 +125,16 @@ export abstract class ConnectorProvider extends TokioEmitter {
   protected _onReconnect?: (state: ReconnectState) => void;
   protected _logFile = "";
   private _chatStage?: ChatStage;
-  public abstract setKey(key: string): void;
   public abstract connect(username: string): Promise<ConnectorResponse>;
   public abstract disconnect(): Promise<void>;
   public abstract isConnected(): boolean;
-  public abstract fetchGifts(): Promise<GiftResponse>;
+
+  // Only TikTok's connection takes a key and has a gift list
+  public setKey(_key: string) {}
+
+  public async fetchGifts(): Promise<GiftResponse> {
+    return { success: true, data: [] };
+  }
 
   // The service's log file, for what the connection reports while it's up.
   public setLogFile(logFile: string) {

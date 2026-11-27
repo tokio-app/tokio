@@ -1,11 +1,6 @@
 import { Platform, TOKIO_EVENTS } from "@/common/types";
 import { createFakeLive } from "@/common/util/samples";
-import {
-  ConnectorProvider,
-  ConnectorResponse,
-  fail,
-  GiftResponse,
-} from "../../common";
+import { ConnectorProvider, ConnectorResponse, fail } from "../../common";
 
 // A connect's wait, the wait between two events, and between two rooms
 export const FAKE_TIMES = {
@@ -39,8 +34,6 @@ export class FakeConnector extends ConnectorProvider {
   constructor(private readonly _platform: Platform) {
     super();
   }
-
-  public setKey() {}
 
   public async connect(channel: string): Promise<ConnectorResponse> {
     if (this._live) return { success: true };
@@ -90,10 +83,5 @@ export class FakeConnector extends ConnectorProvider {
 
   public override channel(): string {
     return this._live?.channel ?? "";
-  }
-
-  // TikTok's gifts come from its real provider
-  public async fetchGifts(): Promise<GiftResponse> {
-    return { success: true, data: [] };
   }
 }

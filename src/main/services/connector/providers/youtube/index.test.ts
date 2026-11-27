@@ -465,10 +465,4 @@ describe("YouTubeConnector", () => {
     // One in flight at most
     expect(youtube.state.continuations.length).toBeLessThanOrEqual(polls + 1);
   });
-
-  it("has no gifts and ignores keys", async () => {
-    connector.setKey();
-    expect(await connector.fetchGifts()).toEqual({ success: true, data: [] });
-    expect(connector.isWaiting()).toBe(false);
-  });
 });

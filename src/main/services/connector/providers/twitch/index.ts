@@ -8,7 +8,6 @@ import {
   ConnectorResponse,
   DeviceCode,
   fail,
-  GiftResponse,
   keepNewest,
   kindOf,
   PlatformAccount,
@@ -126,9 +125,6 @@ export class TwitchConnector
 
   // --- CONNECTION ---
 
-  // Twitch connects with the account, not a key
-  public setKey() {}
-
   // The channel is the account's own, whatever the profile names
   public connect(_channel?: string): Promise<ConnectorResponse> {
     // A connect a Disconnect stopped can still be finishing its requests: a
@@ -151,10 +147,6 @@ export class TwitchConnector
 
   public override isReconnecting(): boolean {
     return this._conn?.reconnecting ?? false;
-  }
-
-  public async fetchGifts(): Promise<GiftResponse> {
-    return { success: true, data: [] };
   }
 
   // --- PRIVATE ---

@@ -615,10 +615,4 @@ describe("KickConnector", () => {
       );
     });
   });
-
-  it("has no gifts and ignores keys", async () => {
-    connector.setKey();
-    expect(await connector.fetchGifts()).toEqual({ success: true, data: [] });
-    expect(connector.isWaiting()).toBe(false);
-  });
 });
