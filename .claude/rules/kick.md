@@ -20,6 +20,6 @@ Builds on `.claude/rules/platforms.md`.
 - Hosts and redemptions name the viewer only by username, so they have no `userId`. Every event's `handle` is the slug chat's `sender.slug` holds (`slugOf` of the username elsewhere), so a block list matches every event by one name.
 - Subs and gifted subs name their viewer only by username too, so the provider finds their id (`_withId`) (`kick:<id>`) in this LIVE's chat and Kicks, by username in any case, else with one lookup of their channel by `slugOf` (lowercase, `_` as `-`; the raw username is a 404). The lookup's `user_id` is chat's `sender.id` (checked 2026-11-22).
   - The answer is kept for the connection, failures included, each failure logged once per name. After a failed lookup the event goes out without an id.
-  - A lookup holds that event back by its round trip, so it can come after events that arrived behind it.
+  - A lookup holds that event back by its round trip, so it can come after events that arrived behind it. A stop sends the ones still waiting (`held`) without their id, before `DISCONNECTED`, as Twitch does.
 - The feed is unofficial and changed from Pusher to Centrifugo in October 2026. An event Tokio can't read is dropped and logged once per name, never thrown out of the socket's listener.
 - A subscriber's months (`subMonths`) are the `subscriber` or `founder` badge's `count` (checked on kick.com's chat, 2026-11-23).

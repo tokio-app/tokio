@@ -413,6 +413,41 @@ describe("KickConnector", () => {
       expect(onSub.mock.calls[1][0].months).toBe(4);
     });
 
+    it("sends a sub still waiting for its id when the stream ends, without it, before DISCONNECTED", async () => {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      kick.override = (url) =>
+        url.endsWith("/channels/new-gifter")
+          ? held.then(() =>
+              json(200, { id: 70, user_id: 71, slug: "new-gifter" }),
+            )
+          : undefined;
+      const order: string[] = [];
+      const onGiftSub = capture(TOKIO_EVENTS.GIFT_SUB);
+      onGiftSub.mockImplementation(() => order.push("GIFT_SUB"));
+      connector.on(TOKIO_EVENTS.DISCONNECTED, () => order.push("DISCONNECTED"));
+      await connector.connect("streamer");
+
+      publish("chatroom_20", "App\\Events\\GiftedSubscriptionsEvent", {
+        gifter_username: "New_Gifter",
+        gifted_usernames: ["a", "b", "c"],
+      });
+      await vi.waitFor(() =>
+        expect(kick.urls.some((u) => u.endsWith("/channels/new-gifter"))).toBe(
+          true,
+        ),
+      );
+      publish("channel.10", "App\\Events\\StreamerIsLive", {});
+      publish("channel.10", "App\\Events\\StopStreamBroadcast", {});
+      await vi.waitFor(() => expect(order).toContain("DISCONNECTED"));
+      release();
+      await new Promise((r) => setTimeout(r, 20));
+
+      expect(order).toEqual(["GIFT_SUB", "DISCONNECTED"]);
+      expect(onGiftSub.mock.calls[0][0]).toMatchObject({ count: 3 });
+      expect(onGiftSub.mock.calls[0][0].user.userId).toBeUndefined();
+    });
+
     it("drops an event whose shape changed and keeps reading", async () => {
       const warn = vi.spyOn(Logger, "warn");
       const onSub = capture(TOKIO_EVENTS.SUBSCRIBE);

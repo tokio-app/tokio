@@ -40,6 +40,8 @@ type Connection = {
   // Each username's viewer id (kick:<id>) in this LIVE, by its lowercase,
   // from chat and Kicks or a lookup; undefined after a failed lookup
   ids: Map<string, Promise<string | undefined>>;
+  // Subs waiting for their viewer's id, which a stop sends without it
+  held: Set<Mapped>;
 };
 
 /**
@@ -165,6 +167,7 @@ export class KickConnector extends ConnectorProvider {
       wasLive: false,
       offline: 0,
       ids: new Map(),
+      held: new Set(),
       socket: new KickSocket(this._config, {
         publication: (_feed, event, data) => this._notify(conn, event, data),
         drop: (why, terminal) => this._drop(conn, why, terminal),
@@ -294,8 +297,10 @@ export class KickConnector extends ConnectorProvider {
     >,
   ) {
     const { user } = mapped.data;
+    conn.held.add(mapped);
     const userId = await this._userId(conn, user.username);
-    if (this._conn !== conn) return;
+    // A stop meanwhile sent it already
+    if (!conn.held.delete(mapped) || this._conn !== conn) return;
     if (userId) mapped.data.user = { ...user, userId };
     this.emit(mapped.event, mapped.data);
   }
@@ -400,6 +405,9 @@ export class KickConnector extends ConnectorProvider {
     clearTimeout(conn.retry);
     conn.wake?.();
     if (!conn.up) return;
+    // Before DISCONNECTED, as they came before the stop
+    for (const mapped of conn.held) this.emit(mapped.event, mapped.data);
+    conn.held.clear();
     Logger.info(
       `<Kick> Disconnected${reason ? " -- the stream ended" : ""}.`,
       this._logFile,
