@@ -4,9 +4,15 @@ import { useT } from "@/ui/i18n";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { FiChevronDown } from "react-icons/fi";
-import { Btn, Check } from "../Elements";
+import { Btn } from "../Elements";
 import elements from "../Elements/elements.module.css";
 import styles from "../GiftSelect/giftselect.module.css";
+import {
+  CheckRow,
+  samePicks,
+  SelectionBar,
+  togglePick,
+} from "../GiftSelect/Selection";
 import { Modal } from "../Modal";
 
 // TikTok doesn't name emotes, the Alerts page numbers them (emoteOptions).
@@ -88,11 +94,7 @@ export function EmoteMultiSelect({
             emotes={emotes}
             selected={value}
             onApply={(picked) => {
-              // Done without a change saves nothing.
-              const same =
-                picked.length === value.length &&
-                picked.every((id, i) => id === value[i]);
-              if (!same) onChange(picked);
+              if (!samePicks(picked, value)) onChange(picked);
               setOpen(false);
             }}
             onClose={() => setOpen(false)}
@@ -128,16 +130,6 @@ function EmotePicker({ emotes, selected, onApply, onClose }: PickerProps) {
   );
 
   const checked = new Set(picked);
-  const unchecked = shown
-    .filter((emote) => !checked.has(emote.value))
-    .map((emote) => emote.value);
-
-  const toggle = (id: string) =>
-    setPicked(
-      checked.has(id)
-        ? picked.filter((value) => value !== id)
-        : [...picked, id],
-    );
 
   return (
     <Modal
@@ -154,43 +146,25 @@ function EmotePicker({ emotes, selected, onApply, onClose }: PickerProps) {
         </>
       }
     >
-      <div className={styles.toolbar}>
-        <span className={styles.count}>
-          {t("components.picker.selected", {
-            items: t("components.emotes.count", { count: emotes.length }),
-            count: picked.length,
-          })}
-        </span>
-        <div className={styles.actions}>
-          <Btn
-            disabled={unchecked.length === 0}
-            onClick={() => setPicked([...picked, ...unchecked])}
-          >
-            {t("components.emotes.selectAll")}
-          </Btn>
-          <Btn disabled={picked.length === 0} onClick={() => setPicked([])}>
-            {t("common.clear")}
-          </Btn>
-        </div>
-      </div>
+      <SelectionBar
+        items={t("components.emotes.count", { count: emotes.length })}
+        selectAll={t("components.emotes.selectAll")}
+        shown={shown.map((emote) => emote.value)}
+        picked={picked}
+        onChange={setPicked}
+      />
 
       <div className={styles.list}>
         {shown.map((emote) => (
-          <label
+          <CheckRow
             key={emote.value}
-            className={cx(
-              styles.row,
-              checked.has(emote.value) && styles.current,
-            )}
             title={emote.label}
+            checked={checked.has(emote.value)}
+            onToggle={() => setPicked(togglePick(picked, emote.value))}
           >
-            <Check
-              checked={checked.has(emote.value)}
-              onChange={() => toggle(emote.value)}
-            />
             <img src={emote.img} alt="" loading="lazy" className={styles.img} />
             <span className={styles.name}>{emote.label}</span>
-          </label>
+          </CheckRow>
         ))}
 
         {shown.length === 0 && (
