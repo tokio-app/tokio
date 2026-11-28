@@ -11,6 +11,7 @@ import { mcpClient } from "@test/mcp";
 import { describe, expect, it, vi } from "vitest";
 
 const store = {
+  getActiveProfileFile: () => "main.json",
   getSettings: () => ({ activeProfile: { name: "Main", file: "main.json" } }),
 };
 

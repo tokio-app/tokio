@@ -99,9 +99,9 @@ export function write<T>(
  * profile than the one read.
  */
 export function guardProfile({ storeManagerService }: AppHandlerVariables) {
-  const file = storeManagerService.getSettings().activeProfile.file;
+  const file = storeManagerService.getActiveProfileFile();
   return (): CallToolResult | undefined =>
-    storeManagerService.getSettings().activeProfile.file === file
+    storeManagerService.getActiveProfileFile() === file
       ? undefined
       : fail(
           "The active profile changed while this ran. Nothing was saved: read it again and retry.",

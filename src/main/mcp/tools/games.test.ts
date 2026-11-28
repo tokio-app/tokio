@@ -48,6 +48,7 @@ const setup = () => {
       storeManagerService: {
         getProfileData,
         getProfiles: () => [],
+        getActiveProfileFile: () => state.file,
         getSettings: () => ({
           activeProfile: { name: "Main", file: state.file },
           games: { minecraft: { enabled: false } },

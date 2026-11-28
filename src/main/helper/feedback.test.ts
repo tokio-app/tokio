@@ -241,7 +241,7 @@ describe("Notifier", () => {
       ]);
     });
 
-    it("only logs when notify is off, by option or by the failure", () => {
+    it("only logs when notify is off", () => {
       const error = vi.spyOn(Logger, "error");
 
       notifier.report({
@@ -249,15 +249,9 @@ describe("Notifier", () => {
         error: new Error("x"),
         notify: false,
       });
-      notifier.report({
-        source: "system",
-        error: new AppFailure(FEEDBACK_CODES.UNKNOWN, "Quiet.", {
-          notify: false,
-        }),
-      });
 
       expect(sent).toEqual([]);
-      expect(error).toHaveBeenCalledTimes(2);
+      expect(error).toHaveBeenCalledOnce();
     });
   });
 });

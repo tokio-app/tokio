@@ -46,6 +46,7 @@ const post = (key: string) =>
 it("loads the SDK and the tools with the first request past the checks", async () => {
   const h = createHandler({
     storeManagerService: {
+      getRemote: () => ({ enabled: true, key: KEY }),
       getSettings: () => ({ remote: { enabled: true, key: KEY } }),
     },
   });

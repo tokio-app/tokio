@@ -202,24 +202,17 @@ const reportOverlayUpdates = (
 
 // Live events reach TTS, music, alerts and the UI from here. No request waits
 // for them, so their failures are reported to the user directly.
-const registerConnectorEvents = (handler: AppHandlerVariables) => {
-  const {
-    connectorService: conn,
-    win,
-    storeManagerService: store,
-    ttsService: tts,
-    musicService: music,
-    alertsService: alerts,
-    gamesService: games,
-    overlayService: overlays,
-    liveService: live,
-    historyService: history,
-    pathManagerService: paths,
-    serverService: server,
-    controlsService: controls,
-    ratesService: rates,
-    notifier,
-  } = handler;
+const registerDispatch = ({
+  connectorService: conn,
+  win,
+  storeManagerService: store,
+  musicService: music,
+  alertsService: alerts,
+  gamesService: games,
+  pathManagerService: paths,
+  controlsService: controls,
+  notifier,
+}: AppHandlerVariables) => {
   const dispatchAlert = async <K extends AppEvents>(
     type: K,
     payload: TokioEventMap[K],
@@ -351,7 +344,17 @@ const registerConnectorEvents = (handler: AppHandlerVariables) => {
       conn.on(trigger, listener);
     }
   }
+};
 
+// What the stats', the session's and the connection's listeners share: the
+// throttled pushes, which a LIVE's end cancels, and the likes seen
+const createLiveHub = (handler: AppHandlerVariables) => {
+  const {
+    connectorService: conn,
+    win,
+    liveService: live,
+    serverService: server,
+  } = handler;
   // Busy lives send many of these, the UI only needs the latest few a second.
   // A throttled push can come after the window closed on quit.
   const sendViews = throttle(
@@ -372,14 +375,6 @@ const registerConnectorEvents = (handler: AppHandlerVariables) => {
     win.webContents.send(APP_EVENTS_RESPONSE.LIKES, { likes });
   }, STATS_THROTTLE_MS);
 
-  // TikTok sometimes lowers the total for a while, so the most seen is kept
-  let likes = 0;
-  conn.on(TOKIO_EVENTS.LIKE, (d) => {
-    likes = Math.max(likes, d.totalLikes);
-    store.updateLiveStats({ likes });
-    sendLikes(likes);
-  });
-
   // The Home page's feed and totals, throttled like the stats.
   const pushSession = () => {
     if (win.isDestroyed()) return;
@@ -388,6 +383,55 @@ const registerConnectorEvents = (handler: AppHandlerVariables) => {
     });
   };
   const sendSession = throttle(pushSession, STATS_THROTTLE_MS);
+  // The platforms the LIVE is on, read when it goes: the connector changes
+  // them before CONNECTED, DISCONNECTED and onPlatform fire
+  const liveMessage = (): TokioPayload => ({
+    type: "tokio:live",
+    data: { platforms: conn.livePlatforms() },
+  });
+  const sendLive = () => server.sendToAll(liveMessage());
+
+  // What Home and the title bar show, as main holds it
+  const pushConnection = () => {
+    // The connection goes on reconnecting after the window closed on quit
+    if (win.isDestroyed()) return;
+    win.webContents.send(
+      APP_EVENTS_RESPONSE.CONNECTED,
+      connectionState(handler),
+    );
+  };
+
+  return {
+    sendViews,
+    sendLikes,
+    pushSession,
+    sendSession,
+    liveMessage,
+    sendLive,
+    pushConnection,
+    // TikTok sometimes lowers the total for a while, so the most seen is kept
+    likes: 0,
+  };
+};
+
+type LiveHub = ReturnType<typeof createLiveHub>;
+
+// Home's and the store's likes, viewers and views, and the chart's minutes
+const registerStats = (
+  {
+    connectorService: conn,
+    storeManagerService: store,
+    liveService: live,
+  }: AppHandlerVariables,
+  hub: LiveHub,
+) => {
+  const { sendViews, sendLikes, sendSession } = hub;
+  conn.on(TOKIO_EVENTS.LIKE, (d) => {
+    hub.likes = Math.max(hub.likes, d.totalLikes);
+    store.updateLiveStats({ likes: hub.likes });
+    sendLikes(hub.likes);
+  });
+
   // Home's chart gets the session again as each minute of viewers ends
   conn.on(TOKIO_EVENTS.ROOM_USER, (d) => {
     store.updateLiveStats({ viewers: d.viewers, views: d.views });
@@ -396,18 +440,24 @@ const registerConnectorEvents = (handler: AppHandlerVariables) => {
     sendViews(d.views, d.viewers, platformViewers);
     if (live.recordViewers(d.viewers, platformViewers)) sendSession();
   });
+};
+
+// The LIVE session Home shows: its feed, its start and the platforms it's on
+const registerSession = (
+  {
+    connectorService: conn,
+    liveService: live,
+    serverService: server,
+    ratesService: rates,
+  }: AppHandlerVariables,
+  hub: LiveHub,
+) => {
+  const { pushSession, sendSession, liveMessage, sendLive } = hub;
   for (const type of ACTIVITY_EVENTS) {
     conn.on(type, (d) => {
       if (live.record(type, d)) sendSession();
     });
   }
-  // The platforms the LIVE is on, read when it goes: the connector changes
-  // them before CONNECTED, DISCONNECTED and onPlatform fire
-  const liveMessage = (): TokioPayload => ({
-    type: "tokio:live",
-    data: { platforms: conn.livePlatforms() },
-  });
-  const sendLive = () => server.sendToAll(liveMessage());
   server.onConnect((id) => server.sendToClient(id, liveMessage()));
 
   // Added when the app loads, before any connect, so the session has started
@@ -422,17 +472,32 @@ const registerConnectorEvents = (handler: AppHandlerVariables) => {
   });
   // The Super Chats' dollars once the rates load
   rates.onChange(() => sendSession());
+};
 
-  // What Home and the title bar show, as main holds it
-  const pushConnection = () => {
-    // The connection goes on reconnecting after the window closed on quit
-    if (win.isDestroyed()) return;
-    win.webContents.send(
-      APP_EVENTS_RESPONSE.CONNECTED,
-      connectionState(handler),
-    );
-  };
-
+// The connection's ends, drops and platforms, and Twitch's account
+const registerConnection = (
+  {
+    connectorService: conn,
+    win,
+    storeManagerService: store,
+    ttsService: tts,
+    musicService: music,
+    alertsService: alerts,
+    liveService: live,
+    historyService: history,
+    ratesService: rates,
+    notifier,
+  }: AppHandlerVariables,
+  hub: LiveHub,
+) => {
+  const {
+    sendViews,
+    sendLikes,
+    pushSession,
+    sendSession,
+    sendLive,
+    pushConnection,
+  } = hub;
   conn.on(TOKIO_EVENTS.DISCONNECTED, (d) => {
     sendLive();
     // After an abnormal stop TikTok looks for its LIVE again, which says
@@ -471,7 +536,7 @@ const registerConnectorEvents = (handler: AppHandlerVariables) => {
     sendViews.cancel();
     sendLikes.cancel();
     sendSession.cancel();
-    likes = 0;
+    hub.likes = 0;
     store.updateLiveStats(EMPTY_LIVE_STATS);
     live.end();
     pushSession();
@@ -533,9 +598,9 @@ const registerConnectorEvents = (handler: AppHandlerVariables) => {
     if (change === "up") history.join(platform);
     // TikTok back in a new room counts its likes from 0, as the session goes on
     if (platform === "tiktok" && change === "up") {
-      likes = 0;
-      store.updateLiveStats({ likes });
-      sendLikes(likes);
+      hub.likes = 0;
+      store.updateLiveStats({ likes: hub.likes });
+      sendLikes(hub.likes);
     }
     const params = { platform: PLATFORM_LABELS[platform] };
     // Apart from the session's own, which can come right after
@@ -598,7 +663,19 @@ const registerConnectorEvents = (handler: AppHandlerVariables) => {
     }
     return saved;
   });
+};
 
+// Chat TTS and music requests
+const registerChat = ({
+  connectorService: conn,
+  win,
+  storeManagerService: store,
+  ttsService: tts,
+  musicService: music,
+  pathManagerService: paths,
+  controlsService: controls,
+  notifier,
+}: AppHandlerVariables) => {
   const handleChat = async (d: ChatEvent) => {
     // Before the else branches below, whose clearHandler would empty the
     // song queue the pause lets play on
@@ -657,7 +734,15 @@ const registerConnectorEvents = (handler: AppHandlerVariables) => {
       notifier.report({ source: "system", error, context: TOKIO_EVENTS.CHAT });
     });
   });
+};
 
+const registerEmotes = (handler: AppHandlerVariables) => {
+  const {
+    connectorService: conn,
+    win,
+    storeManagerService: store,
+    notifier,
+  } = handler;
   // TikTok can't list a LIVE's emotes, so the profile keeps the ones viewers
   // use, whatever features are on.
   const recordEmotes = async (d: ChatEvent) => {
@@ -684,7 +769,15 @@ const registerConnectorEvents = (handler: AppHandlerVariables) => {
       notifier.report({ source: "alerts", error, context: TOKIO_EVENTS.CHAT });
     });
   });
+};
 
+const registerGifts = (handler: AppHandlerVariables) => {
+  const {
+    connectorService: conn,
+    win,
+    overlayService: overlays,
+    notifier,
+  } = handler;
   // TikTok's gift list misses some gifts, like other regions' ones, so the
   // ones viewers send that aren't on it are saved for every profile,
   // whatever features are on.
@@ -715,7 +808,14 @@ const registerConnectorEvents = (handler: AppHandlerVariables) => {
       notifier.report({ source: "alerts", error, context: TOKIO_EVENTS.GIFT });
     });
   });
+};
 
+const registerMusic = ({
+  win,
+  musicService: music,
+  pathManagerService: paths,
+  notifier,
+}: AppHandlerVariables) => {
   // Home's now playing gets the queue as overlays do, on every change
   music.on(TOKIO_EVENTS.MUSIC_CHANGE, (songs) => {
     if (win.isDestroyed()) return;
@@ -912,8 +1012,8 @@ const registerTimer = ({
 };
 
 // Overlay Studio's elements react to live events whatever features are on,
-// and its texts follow the live numbers. Registered after
-// registerConnectorEvents: the connector runs its listeners in order, so the
+// and its texts follow the live numbers. Registered after registerStats and
+// registerSession: the connector runs its listeners in order, so the
 // stats and the LIVE session already hold an event when these read them.
 const registerStudio = (handler: AppHandlerVariables) => {
   const {
@@ -1360,7 +1460,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     const control = express.Router();
     control.use(
       createRemoteRoutes({
-        remote: () => storeManagerService.getSettings().remote,
+        remote: () => storeManagerService.getRemote(),
         state: () => remoteState(handler),
         invoke: handler.invoke,
         labels: remoteLabels,
@@ -1368,13 +1468,21 @@ const startApp = async (handler: AppHandlerVariables) => {
       createMcpRoutes(handler),
     );
     serverService.setControlRoutes(control);
-    registerConnectorEvents(handler);
+    registerDispatch(handler);
+    const hub = createLiveHub(handler);
+    registerStats(handler, hub);
+    registerSession(handler, hub);
+    registerConnection(handler, hub);
+    registerChat(handler);
+    registerEmotes(handler);
+    registerGifts(handler);
+    registerMusic(handler);
     registerControls(handler);
     registerTimer(handler);
     registerGames(handler);
     registerFans(handler);
     registerHistory(handler);
-    // After registerConnectorEvents, see registerStudio
+    // After registerStats and registerSession, see registerStudio
     registerStudio(handler);
     registerCameras(handler);
     registerTranslation(handler);

@@ -34,6 +34,7 @@ const setup = (stubs: Parameters<typeof createHandler>[0] = {}) => {
       storeManagerService: {
         getProfileData: async () => profile,
         getProfiles: () => [],
+        getActiveProfileFile: () => "main.json",
         getSettings: () => ({
           activeProfile: { name: "Main", file: "main.json" },
         }),

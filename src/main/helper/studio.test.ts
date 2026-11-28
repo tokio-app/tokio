@@ -66,7 +66,6 @@ const session = (startedAt: number | null) => ({
     giftSubs: 6,
   },
   usd: 42.5,
-  activity: [],
 });
 
 const setup = (
@@ -96,7 +95,7 @@ const setup = (
       getLiveStats: () => ({ likes: 12_840, viewers: 30, views: 0 }),
       getProfileData: async () => ({ platforms: ["tiktok"] }),
     },
-    liveService: { getSession: () => session(startedAt) },
+    liveService: { getNumbers: () => session(startedAt) },
     overlayService: {
       getGifts: async () => [
         { value: 1, label: "Rose", img: "tiktok-rose.png", coins: 1 },

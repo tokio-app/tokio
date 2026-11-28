@@ -1123,6 +1123,18 @@ describe("StoreManagerService", () => {
       expect((await init()).getSettings().remote).toEqual(remote);
     });
 
+    it("reads it and the active profile's file without a copy", async () => {
+      const store = await init();
+      await store.updateRemote({ enabled: true, key: "abc" });
+      const { file } = store.getSettings().activeProfile;
+      const clone = vi.spyOn(globalThis, "structuredClone");
+
+      expect(store.getRemote()).toEqual({ enabled: true, key: "abc" });
+      expect(store.getRemote()).toBe(store.getRemote());
+      expect(store.getActiveProfileFile()).toBe(file);
+      expect(clone).not.toHaveBeenCalled();
+    });
+
     it("refuses a bad value without changing the store", async () => {
       const store = await init();
 

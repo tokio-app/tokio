@@ -306,6 +306,7 @@ describe("remote", () => {
       server: { enabled: server },
     };
     const store = {
+      getRemote: () => settings.remote,
       getSettings: () => settings,
       getProfiles: () => [],
       updateRemote: vi.fn(async (value: unknown) => {

@@ -424,6 +424,21 @@ export class StoreManagerService extends Service {
     return this._storeData!.settings.studio;
   }
 
+  /**
+   * The phone remote's settings, read on every request to the remote's API
+   * and MCP. Not cloned, so don't change what it returns.
+   */
+  public getRemote(): Readonly<AppSettings["remote"]> {
+    this._ensureInitialized();
+    return this._storeData!.settings.remote;
+  }
+
+  /** The active profile's file, without getSettings' copy. */
+  public getActiveProfileFile(): string {
+    this._ensureInitialized();
+    return this._activeProfileFile();
+  }
+
   /** The LIVE's likes and viewers, read on every live event, not cloned. */
   public getLiveStats(): Readonly<AppSettings["liveStats"]> {
     this._ensureInitialized();

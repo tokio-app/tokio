@@ -38,6 +38,7 @@ paths:
 - One that doesn't parse or validate is backed up from the bytes read to `tokio.corrupted-<time>.json` next to it and replaced by the defaults. `startApp` warns naming the backup (`corruptedBackup()`, `SETTINGS_LOAD_FAILED`), and `newStore` stays false (`.claude/rules/first-start.md`).
 - One that can't be read (locked, no access) or backed up stops startup ("Tokio couldn't start") and is left as it is.
 - A rebuilt store keeps a valid `default.json`. An invalid one is backed up as `default.corrupted-<time>.json` before it's replaced, and one that can't be read stops startup too. So does another profile file it can't read, or a sounds, media or pictures folder that's there but can't be read. Profiles that don't load are left out. Its `activeProfile` takes the found `default.json` entry, with the name saved in it, so a renamed first profile keeps its name.
+- `getSettings()` deep-copies every setting, which costs milliseconds with big libraries. What's read often reads a getter that doesn't copy, so never change what it returns: `getActiveFeatures()`, `getStudio()`, `getLiveStats()`, `getRemote()` (the remote's API and MCP, on every request) and `getActiveProfileFile()` (MCP's profile check).
 
 ## The Twitch account
 

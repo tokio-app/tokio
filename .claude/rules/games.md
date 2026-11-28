@@ -21,7 +21,7 @@ The **Games** page connects Minecraft to Tokio: Bedrock Edition by itself, Java 
 
 ## Runs
 
-- `registerConnectorEvents` calls `GamesService.handle` next to the alerts, whatever features are on. It returns when Minecraft is off or in error.
+- `registerDispatch` (`src/main/events/init.ts`) calls `GamesService.handle` next to the alerts, whatever features are on. It returns when Minecraft is off or in error.
 - Matching is `matchesTrigger` and `streakOf` (`.claude/rules/triggers.md`) `GamesService` keeps its own `GiftStreaks`, used once per event; `{count}` is the streak's total.
 - **Every gift** runs once per gift added. A Like action runs once every `likes_every` likes from all viewers, counted per action in `_likes` with the rest carried over, as the timer does.
 - Gifts and likes are never capped (the user's call: every gift and like count runs).

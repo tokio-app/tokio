@@ -35,6 +35,7 @@ describe("MCP route", () => {
           status: () => ({ minecraft: { state: "off" } }),
         },
         storeManagerService: {
+          getRemote: () => remote,
           getSettings: () => ({
             remote,
             activeProfile: { name: "Main", file: "main.json" },
@@ -52,11 +53,9 @@ describe("MCP route", () => {
           username: "",
         },
         liveService: {
-          getSession: () => ({
+          getNumbers: () => ({
             startedAt: null,
             totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
-            activity: [],
-            viewers: [],
           }),
         },
         timerService: {

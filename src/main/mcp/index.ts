@@ -117,7 +117,7 @@ export function createMcpRoutes(
   router.all(
     `/${MCP_PATH}`,
     localOnly,
-    remoteGuard(() => handler.storeManagerService.getSettings().remote),
+    remoteGuard(() => handler.storeManagerService.getRemote()),
     // A full Overlay Studio overlay can pass 100 KB
     express.json({ limit: "1mb" }),
     serve,

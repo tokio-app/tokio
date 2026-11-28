@@ -33,6 +33,7 @@ describe("live MCP tools", () => {
           storeManagerService: {
             getProfileData: async () => profile,
             getProfiles: () => [],
+            getActiveProfileFile: () => settings.activeProfile.file,
             getSettings: () => settings,
             updateProfileData,
           },
@@ -1159,6 +1160,7 @@ describe("live MCP tools", () => {
       const h = createHandler(
         {
           storeManagerService: {
+            getActiveProfileFile: () => "main.json",
             getSettings: () => ({
               activeProfile: { name: "Main", file: "main.json" },
             }),

@@ -15,7 +15,11 @@ import * as areas from "./tools/live";
 
 const store = (file = "a.json") => {
   const settings = { activeProfile: { file, name: "A" } };
-  return { getSettings: vi.fn(() => settings), settings };
+  return {
+    getSettings: vi.fn(() => settings),
+    getActiveProfileFile: () => settings.activeProfile.file,
+    settings,
+  };
 };
 
 // A section of two fields, one nested, saved by `write`
@@ -321,7 +325,7 @@ describe("MCP registry", () => {
           username: "host",
         },
         liveService: {
-          getSession: () => ({
+          getNumbers: () => ({
             startedAt: 0,
             totals: {
               followers: 1,
@@ -334,8 +338,6 @@ describe("MCP registry", () => {
               giftSubs: 7,
             },
             usd: 12.345,
-            activity: [],
-            viewers: [],
           }),
         },
         controlsService: { isPaused: () => true },
