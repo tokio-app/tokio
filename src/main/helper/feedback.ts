@@ -43,7 +43,6 @@ type FailureLevel = Extract<FeedbackLevel, "warning" | "error">;
 export class AppFailure extends Error {
   public readonly code: FEEDBACK_CODES;
   public readonly level: FailureLevel;
-  public readonly notify: boolean;
   // The service already logged it, report() doesn't log it again
   public readonly logged: boolean;
 
@@ -52,7 +51,6 @@ export class AppFailure extends Error {
     message: string,
     options: {
       level?: FailureLevel;
-      notify?: boolean;
       logged?: boolean;
       cause?: unknown;
     } = {},
@@ -61,7 +59,6 @@ export class AppFailure extends Error {
     this.name = "AppFailure";
     this.code = code;
     this.level = options.level ?? "error";
-    this.notify = options.notify ?? true;
     this.logged = options.logged ?? false;
   }
 }
@@ -207,7 +204,7 @@ export class Notifier {
 
   /**
    * Logs a failure to the source's log file and notifies the user, unless
-   * `notify` is false or the AppFailure opted out. Returns what to reply with.
+   * `notify` is false. Returns what to reply with.
    * A warning without a cause isn't logged: it's what the user did, or a
    * service already logged it, so the notice says it all. An AppFailure's
    * error logs one line, since formatError carries its cause chain, and
@@ -238,9 +235,7 @@ export class Notifier {
       Logger.error(line, logFile, failure ? undefined : detail);
     }
 
-    if (notify && (failure?.notify ?? true)) {
-      this.notify({ level, source, ...appError });
-    }
+    if (notify) this.notify({ level, source, ...appError });
     return appError;
   }
 }
