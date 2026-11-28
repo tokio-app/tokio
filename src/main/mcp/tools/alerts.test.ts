@@ -51,6 +51,7 @@ function setup(items: Alert[] = [alert()]) {
       return true;
     });
   const storeManagerService = {
+    getActiveProfileFile: () => settings.activeProfile.file,
     getSettings: () => settings,
     getProfiles: () => [settings.activeProfile],
     getProfileData: async () => profile,
@@ -526,12 +527,8 @@ describe("alerts MCP tools", () => {
     it("refuses a save when the profile switched meanwhile", async () => {
       const s = setup();
       let reads = 0;
-      s.storeManagerService.getSettings = () => ({
-        activeProfile: {
-          name: "Main",
-          file: reads++ ? "other.json" : "main.json",
-        },
-      });
+      s.storeManagerService.getActiveProfileFile = () =>
+        reads++ ? "other.json" : "main.json";
       const { call } = await mcpClient(s.h.handler);
 
       const res = await call("save_item", {

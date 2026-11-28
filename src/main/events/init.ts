@@ -1360,7 +1360,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     const control = express.Router();
     control.use(
       createRemoteRoutes({
-        remote: () => storeManagerService.getSettings().remote,
+        remote: () => storeManagerService.getRemote(),
         state: () => remoteState(handler),
         invoke: handler.invoke,
         labels: remoteLabels,

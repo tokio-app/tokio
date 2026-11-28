@@ -35,6 +35,7 @@ describe("MCP route", () => {
           status: () => ({ minecraft: { state: "off" } }),
         },
         storeManagerService: {
+          getRemote: () => remote,
           getSettings: () => ({
             remote,
             activeProfile: { name: "Main", file: "main.json" },

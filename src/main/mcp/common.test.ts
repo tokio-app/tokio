@@ -116,7 +116,9 @@ describe("guardProfile", () => {
   it("refuses once another profile is active", () => {
     const settings = { activeProfile: { file: "a.json", name: "A" } };
     const h = createHandler({
-      storeManagerService: { getSettings: () => settings },
+      storeManagerService: {
+        getActiveProfileFile: () => settings.activeProfile.file,
+      },
     });
 
     const changed = guardProfile(h.handler);

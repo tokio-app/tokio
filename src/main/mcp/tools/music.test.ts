@@ -39,6 +39,7 @@ const setup = ({ on = true, connected = true } = {}) => {
       storeManagerService: {
         getProfileData: async () => profile,
         getProfiles: () => [],
+        getActiveProfileFile: () => "main.json",
         getSettings: () => ({
           activeProfile: { name: "Main", file: "main.json" },
         }),

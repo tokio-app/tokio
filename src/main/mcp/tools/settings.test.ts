@@ -28,6 +28,7 @@ describe("settings MCP sections", () => {
           storeManagerService: {
             getActiveFeatures: () => features,
             updateActiveFeatures,
+            getActiveProfileFile: () => "main.json",
             getSettings: () => ({
               activeProfile: { name: "Main", file: "main.json" },
               activeFeatures: features,
@@ -116,6 +117,7 @@ describe("settings MCP sections", () => {
       const h = createHandler(
         {
           storeManagerService: {
+            getActiveProfileFile: () => settings.activeProfile.file,
             getSettings: () => settings,
             getProfiles: () => [],
             updateActivityFeed,
@@ -153,6 +155,7 @@ describe("settings MCP sections", () => {
     const setup = () => {
       const settings = storeSettings();
       const store = {
+        getActiveProfileFile: () => settings.activeProfile.file,
         getSettings: () => settings,
         getProfiles: () => [],
         updateTraySettings: vi.fn(async (enabled: boolean) => {
@@ -243,6 +246,7 @@ describe("settings MCP sections", () => {
     const setup = () => {
       const settings = storeSettings();
       const store = {
+        getActiveProfileFile: () => settings.activeProfile.file,
         getSettings: () => settings,
         getProfiles: () => [],
         updateShortcuts: vi.fn(async (value: unknown) => {

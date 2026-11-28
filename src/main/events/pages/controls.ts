@@ -155,7 +155,7 @@ const newRemoteKey = () => randomBytes(18).toString("base64url");
 events.push(
   APP_EVENTS.SET_REMOTE,
   async ({ storeManagerService: store, notifier }, e, { enabled }) => {
-    const { key } = store.getSettings().remote;
+    const { key } = store.getRemote();
     const saved = await store.updateRemote({
       enabled,
       key: enabled && !key ? newRemoteKey() : key,
@@ -193,7 +193,7 @@ events.push(
 events.push(
   APP_EVENTS.NEW_REMOTE_KEY,
   async ({ storeManagerService: store, notifier }, e) => {
-    const { enabled } = store.getSettings().remote;
+    const { enabled } = store.getRemote();
     const saved = await store.updateRemote({ enabled, key: newRemoteKey() });
     replySettings(e, store);
     if (!saved) throw saveFailure();

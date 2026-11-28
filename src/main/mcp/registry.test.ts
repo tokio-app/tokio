@@ -15,7 +15,11 @@ import * as areas from "./tools/live";
 
 const store = (file = "a.json") => {
   const settings = { activeProfile: { file, name: "A" } };
-  return { getSettings: vi.fn(() => settings), settings };
+  return {
+    getSettings: vi.fn(() => settings),
+    getActiveProfileFile: () => settings.activeProfile.file,
+    settings,
+  };
 };
 
 // A section of two fields, one nested, saved by `write`
