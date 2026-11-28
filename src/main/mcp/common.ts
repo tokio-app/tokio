@@ -222,16 +222,16 @@ export const unknownTriggerKeys = (
     : [];
 
 /** An error result naming the unknown keys, undefined when there are none. */
-export function refuseUnknown(
-  schema: z.core.$ZodType,
-  changes: unknown,
-): CallToolResult | undefined {
-  const keys = unknownKeys(schema, changes);
-  if (keys.length === 0) return undefined;
-  return fail(
-    `Unknown settings: ${keys.join(", ")}. Nothing was saved: see describe for the fields.`,
-  );
-}
+export const refuseKeys = (keys: string[]): CallToolResult | undefined =>
+  keys.length === 0
+    ? undefined
+    : fail(
+        `Unknown settings: ${keys.join(", ")}. Nothing was saved: see describe for the fields.`,
+      );
+
+/** refuseKeys for the keys of `changes` that `schema` has no field for. */
+export const refuseUnknown = (schema: z.core.$ZodType, changes: unknown) =>
+  refuseKeys(unknownKeys(schema, changes));
 
 /** An error result listing what the schema refused. */
 export const invalid = (error: z.ZodError): CallToolResult =>
@@ -299,7 +299,11 @@ export async function invokeOk<
   if (isRecord(res) && res.success === false) {
     const message = isRecord(res.error) ? res.error.message : undefined;
     return {
-      error: fail(typeof message === "string" ? message : `${event} failed.`),
+      error: fail(
+        typeof message === "string"
+          ? message
+          : "It didn't work: Tokio's notices say why.",
+      ),
     };
   }
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the channel ties it to R

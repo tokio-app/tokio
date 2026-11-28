@@ -146,15 +146,16 @@ describe("music MCP tools", () => {
       expect(musicService.revoke).toHaveBeenCalledWith("B");
     });
 
-    it("skips and goes back", async () => {
+    it("goes back, and leaves skipping to control skip_song", async () => {
       const { h, musicService } = setup();
       const { call } = await mcpClient(h.handler);
 
-      await call("music", { action: "next" });
       await call("music", { action: "previous" });
+      const next = await call("music", { action: "next" });
 
-      expect(musicService.skip).toHaveBeenCalledOnce();
       expect(musicService.previous).toHaveBeenCalledOnce();
+      expect(next.isError).toBe(true);
+      expect(musicService.skip).not.toHaveBeenCalled();
     });
 
     it("starts CONNECT_MUSIC with the profile's player and returns at once", async () => {
@@ -193,10 +194,10 @@ describe("music MCP tools", () => {
       const { call } = await mcpClient(h.handler);
 
       await call("music", { action: "connect" });
-      const next = await call("music", { action: "next" });
+      const previous = await call("music", { action: "previous" });
 
-      expect(next.value).toMatchObject({ done: true });
-      expect(musicService.skip).toHaveBeenCalledOnce();
+      expect(previous.value).toMatchObject({ done: true });
+      expect(musicService.previous).toHaveBeenCalledOnce();
       expect(h.pushed(APP_EVENTS_RESPONSE.MUSIC_CONNECTED)).toEqual([]);
       finish({ success: true });
       await vi.waitFor(() =>

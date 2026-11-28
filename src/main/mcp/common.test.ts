@@ -272,10 +272,13 @@ describe("invokeOk", () => {
   const stack = () => {
     const events = createStack("system");
     events.push(APP_EVENTS.CONTROL, (_h, e, { action }) => {
-      if (action === "pause") {
+      if (action === "pause" || action === "replayAlert") {
         e.reply(APP_EVENTS_RESPONSE.CONTROL, {
           success: false,
-          error: { code: FEEDBACK_CODES.CONTROL_FAILED, message: "No way." },
+          // Without a message, as a CONNECT that failed everywhere
+          ...(action === "pause" && {
+            error: { code: FEEDBACK_CODES.CONTROL_FAILED, message: "No way." },
+          }),
           action,
           done: false,
           paused: false,
@@ -323,6 +326,24 @@ describe("invokeOk", () => {
 
     expect(error).toEqual({
       content: [{ type: "text", text: "No way." }],
+      isError: true,
+    });
+  });
+
+  it("says the notices tell why when a failure reply has no message", async () => {
+    const h = createHandler({}, { stack: stack() });
+
+    const { error } = await invokeOk(
+      h.handler,
+      APP_EVENTS.CONTROL,
+      { action: "replayAlert" },
+      APP_EVENTS_RESPONSE.CONTROL,
+    );
+
+    expect(error).toEqual({
+      content: [
+        { type: "text", text: "It didn't work: Tokio's notices say why." },
+      ],
       isError: true,
     });
   });

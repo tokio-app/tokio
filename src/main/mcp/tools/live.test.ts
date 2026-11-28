@@ -506,6 +506,14 @@ describe("live MCP tools", () => {
 
       expect(res.value).toMatchObject({ activity: [{ id: 3 }] });
     });
+
+    it("filters Super Chats", async () => {
+      const { call } = await mcpClient(setup().handler);
+
+      const res = await call("get_activity", { types: ["superchat"] });
+
+      expect(res.value).toMatchObject({ activity: [{ id: 7 }] });
+    });
   });
 
   describe("live", () => {
@@ -719,6 +727,24 @@ describe("live MCP tools", () => {
       expect(invoke).toHaveBeenCalledWith(APP_EVENTS.DISCONNECT, {
         platform: "kick",
       });
+    });
+
+    it("refuses the field the other action takes, naming the right one", async () => {
+      const { h } = setup(undefined, "saved");
+      const invoke = vi.spyOn(h.handler, "invoke");
+      const { call } = await mcpClient(h.handler);
+
+      const off = await call("live", {
+        action: "disconnect",
+        platforms: ["kick"],
+      });
+      const on = await call("live", { action: "connect", platform: "kick" });
+
+      expect(off).toMatchObject({ isError: true });
+      expect(off.text).toContain("`platform`");
+      expect(on).toMatchObject({ isError: true });
+      expect(on.text).toContain("`platforms`");
+      expect(invoke).not.toHaveBeenCalled();
     });
 
     it("needs a Kick channel when the profile has none", async () => {

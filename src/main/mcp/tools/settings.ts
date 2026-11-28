@@ -147,7 +147,7 @@ export const sections: Sections = {
       return error ?? ok("Saved.");
     },
     notes:
-      "The kinds of events Home's activity feed keeps from each platform, for every profile: kick.chat false hides Kick's chats and keeps the others'. Hiding one drops its items already in the feed; they still count toward the LIVE's totals. A platform sends only some kinds: tiktok chat, gift, follow, share, superfan and join; twitch chat, follow, sub, giftsub, cheer, raid and redeem; youtube chat, gift, sub and giftsub (its memberships) and superchat; kick chat, sub, giftsub, raid, redeem and kicks.",
+      "The kinds of events Home's activity feed keeps from each platform, for every profile: kick.chat false hides Kick's chats and keeps the others'. Hiding one drops its items already in the feed; they still count toward the LIVE's totals.",
   }),
 
   app: defineSection({
@@ -198,9 +198,18 @@ export const sections: Sections = {
       return { skipSong, stopTts, replayAlert, pause };
     },
     write: async (handler, values) => {
+      // The action holding each combination, its parts sorted: Shift+Ctrl+S
+      // is Ctrl+Shift+S. A second one can't register, and is reported as
+      // another app's.
+      const holders = new Map<string, string>();
       const problems = Object.entries(values).flatMap(
         ([action, accelerator]) => {
-          const problem = shortcutProblem(accelerator);
+          const keys = accelerator.split("+").sort().join("+");
+          const other = accelerator === "" ? undefined : holders.get(keys);
+          if (!other) holders.set(keys, action);
+          const problem =
+            shortcutProblem(accelerator) ??
+            (other && `${other} has it too, give one of them another`);
           return problem ? [`${action} (${accelerator}): ${problem}`] : [];
         },
       );

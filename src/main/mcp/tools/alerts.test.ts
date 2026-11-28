@@ -267,6 +267,7 @@ describe("alerts MCP tools", () => {
             ...createAlert().trigger,
             type: TOKIO_EVENTS.GIFT,
             gifts: [2],
+            platform: "tiktok",
           },
         }),
       ]);
@@ -281,7 +282,11 @@ describe("alerts MCP tools", () => {
             id: "a2",
             name: "Roses",
             enabled: true,
-            trigger: { type: TOKIO_EVENTS.GIFT, gifts: [2] },
+            trigger: {
+              type: TOKIO_EVENTS.GIFT,
+              platform: "tiktok",
+              gifts: [2],
+            },
             also_triggers: [],
             sound: null,
             message: null,
@@ -438,6 +443,41 @@ describe("alerts MCP tools", () => {
       });
     });
 
+    it("replaces its voice whole, never keeping the last engine's id", async () => {
+      const s = setup([
+        alert({
+          tts: {
+            voice: {
+              engine: "elevenlabs",
+              name: "Rachel",
+              lang: "en",
+              id: "r1",
+            },
+            message: "Hi",
+            speed: 1,
+            pitch: 1,
+          },
+        }),
+      ]);
+      const { call } = await mcpClient(s.h.handler);
+
+      const res = await call("save_item", {
+        kind: "alert",
+        id: "a1",
+        changes: {
+          tts: { voice: { engine: "edge", name: "Ana", lang: "es-MX" } },
+        },
+      });
+
+      expect(res.isError).toBe(false);
+      expect(s.profile.alerts.items[0].tts).toEqual({
+        voice: { engine: "edge", name: "Ana", lang: "es-MX", id: "" },
+        message: "Hi",
+        speed: 1,
+        pitch: 1,
+      });
+    });
+
     it.each([
       ["a sound not in the library", { sound: { file: "gone.mp3" } }],
       ["media not in the library", { media: { file: "gone.png" } }],
@@ -465,6 +505,22 @@ describe("alerts MCP tools", () => {
       });
 
       expect(res.isError).toBe(true);
+    });
+
+    it("says the profile couldn't be read, not that the alert is missing", async () => {
+      const s = setup();
+      Object.assign(s.storeManagerService, {
+        getProfileData: async () => null,
+      });
+      const { call } = await mcpClient(s.h.handler);
+
+      for (const res of [
+        await call("get", { kind: "alert", id: "a1" }),
+        await call("test", { kind: "alert", id: "a1" }),
+      ]) {
+        expect(res.isError).toBe(true);
+        expect(res.text).toContain("The active profile couldn't be read.");
+      }
     });
 
     it("refuses a save when the profile switched meanwhile", async () => {

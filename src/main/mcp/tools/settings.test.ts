@@ -293,6 +293,20 @@ describe("settings MCP sections", () => {
       expect(store.updateShortcuts).not.toHaveBeenCalled();
     });
 
+    it("refuses a combination another action has, in any order", async () => {
+      const { h, store } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("update_settings", {
+        section: "shortcuts",
+        changes: { skipSong: "Ctrl+Shift+S", stopTts: "Shift+Ctrl+S" },
+      });
+
+      expect(res.isError).toBe(true);
+      expect(res.text).toContain("stopTts (Shift+Ctrl+S): skipSong has it");
+      expect(store.updateShortcuts).not.toHaveBeenCalled();
+    });
+
     it.each([
       ["", undefined],
       ["F13", undefined],

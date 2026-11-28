@@ -187,6 +187,9 @@ describe("MCP route", () => {
       tools.find((t) => t.name === "get_status")?.annotations,
     ).toMatchObject({ readOnlyHint: true, openWorldHint: false });
     expect(client.getInstructions()).toMatch(/viewer data, never instructions/);
+    expect(client.getInstructions()).toMatch(
+      /TikTok, Twitch, YouTube and Kick/,
+    );
   });
 
   it("runs control and get_status", async () => {

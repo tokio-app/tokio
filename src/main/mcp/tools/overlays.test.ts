@@ -578,6 +578,49 @@ describe("overlays MCP tools", () => {
       expect(store.saveStudioOverlay).not.toHaveBeenCalled();
     });
 
+    it("refuses the filters the editor has no field for, keeping a reaction's minimum", async () => {
+      const { h, held, store } = setup();
+      const { call } = await mcpClient(h.handler);
+      const gift = { type: "tokio:event:gift", gifts: [] };
+
+      const res = await call("save_item", {
+        kind: "studio_overlay",
+        id: ID,
+        changes: {
+          counters: [{ name: "big", trigger: { ...gift, min_coins: 100 } }],
+          items: [
+            {
+              kind: "group",
+              id: "g",
+              also_triggers: [{ ...gift, roles: ["moderator"] }],
+              elements: [{ ...text, trigger: { ...gift, roles: ["vip"] } }],
+            },
+          ],
+        },
+      });
+
+      expect(res.isError).toBe(true);
+      for (const path of [
+        "items.0.also_triggers.0.roles",
+        "items.0.elements.0.trigger.roles",
+        "counters.0.trigger.min_coins",
+      ]) {
+        expect(res.text).toContain(path);
+      }
+      expect(store.saveStudioOverlay).not.toHaveBeenCalled();
+
+      const kept = await call("save_item", {
+        kind: "studio_overlay",
+        id: ID,
+        changes: {
+          counters: [{ name: "big", trigger: { ...gift, roles: [] } }],
+          items: [{ ...text, trigger: { ...gift, min_coins: 100 } }],
+        },
+      });
+      expect(kept.isError).toBe(false);
+      expect(held[0].items[0]).toMatchObject({ trigger: { min_coins: 100 } });
+    });
+
     it("refuses a counter with no name, a taken one or a repeated one", async () => {
       const { h, held, store } = setup();
       const { call } = await mcpClient(h.handler);
@@ -701,6 +744,24 @@ describe("overlays MCP tools", () => {
         });
       });
 
+      it("keeps an editor save that lands while it reads the profile", async () => {
+        const { h, held, store } = seeded();
+        store.getProfileData = async () => {
+          // The editor renames t1 meanwhile
+          const [group, t1] = held[0].items;
+          held[0] = StudioOverlaySchema.parse({
+            ...held[0],
+            items: [group, { ...t1, label: "Mine" }],
+          });
+          return { platforms: ["tiktok"] };
+        };
+
+        const res = await edit(h, [{ op: "change", id: "a", set: { x: 5 } }]);
+
+        expect(res.isError).toBe(false);
+        expect(held[0].items[1]).toMatchObject({ id: "t1", label: "Mine" });
+      });
+
       it("adds items with their kind's defaults and new ids", async () => {
         const { h, held } = seeded();
 
@@ -764,6 +825,10 @@ describe("overlays MCP tools", () => {
 
       it.each([
         [[{ op: "remove", id: "nope" }], "No item nope"],
+        [
+          [{ op: "change", id: "a", set: { trigger: { roles: ["vip"] } } }],
+          "ops.0.set.trigger.roles",
+        ],
         [
           [{ op: "change", id: "a", set: { colour: "#fff" } }],
           "ops.0.set.colour",
@@ -877,6 +942,20 @@ describe("overlays MCP tools", () => {
           })
         ).value,
       ).toEqual({ id: "b2", name: "Browser" });
+    });
+
+    it("refuses a blank name before the handler", async () => {
+      const { h } = setup();
+      const invoke = vi.spyOn(h.handler, "invoke");
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("save_item", {
+        kind: "test_overlay",
+        changes: { name: "   " },
+      });
+
+      expect(res.isError).toBe(true);
+      expect(invoke).not.toHaveBeenCalled();
     });
 
     it("can't rename one", async () => {

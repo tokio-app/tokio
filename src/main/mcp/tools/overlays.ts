@@ -12,12 +12,7 @@ import {
   StudioOverlaySchema,
   StudioTriggerSchema,
 } from "@/common/schemas";
-import {
-  APP_EVENTS,
-  APP_EVENTS_RESPONSE,
-  AppEventsMap,
-  type Platform,
-} from "@/common/types";
+import { APP_EVENTS, APP_EVENTS_RESPONSE, type Platform } from "@/common/types";
 import {
   ALERT_MESSAGE_VARIABLES,
   catalogState,
@@ -34,12 +29,12 @@ import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import {
   activeProfile,
-  type CallToolResult,
   deepMerge,
   fail,
   invalid,
   invokeOk,
   ok,
+  refuseKeys,
   unknownKeys,
   unknownTriggerKeys,
 } from "../common";
@@ -78,6 +73,38 @@ const findTestOverlay = ({ overlayService }: Handler, id: string) =>
 const elementSchema = (kind: unknown) =>
   StudioElementSchema.options.find((o) => o.shape.kind.value === kind);
 
+// Filters the editor has no field for, so the streamer couldn't see or
+// clear them (triggers.md): reactions show the minimum only, counters
+// neither. A default passes, since a copy of a stored overlay sends them.
+const NO_FIELD = { min_coins: 0, roles: [] };
+
+function hiddenKeys(
+  item: unknown,
+  prefix: string,
+  fields: (keyof typeof NO_FIELD)[],
+): string[] {
+  if (!isRecord(item)) return [];
+  const also: unknown[] = Array.isArray(item.also_triggers)
+    ? item.also_triggers
+    : [];
+  const rows: [string, unknown][] = [
+    ["trigger", item.trigger],
+    ...also.map((row, i): [string, unknown] => [`also_triggers.${i}`, row]),
+  ];
+  return rows.flatMap(([path, row]) =>
+    isRecord(row)
+      ? fields
+          .filter(
+            (f) =>
+              Object.hasOwn(row, f) && !isDeepStrictEqual(row[f], NO_FIELD[f]),
+          )
+          .map(
+            (f) => `${prefix}${path}.${f} (Overlay Studio has no such filter)`,
+          )
+      : [],
+  );
+}
+
 const unknownElementKeys = (element: unknown, prefix: string) => [
   ...unknownKeys(
     elementSchema(isRecord(element) ? element.kind : undefined) ??
@@ -86,11 +113,13 @@ const unknownElementKeys = (element: unknown, prefix: string) => [
     prefix,
   ),
   ...unknownTriggerKeys(StudioTriggerSchema, element, prefix),
+  ...hiddenKeys(element, prefix, ["roles"]),
 ];
 
 const unknownGroupKeys = (group: unknown, prefix: string) => [
   ...unknownKeys(StudioGroupSchema, group, prefix),
   ...unknownTriggerKeys(StudioTriggerSchema, group, prefix),
+  ...hiddenKeys(group, prefix, ["roles"]),
 ];
 
 // unknownKeys stops at arrays, and a studio overlay is mostly its items: a
@@ -119,9 +148,10 @@ const CounterSchema = StudioOverlaySchema.shape.counters.unwrap().element;
 
 const unknownCounterKeys = (counters: unknown): string[] =>
   Array.isArray(counters)
-    ? counters.flatMap((counter: unknown, i) =>
-        unknownKeys(CounterSchema, counter, `counters.${i}.`),
-      )
+    ? counters.flatMap((counter: unknown, i) => [
+        ...unknownKeys(CounterSchema, counter, `counters.${i}.`),
+        ...hiddenKeys(counter, `counters.${i}.`, ["min_coins", "roles"]),
+      ])
     : [];
 
 // The names a text already fills: a counter named so would never show
@@ -155,21 +185,6 @@ function newStudioName({ storeManagerService }: Handler) {
   return t("studio.newName", { number });
 }
 
-// Studio's handlers reply STUDIO to the window, failures included: only
-// invoke's error matters here
-const studioInvoke = async <
-  K extends
-    | APP_EVENTS.ADD_STUDIO_OVERLAY
-    | APP_EVENTS.SAVE_STUDIO_OVERLAY
-    | APP_EVENTS.REMOVE_STUDIO_OVERLAY
-    | APP_EVENTS.TEST_STUDIO_OVERLAY,
->(
-  handler: Handler,
-  event: K,
-  data: AppEventsMap[K],
-): Promise<CallToolResult | undefined> =>
-  (await invokeOk(handler, event, data)).error;
-
 const TRIGGER_VARIABLES = ALERT_TRIGGERS.map((trigger) => {
   const names = countedVariables(trigger).map((n) => `{${n}}`);
   return `${trigger}: ${names.join(" ") || "none"}`;
@@ -177,7 +192,10 @@ const TRIGGER_VARIABLES = ALERT_TRIGGERS.map((trigger) => {
 
 const StudioChanges = StudioOverlaySchema.omit({ id: true });
 
-const TestOverlayChanges = z.object({ name: z.string().min(1) }).strict();
+// Trimmed: the handler logs a blank name as an error
+const TestOverlayChanges = z
+  .object({ name: z.string().trim().min(1) })
+  .strict();
 
 export const kinds: Kinds = {
   overlays: defineKind({
@@ -285,7 +303,7 @@ export const kinds: Kinds = {
       "Every element can have a shadow (shadow_x and shadow_y 0 make a glow) and a blur. Texts take an outline, letter_spacing and line_height (% of size), italic and caps; texts and shapes a gradient from color into gradient_color at gradient_angle (CSS degrees: 90 runs left to right).",
       "when: always (on screen), event (hidden until its trigger, then shows for seconds with its entrance and exit), animate (on screen, plays its animation on each trigger) or loop (on screen, plays idle forever). A group reacts as one, its elements keep their own when. On Like it reacts every likes_every likes from all viewers.",
       `It also reacts to each of also_triggers (up to 4 more), and waits delay seconds (0 to 10) before it plays. A trigger of type ${GOAL_TRIGGER} reacts once per LIVE when number (a LIVE number but uptime, or a counter's name) reaches goal. counters (up to 10) count a trigger during the LIVE, a gift by its gifts and a Like by its likes, and texts show each as {name}: a name of word characters, not empty, taken or a LIVE number's.`,
-      `Texts can say ${STUDIO_NUMBERS.map((n) => `{${n}}`).join(" ")} (the LIVE's numbers; each currency is its platform's, never added up: {coins} TikTok's coins, {kicks} Kick's Kicks, {bits} Twitch's Bits, {superchats} YouTube's Super Chats in US dollars, a dash until the exchange rates load; {giftsubs} counts the subs gifted on Twitch, YouTube and Kick) and, while they react, their trigger's variables: ${TRIGGER_VARIABLES}. Trigger values and fields are the alert kind's (describe alert), min_coins's units included.`,
+      `Texts can say ${STUDIO_NUMBERS.map((n) => `{${n}}`).join(" ")} (the LIVE's numbers; each currency is its platform's, never added up: {coins} TikTok's coins, {kicks} Kick's Kicks, {bits} Twitch's Bits, {superchats} YouTube's Super Chats in US dollars, a dash until the exchange rates load; {giftsubs} counts the subs gifted on Twitch, YouTube and Kick) and, while they react, their trigger's variables: ${TRIGGER_VARIABLES}. Trigger values and fields are the alert kind's (describe alert), min_coins's units included, but reactions take no roles, and counters neither roles nor min_coins: the editor has no field for them.`,
       "test plays every reacting element and group once on stream, with samples.",
       "To change single items, use edit_studio_overlay instead of resending items.",
       "preview_studio_overlay returns a picture of the overlay.",
@@ -312,15 +330,11 @@ export const kinds: Kinds = {
       return ok({ ...overlay, url: getStudioOverlayURL(id) });
     },
     save: async (handler, id, changes) => {
-      const unknown = [
+      const unknown = refuseKeys([
         ...unknownItemKeys(changes.items),
         ...unknownCounterKeys(changes.counters),
-      ];
-      if (unknown.length > 0) {
-        return fail(
-          `Unknown settings: ${unknown.join(", ")}. Nothing was saved: see describe for the fields.`,
-        );
-      }
+      ]);
+      if (unknown) return unknown;
       const stored =
         id === undefined
           ? { id: randomUUID(), name: newStudioName(handler) }
@@ -338,14 +352,14 @@ export const kinds: Kinds = {
       if (problem) return fail(`${problem} Nothing was saved.`);
 
       if (id === undefined) {
-        const error = await studioInvoke(
+        const { error } = await invokeOk(
           handler,
           APP_EVENTS.ADD_STUDIO_OVERLAY,
           { id: overlay.id, name: overlay.name },
         );
         if (error) return error;
       }
-      const error = await studioInvoke(
+      const { error } = await invokeOk(
         handler,
         APP_EVENTS.SAVE_STUDIO_OVERLAY,
         { overlay },
@@ -361,20 +375,22 @@ export const kinds: Kinds = {
     },
     remove: async (handler, id) => {
       if (!findStudio(handler, id)) return fail(`No studio overlay ${id}.`);
-      return (
-        (await studioInvoke(handler, APP_EVENTS.REMOVE_STUDIO_OVERLAY, {
-          id,
-        })) ?? ok("Removed.")
+      const { error } = await invokeOk(
+        handler,
+        APP_EVENTS.REMOVE_STUDIO_OVERLAY,
+        { id },
       );
+      return error ?? ok("Removed.");
     },
     test: async (handler, id) => {
       if (id === undefined) return needsId("studio overlay");
       if (!findStudio(handler, id)) return fail(`No studio overlay ${id}.`);
-      return (
-        (await studioInvoke(handler, APP_EVENTS.TEST_STUDIO_OVERLAY, {
-          id,
-        })) ?? ok("Played on its browser sources.")
+      const { error } = await invokeOk(
+        handler,
+        APP_EVENTS.TEST_STUDIO_OVERLAY,
+        { id },
       );
+      return error ?? ok("Played on its browser sources.");
     },
   }),
 
@@ -750,11 +766,12 @@ export const tools: ToolDef<any>[] = [
     input: EditInput,
     annotations: WRITE,
     run: async (handler, { id, ops }) => {
+      // Before the read: an editor save landing in this wait would be saved over
+      const platforms = (await activeProfile(handler))?.platforms ?? ["tiktok"];
       const stored = findStudio(handler, id);
       if (!stored) return fail(`No studio overlay ${id}.`);
       const items = structuredClone(stored.items);
       const added: string[] = [];
-      const platforms = (await activeProfile(handler))?.platforms ?? ["tiktok"];
       for (const [i, op] of ops.entries()) {
         try {
           added.push(
@@ -768,7 +785,7 @@ export const tools: ToolDef<any>[] = [
       }
       const parsed = StudioOverlaySchema.safeParse({ ...stored, items });
       if (!parsed.success) return invalid(parsed.error);
-      const error = await studioInvoke(
+      const { error } = await invokeOk(
         handler,
         APP_EVENTS.SAVE_STUDIO_OVERLAY,
         { overlay: parsed.data },

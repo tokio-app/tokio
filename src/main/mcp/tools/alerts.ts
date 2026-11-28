@@ -38,7 +38,9 @@ import {
   invalid,
   invokeOk,
   ok,
+  profileOf,
   pushProfile,
+  refuseKeys,
   unknownTriggerKeys,
   PLATFORM_NOTE,
 } from "../common";
@@ -67,8 +69,6 @@ const AlertsSettingsSchema = ProfileSchema.shape.alerts
 // What save_item can change: the id is the alert's for good
 const AlertChangesSchema = AlertItemSchema.omit({ id: true });
 
-const NO_PROFILE = "The active profile isn't loaded.";
-
 /**
  * Saves the alerts section through its handler, then sends the window the
  * profile. Called right after a guardProfile check: invoke runs before any
@@ -95,8 +95,10 @@ const triggerSummary = ({
   user,
   min_coins,
   roles,
+  platform,
 }: Alert["trigger"]) => ({
   type,
+  ...(platform && { platform }),
   ...(gifts.length > 0 && { gifts }),
   ...(every_gift && { every_gift }),
   ...(emotes.length > 0 && { emotes }),
@@ -147,6 +149,12 @@ function mergeAlert(
   const merged = deepMerge(base, changes);
   if (!isRecord(merged))
     return { error: fail("The changes must be an object.") };
+  // A voice is replaced whole: merged, it would keep the last engine's id,
+  // which the engines read first (tts.md)
+  const voice = isRecord(changes.tts) ? changes.tts.voice : undefined;
+  if (isRecord(voice) && isRecord(merged.tts)) {
+    merged.tts.voice = { id: "", ...voice };
+  }
   // Arrays replace: a new row has no stored gifts to merge onto
   if (Array.isArray(merged.also_triggers)) {
     merged.also_triggers = merged.also_triggers.map((row: unknown) =>
@@ -216,16 +224,14 @@ export const sections: Sections = {
   alerts: defineSection({
     schema: AlertsSettingsSchema,
     read: async (handler) => {
-      const profile = await activeProfile(handler);
-      if (!profile) throw new Error(NO_PROFILE);
+      const profile = await profileOf(handler);
       const { simultaneous, queue_length } = profile.alerts;
       return { simultaneous, queue_length };
     },
     write: async (handler, values) => {
       // The read below waits: check again right before the invoke
       const changed = guardProfile(handler);
-      const profile = await activeProfile(handler);
-      if (!profile) return fail(NO_PROFILE);
+      const profile = await profileOf(handler);
       const error =
         changed() ??
         (await saveAlerts(handler, {
@@ -248,11 +254,10 @@ export const kinds: Kinds = {
       `trigger.type is one of: ${ALERT_TRIGGERS.join(", ")}. gifts (TikTok's gift ids from list gifts, empty for any) and every_gift are for gift triggers. min_coins is a trigger's minimum in its event's own unit, 0 for none: on ${TOKIO_EVENTS.GIFT}, only for any gift, the streak's worth when it ends (each gift's with every_gift) in TikTok's coins (YouTube's gifts have no price, so a min_coins above 0 never matches them, and Kick sends no gifts); on ${TOKIO_EVENTS.CHEER}, Bits; on ${TOKIO_EVENTS.KICKS}, Kick's Kicks; on ${TOKIO_EVENTS.SUPER_CHAT}, US dollars at the day's exchange rates (a Super Chat whose dollars aren't known, before the rates load or in a currency they lack, always matches); on ${TOKIO_EVENTS.GIFT_SUB}, the subs gifted at once. Other triggers ignore it. emotes (ids from list emotes, empty for any) for the emote trigger; keyword (whole words) for chat; user (a handle or name) for member and super fan joins; roles (follower, moderator, superfan, vip) only for chat, emote and gift: TikTok's say follower, moderator and superfan; Twitch's, YouTube's and Kick's chat and emotes say moderator and superfan (their subscribers or members), Twitch's and Kick's vip too, never follower, and their gifts none.`,
       `${PLATFORM_NOTE} Each of also_triggers has its own.`,
       "sound and media take a file from list sounds and list media ({ file } is enough; the name comes from the library). A sound plays from start to end seconds (end null: to its end); media shows for duration seconds (1–60), at least while the sound plays, and a video plays its cut at its own volume. Ask the streamer which sound or picture they want; add_to_library adds new ones. null clears one.",
-      `tts: { voice, message, speed, pitch }, voice from list_voices ({ engine, name, lang, id }). The message can hold its trigger's variables: ${VARIABLES}. {count} is a gift streak's total, or a like batch's likes. volume (0–100) is the sound's or message's.`,
+      `tts: { voice, message, speed, pitch }, voice from list_voices ({ engine, name, lang, id }), replaced whole, so send all four. The message can hold its trigger's variables: ${VARIABLES}. {count} is a gift streak's total, or a like batch's likes. volume (0–100) is the sound's or message's.`,
     ].join("\n"),
     list: async (handler, { query, limit }) => {
-      const profile = await activeProfile(handler);
-      if (!profile) return fail(NO_PROFILE);
+      const profile = await profileOf(handler);
       const wanted = query?.toLowerCase();
       const found = profile.alerts.items.filter(
         (a) => !wanted || a.name.toLowerCase().includes(wanted),
@@ -263,8 +268,8 @@ export const kinds: Kinds = {
       });
     },
     get: async (handler, id) => {
-      const profile = await activeProfile(handler);
-      const alert = profile?.alerts.items.find((a) => a.id === id);
+      const profile = await profileOf(handler);
+      const alert = profile.alerts.items.find((a) => a.id === id);
       if (!alert) return fail(`No alert has the id ${id}.`);
       return ok({
         ...AlertItemSchema.parse(alert),
@@ -272,16 +277,11 @@ export const kinds: Kinds = {
       });
     },
     save: async (handler, id, changes) => {
-      const unknown = unknownTriggerKeys(TriggerSchema, changes);
-      if (unknown.length > 0) {
-        return fail(
-          `Unknown settings: ${unknown.join(", ")}. Nothing was saved: see describe for the fields.`,
-        );
-      }
+      const unknown = refuseKeys(unknownTriggerKeys(TriggerSchema, changes));
+      if (unknown) return unknown;
       const changed = guardProfile(handler);
       const { storeManagerService } = handler;
-      const profile = await activeProfile(handler);
-      if (!profile) return fail(NO_PROFILE);
+      const profile = await profileOf(handler);
       const { items } = profile.alerts;
       const index =
         id === undefined ? items.length : items.findIndex((a) => a.id === id);
@@ -306,8 +306,7 @@ export const kinds: Kinds = {
     },
     remove: async (handler, id) => {
       const changed = guardProfile(handler);
-      const profile = await activeProfile(handler);
-      if (!profile) return fail(NO_PROFILE);
+      const profile = await profileOf(handler);
       const { items } = profile.alerts;
       if (!items.some((a) => a.id === id)) {
         return fail(`No alert has the id ${id}.`);
@@ -321,9 +320,9 @@ export const kinds: Kinds = {
       return error ?? ok("Removed.");
     },
     test: async (handler, id) => {
-      const profile = await activeProfile(handler);
-      const alert = profile?.alerts.items.find((a) => a.id === id);
-      if (!profile || !alert) return fail(`No alert has the id ${id}.`);
+      const profile = await profileOf(handler);
+      const alert = profile.alerts.items.find((a) => a.id === id);
+      if (!alert) return fail(`No alert has the id ${id}.`);
       const { tts, sound, media, volume } = alert;
       if (!tts && !sound && !media) {
         return fail("The alert has no sound, message or media to test.");
@@ -461,8 +460,7 @@ export const kinds: Kinds = {
     notes:
       "The emotes viewers used in the active profile's LIVEs (TikTok can't list them otherwise), oldest first. An emote trigger takes their ids.",
     list: async (handler, { query, limit }) => {
-      const profile = await activeProfile(handler);
-      if (!profile) return fail(NO_PROFILE);
+      const profile = await profileOf(handler);
       const found = profile.emotes.filter(
         (e) => !query || e.id.includes(query),
       );
