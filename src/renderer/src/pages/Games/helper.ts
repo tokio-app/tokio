@@ -25,7 +25,9 @@ import {
   JAVA_ONLY_STEPS,
   MINECRAFT_NAMES,
   MINECRAFT_PORT,
+  NETHERITE_ARMOR,
   NETHERITE_KIT,
+  NOT_MOBS,
   StepKind,
   TIME_NAMES,
   WEATHER_NAMES,
@@ -72,16 +74,6 @@ export const ITEMS: Record<MinecraftEdition, SelectOption<string>[]> = {
   java: options(MINECRAFT_NAMES.java.items),
 };
 
-// What Java summons but isn't a living mob, and Tokio's chicken jockey (two
-// mobs), which the mod can't turn the player into
-const NOT_MOBS = [
-  "tnt",
-  "lightning_bolt",
-  "end_crystal",
-  "experience_orb",
-  "firework_rocket",
-  "chicken_jockey",
-];
 export const MORPH_MOBS = MOBS.java.filter(
   ({ value }) => !NOT_MOBS.includes(value),
 );
@@ -185,7 +177,9 @@ function idIn(
   if (Object.hasOwn(names, id)) return id;
   const renamed = RENAMED.get(id);
   if (renamed && Object.hasOwn(names, renamed)) return renamed;
-  const name = MINECRAFT_NAMES[from][kind][id]?.toLowerCase();
+  const known = MINECRAFT_NAMES[from][kind];
+  // hasOwn: an id like "constructor" is on every object
+  const name = Object.hasOwn(known, id) ? known[id].toLowerCase() : undefined;
   const same = Object.keys(names).find(
     (other) => names[other].toLowerCase() === name,
   );
@@ -220,14 +214,6 @@ export function withEdition(
   return { ...action, edition, steps };
 }
 
-// What the Netherite armor help puts on
-export const NETHERITE_ARMOR = [
-  "netherite_helmet",
-  "netherite_chestplate",
-  "netherite_leggings",
-  "netherite_boots",
-];
-
 // What the Netherite kit help puts on and gives
 export const NETHERITE_KIT_ITEMS = [
   ...NETHERITE_ARMOR,
@@ -239,7 +225,7 @@ const NUMERALS = ["", "", " II", " III", " IV", " V"];
 
 // The enchantments the items get between them, named as the game names
 // them: "Sharpness V, Sweeping Edge III, …, and Mending"
-export function enchantmentsText(items: string[], language: string) {
+export function enchantmentsText(items: readonly string[], language: string) {
   const names = bestEnchantments(...items).map(
     ([id, level]) =>
       translate(language, `minecraft.enchantment.${id}`) + NUMERALS[level],

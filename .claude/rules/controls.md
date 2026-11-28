@@ -23,8 +23,8 @@ Skip song, stop TTS, replay the last alert and pause everything (`CONTROL_ACTION
 - Skip (`MusicService.skip`) waits behind song searches as `!next` does, with no cooldown or permissions. A waiting request plays; otherwise the player's own Next runs, and `endCurrent` drops the skipped request at once, since `remaining()` would notice only within `MOVED_CHECK_MS`. YouTube's Next selector is `NEXT_BUTTON` in its config: fix it there when YouTube changes. A failed Next is only logged.
 - Replay sends the last LIVE event's alerts again, once each (`repeat: 1`), even with alerts off or paused: it's an explicit press. Each `dispatchAlert` call (`init.ts`) collects its payloads in one array, recorded with its first, so spoken alerts made later join their own event.
 - Pause holds reactions while the music plays on (the user's call):
-  - Pausing stops TTS and alerts (the same pairs as Home's switches) and drops the game backlogs (`GamesService.stopRuns`).
-  - While paused, `handleChat`, `dispatchAlert` and `dispatchGames` return at once. So does the alert send callback, for a spoken alert finished after the pause came. Nothing from the pause plays later.
+  - Pausing stops TTS and alerts (the same pairs as Home's switches, but `clear({ streaks: false })`) and drops the game backlogs (`GamesService.stopRuns`).
+  - While paused, `handleChat` returns at once. `dispatchAlert` and `dispatchGames` return after their profile read, so an event read during the pause doesn't play, and call `skip`, which counts it in their gift streaks: a combo paused at 10 and resumed at 50 plays only what came after Resume. So does the alert send callback, for a spoken alert finished after the pause came. Nothing from the pause plays later.
   - `handleChat` returns before its `else` branches: their `clearHandler()` would empty the song queue.
   - It lives in memory. `CONNECTED` clears it, so a new LIVE never starts silent.
   - Home shows it: it asks `GET_CONTROLS` on mount, since a reload mid-pause misses the `CONTROLS` push.

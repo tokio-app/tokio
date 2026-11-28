@@ -1,3 +1,4 @@
+import type { MessageKey } from "../i18n";
 import { GamesOverlay, GamesSettings, MinecraftEdition } from "../schemas";
 
 // A game's connection: off, waiting for the game to connect, connected, or
@@ -37,6 +38,9 @@ export type CommandResult = {
   message: string;
   // The game left or was replaced before it answered
   dropped?: true;
+  // The message's key when Tokio failed the command, not the game: it
+  // never reached the game, or got no answer
+  key?: MessageKey;
 };
 
 // One action on the games overlay: its event, an arrow, then its picture and

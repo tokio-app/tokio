@@ -95,7 +95,7 @@ The trigger rows, their matching, minimums and roles are in `.claude/rules/trigg
 - `{count}` in a gift alert's message is the streak's total, not TikTok's `comboCount`. It isn't offered on every gift; a message that has it gets the count so far. One event that adds several gifts makes the message once and sends one `ALERT_AUDIO` with `repeat`.
 - `_generate(..., false)` doesn't log a live alert's failed message; previews (`speak`) log their own, which `speakTest` counts on.
 - A TTS test (`TEST_ALERT`'s `tts` branch) fills the message with a sample from the `platform` it carries: the row's own, else the profile's first that sends its event (`samplePlatform`), which every caller resolves (the row's Play, the editor's Sound tab, the sound picker's TTS tab, MCP's alert test). Without one it's TikTok's (Music change).
-- `AlertsService.clear` runs wherever `ALERT_CLEAR` is sent: it drops the waiting messages, sounds and media, hides the media shown, and forgets the gift streaks, since their ends may be missed.
+- `AlertsService.clear` runs wherever `ALERT_CLEAR` is sent: it drops the waiting messages, sounds and media, hides the media shown, and forgets the gift streaks, since their ends may be missed. Pause keeps them (`clear({ streaks: false })`, `.claude/rules/controls.md`).
 
 ## Media
 

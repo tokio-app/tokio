@@ -324,6 +324,7 @@ describe("MinecraftConnection", () => {
       command: "say late",
       ok: false,
       message: "Too many commands are waiting.",
+      key: "main.minecraft.tooManyWaiting",
     });
     await vi.waitFor(() => expect(fake.requests).toHaveLength(MAX_IN_FLIGHT));
 
@@ -352,6 +353,7 @@ describe("MinecraftConnection", () => {
       command: "say lost",
       ok: false,
       message: "Minecraft didn't answer.",
+      key: "main.minecraft.noAnswer",
     });
     fake.reply = () => ({ statusCode: 0 });
     expect((await connection.send("say next")).ok).toBe(true);
@@ -394,6 +396,7 @@ describe("MinecraftConnection", () => {
       command: "say hi",
       ok: false,
       message: "Minecraft se desconectó.",
+      key: "main.minecraft.disconnected",
       dropped: true,
     });
   });
@@ -404,6 +407,7 @@ describe("MinecraftConnection", () => {
       command: "say hi",
       ok: false,
       message: "Minecraft isn't connected.",
+      key: "main.minecraft.notConnected",
     });
   });
 
@@ -486,6 +490,7 @@ describe("MinecraftConnection", () => {
       command: "summon cow ~ ~ ~",
       ok: false,
       message: "Minecraft isn't connected.",
+      key: "main.minecraft.notConnected",
       dropped: true,
     });
     expect((await connection.send("say hi", "java")).ok).toBe(true);

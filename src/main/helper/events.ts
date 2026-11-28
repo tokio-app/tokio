@@ -60,7 +60,6 @@ class EventStack {
     callback: EventCallback<E>,
     options: EventOptions<E> = {},
   ) {
-    if (!event || !callback) return;
     this.evs.push({
       event,
       callback,
@@ -155,6 +154,7 @@ const PRIVATE_REPLIES: ReadonlySet<APP_EVENTS_RESPONSE> = new Set([
   APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE,
   APP_EVENTS_RESPONSE.GET_TTS_TEST,
   APP_EVENTS_RESPONSE.TEST_ALERT,
+  APP_EVENTS_RESPONSE.TEST_GAME_ACTION,
   APP_EVENTS_RESPONSE.SOUND_DATA,
 ]);
 

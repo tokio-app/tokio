@@ -420,6 +420,15 @@ describe("AlertsService", () => {
         expect(await plays([update(3)])).toEqual([3]);
       });
 
+      it("counts the gifts a pause skipped, and keeps the streaks through its clear", async () => {
+        expect(await plays([update(10)])).toEqual([10]);
+        // The pause
+        service.clear({ streaks: false });
+        service.skip(TOKIO_EVENTS.GIFT, update(50));
+
+        expect(await plays([update(51)])).toEqual([1]);
+      });
+
       it("plays no more times than the queue takes", async () => {
         expect(await plays([update(250)])).toEqual([100]);
       });

@@ -28,6 +28,7 @@ const TestSchema = z.object({
   trigger: TriggerSchema.shape.type,
   platform: TriggerSchema.shape.platform,
   steps: z.array(GameStepSchema),
+  request: z.number(),
 });
 
 // What main holds, also pushed on every status change (registerGames)
@@ -104,7 +105,7 @@ events.push(
 events.push(
   APP_EVENTS.TEST_GAME_ACTION,
   async ({ gamesService }, e, data) => {
-    const { id, ...test } = TestSchema.parse(data);
+    const { id, request, ...test } = TestSchema.parse(data);
     const res = await gamesService.test(test);
     if (!res.success) {
       throw new AppFailure(
@@ -116,6 +117,7 @@ events.push(
     e.reply(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, {
       success: true,
       id,
+      request,
       results: res.data ?? [],
     });
   },
@@ -125,10 +127,11 @@ events.push(
       code: FEEDBACK_CODES.GAME_TEST_FAILED,
       message: "main.failure.testGameAction",
     },
-    onError: (e, error, { id }) =>
+    onError: (e, error, { id, request }) =>
       e.reply(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, {
         success: false,
         id,
+        request,
         results: [],
         error,
       }),

@@ -224,11 +224,15 @@ const registerConnectorEvents = ({
     type: K,
     payload: TokioEventMap[K],
   ) => {
-    // Ignored while paused, and never played later
-    if (controls.isPaused()) return;
     if (!store.getActiveFeatures().alerts) return;
     const profile = await store.getProfileData();
     if (!profile) return;
+    // Ignored while paused, and never played later, but counted: a streak's
+    // gifts sent during the pause don't play once it ends
+    if (controls.isPaused()) {
+      alerts.skip(type, payload);
+      return;
+    }
     // This event's sounds, media and spoken messages, which a replay plays
     const group: AlertAudio[] = [];
     await alerts.handle(
@@ -297,10 +301,14 @@ const registerConnectorEvents = ({
     type: K,
     payload: TokioEventMap[K],
   ) => {
-    // The pause dropped the waiting runs, and takes no new ones
-    if (controls.isPaused()) return;
     const profile = await store.getProfileData();
     if (!profile) return;
+    // The pause dropped the waiting runs, and takes no new ones, but counts
+    // them as alerts do
+    if (controls.isPaused()) {
+      games.skip(type, payload);
+      return;
+    }
     await games.handle(type, payload, profile.games);
   };
 
@@ -308,14 +316,15 @@ const registerConnectorEvents = ({
     // Not a live event, the services match emote triggers on chat events.
     if (trigger === EMOTE_TRIGGER) continue;
     const listener = (d: TokioEventMap[typeof trigger]) => {
-      const label = t(ALERT_TRIGGER_LABELS[trigger]);
       dispatchAlert(trigger, d).catch((error) => {
         notifier.report({
           source: "alerts",
           error,
           fallback: {
             code: FEEDBACK_CODES.ALERT_FAILED,
-            message: t("main.init.alertFailed", { label }),
+            message: t("main.init.alertFailed", {
+              label: t(ALERT_TRIGGER_LABELS[trigger]),
+            }),
           },
           context: trigger,
         });
@@ -326,7 +335,9 @@ const registerConnectorEvents = ({
           error,
           fallback: {
             code: FEEDBACK_CODES.GAME_ACTION_FAILED,
-            message: t("main.init.gameActionFailed", { label }),
+            message: t("main.init.gameActionFailed", {
+              label: t(ALERT_TRIGGER_LABELS[trigger]),
+            }),
           },
           context: trigger,
         });
@@ -765,7 +776,7 @@ const registerGames = (handler: AppHandlerVariables) => {
     });
   });
   // Logged once per notice, as they can repeat on every event
-  games.onError((action, { offline, full, message }) => {
+  games.onError((action, { offline, full, message, key }) => {
     const label = t(ALERT_TRIGGER_LABELS[action.trigger.type]);
     // Logs stay English
     const logged = translate(
@@ -817,7 +828,7 @@ const registerGames = (handler: AppHandlerVariables) => {
       )
     ) {
       Logger.warn(
-        `<Games> A command of the ${logged} action failed -- ${message}`,
+        `<Games> A command of the ${logged} action failed -- ${key ? translate(DEFAULT_LANGUAGE, key) : message}`,
         paths.files.logs.games,
       );
     }

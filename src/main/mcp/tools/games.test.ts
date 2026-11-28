@@ -207,9 +207,19 @@ describe("games MCP tools", () => {
     it.each([
       [{ steps: [{ type: "spawn", mob: "dragonite", amount: 1 }] }, "mob id"],
       [{ steps: [{ type: "morph", mob: "creeper" }] }, "Java Edition only"],
+      [
+        { edition: "java", steps: [{ type: "morph", mob: "tnt" }] },
+        "isn't a living mob",
+      ],
       [{ overlay: { image: { name: "X", file: "x.png" } } }, "pictures"],
       [{ steps: [{ type: "spawn", mob: "zombie", amount: 0 }] }, "Invalid"],
       [{ id: "other" }, "Unknown"],
+      // The Games page can't show them
+      [{ trigger: { min_coins: 500 } }, "Unknown settings: trigger.min_coins"],
+      [
+        { trigger: { roles: ["moderator"] } },
+        "Unknown settings: trigger.roles",
+      ],
     ])("refuses %j", async (changes, message) => {
       const { h, updateProfileData } = setup();
       const { call } = await mcpClient(h.handler);
@@ -275,8 +285,8 @@ describe("games MCP tools", () => {
         platform: "twitch",
         steps: [expect.objectContaining({ type: "spawn", mob: "zombie" })],
       });
-      // The Games page shows them too
-      expect(h.pushed(APP_EVENTS_RESPONSE.TEST_GAME_ACTION)).toHaveLength(1);
+      // Private: a Games row testing the action would take it as its own
+      expect(h.pushed(APP_EVENTS_RESPONSE.TEST_GAME_ACTION)).toEqual([]);
     });
 
     it("gives the test's failure", async () => {
@@ -312,6 +322,11 @@ describe("games MCP tools", () => {
         action: { id: "a1" },
         overlayURL: "http://tokio-app.local:37891/games/minecraft/",
       });
+      const { value } = await call("get", { kind: "game_action", id: "a1" });
+      // What the Games page shows, so a trigger sent back isn't refused
+      expect(value).not.toHaveProperty("action.trigger.min_coins");
+      expect(value).not.toHaveProperty("action.trigger.roles");
+      expect(value).toHaveProperty("action.trigger.type");
     });
   });
 
