@@ -5,6 +5,7 @@ import {
   ReactNode,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -135,12 +136,23 @@ export function Modal({
     closeRef.current = onClose;
   });
 
+  // A layout effect, so the page is live again before the layout effects of
+  // what closed it run: useFocusAfterDelete focuses a row, which an inert
+  // page would refuse
+  useLayoutEffect(() => {
+    const backdrop = backdropRef.current!;
+    openDialogs.push(backdrop);
+    inertBehind();
+    return () => {
+      openDialogs.splice(openDialogs.indexOf(backdrop), 1);
+      inertBehind();
+    };
+  }, []);
+
   // Takes the focus, so Escape reaches it, and gives it back on close.
   useEffect(() => {
     const backdrop = backdropRef.current!;
     const dialog = dialogRef.current!;
-    openDialogs.push(backdrop);
-    inertBehind();
     if (!dialog.contains(document.activeElement)) dialog.focus();
 
     // With the focus on <body>, the card's own keys don't fire: Escape
@@ -160,8 +172,6 @@ export function Modal({
 
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      openDialogs.splice(openDialogs.indexOf(backdrop), 1);
-      inertBehind();
       if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
       // Its opener left too, like a deleted sound's button or About's Take
       // the tour: the dialog under it takes the focus, or the page
