@@ -4,7 +4,7 @@ import {
   TimerSettings,
   TimerSettingsSchema,
 } from "@/common/schemas";
-import { GiftEvent, TOKIO_EVENTS, UserData } from "@/common/types";
+import { GiftEvent, Platform, TOKIO_EVENTS, UserData } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import type { StoreManagerService } from "@/services/store";
@@ -380,6 +380,22 @@ describe("TimerService", () => {
       vi.advanceTimersByTime(30_000);
       timer.handle(TOKIO_EVENTS.CHAT, chat("a"));
       expect(changes.at(-1)).toBe(1000);
+    });
+
+    it("keeps a cooldown per viewer, not per handle", () => {
+      ready(settings(chatRule(30), { chat: 1 }));
+      const on = (platform: Platform, userId?: string) => ({
+        ...chat("sam"),
+        user: { ...viewer("sam"), platform, userId },
+      });
+
+      timer.handle(TOKIO_EVENTS.CHAT, on("tiktok", "1"));
+      timer.handle(TOKIO_EVENTS.CHAT, on("twitch", "twitch:1"));
+      timer.handle(TOKIO_EVENTS.CHAT, on("kick"));
+      timer.handle(TOKIO_EVENTS.CHAT, on("youtube"));
+      timer.handle(TOKIO_EVENTS.CHAT, on("twitch", "twitch:1"));
+
+      expect(changes).toEqual([1000, 1000, 1000, 1000]);
     });
 
     it("adds only the chat that has the keyword, matched like chat alerts", () => {

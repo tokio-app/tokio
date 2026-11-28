@@ -36,7 +36,7 @@ paths:
 - The caps (`STUDIO_MAX_ELEMENTS`, `STUDIO_MAX_GROUPS` and the rest) stay tight: each autosave rewrites and flushes the whole `tokio.json`.
 - A media element saves a library basename; the only URL an element saves is an emote's `image`, kept to `https:`.
 - The list page picks the id (`crypto.randomUUID()`) and opens a new overlay only once the `STUDIO` list holds it, so a failed add opens nothing.
-- Duplicate sends `ADD_STUDIO_OVERLAY` with `copy`, the source's id, and stays on the list (the user's call). `copyName` names the copy. `addStudioOverlay` copies everything the source holds, element ids too, so an element id is unique only within its overlay: key anything per element by its overlay too. A source main no longer holds gets `main.studio.missing`.
+- Duplicate sends `ADD_STUDIO_OVERLAY` with `copy`, the source's id, and stays on the list (the user's call). `copyName` names the copy. New overlay and Duplicate count the names they sent as taken until a `STUDIO` reply lists their id, so quick clicks get different names. `addStudioOverlay` copies everything the source holds, element ids too, so an element id is unique only within its overlay: key anything per element by its overlay too. A source main no longer holds gets `main.studio.missing`.
 - `addStudioOverlay` refuses an id that isn't a UUID or is taken, since it becomes the URL and the socket id; `saveStudioOverlay` and `removeStudioOverlay` refuse one they don't hold, and the handler warns `main.studio.missing`. Every handler in `src/main/events/pages/studio.ts` replies `STUDIO` with the list main holds, failures included.
 
 ## Reactions

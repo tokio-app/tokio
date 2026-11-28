@@ -28,7 +28,7 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
 - Gifts go through a `GiftStreaks` even while the clock doesn't count, so a streak begun before Start adds only what comes after. A gift adds `added × max(0, coins)` times `coin`, and a gift without a currency (YouTube's) adds nothing, as `LiveService` counts them.
 - Twitch adds `sub` (per subscription), `gift_sub` (per gifted sub) and `bit` (per Bit). YouTube's memberships use `sub` and `gift_sub`, and `superchat` adds the same seconds per Super Chat or Super Sticker whatever it cost, since currencies differ. Kick's `KICKS` add `kick` per Kick.
 - The rows and carousel items follow the profile's platforms (`TIMER_TRIGGERS`, `triggersFor`, `.claude/rules/platforms.md`): `TimerService` gets them from `load(timer, file, platforms)` and `setPlatforms`, which sends the overlay again, and the page from one page-level `GET_PROFILE`.
-- Chat adds time only for messages with `chat.keyword` (`hasKeyword`, like chat alerts), once per viewer (by handle) in `chat.cooldown` seconds. A message without the keyword doesn't start the cooldown.
+- Chat adds time only for messages with `chat.keyword` (`hasKeyword`, like chat alerts), once per viewer (by user id, else platform and handle, since handles repeat across platforms) in `chat.cooldown` seconds. A message without the keyword doesn't start the cooldown.
 - There are no join, envelope or Super Fan box triggers: a Super Fan box comes with a new Super Fan, which already counts.
 - `disconnected()` forgets the cooldowns and the streaks, and pauses a running clock when `pause_on_end` is on.
 

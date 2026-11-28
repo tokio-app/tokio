@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   downloadOverlay,
   extractZip,
+  MAX_UNZIPPED_BYTES,
   MAX_ZIP_BYTES,
   parseCatalog,
   RELEASES_PREFIX,
@@ -314,6 +315,20 @@ describe("extractZip", () => {
       });
       await expect(extractZip(zip, folder)).rejects.toThrow("outside");
     }
+    expect(await readdir(root)).toEqual([]);
+  });
+
+  it("refuses files that add up to more than the cap once unzipped", async () => {
+    // Stored, then listed in its central directory as a byte too big
+    const zip = zipSync({ "index.html": strToU8("<p></p>") }, { level: 0 });
+    const view = new DataView(zip.buffer);
+    let central = zip.length - 4;
+    while (view.getUint32(central, true) !== 0x02014b50) central--;
+    view.setUint32(central + 24, MAX_UNZIPPED_BYTES + 1, true);
+
+    await expect(extractZip(zip, join(root, "overlay"))).rejects.toThrow(
+      "too big",
+    );
     expect(await readdir(root)).toEqual([]);
   });
 });

@@ -15,7 +15,7 @@ import { useIpcListener, useIpcRequest, useServerEnabled } from "@/hooks";
 import toolsStyles from "@/pages/Tools/tools.module.css";
 import { rich, useT } from "@/ui/i18n";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FiLink, FiPlus, FiTrash2 } from "react-icons/fi";
 import { LuCopyPlus } from "react-icons/lu";
 import { copyName, newOverlayName, sizeText } from "./helper";
@@ -36,6 +36,9 @@ export function Studio() {
     StudioOverlay,
     "id" | "name"
   > | null>(null);
+  // The names asked for by id, taken until a reply lists them, so a second
+  // click before it doesn't pick the same name. A failed add's stays taken.
+  const sent = useRef(new Map<string, string>());
 
   useIpcRequest(APP_EVENTS.GET_STUDIO);
   const serverEnabled = useServerEnabled();
@@ -43,6 +46,7 @@ export function Studio() {
   // Failures still carry what main holds
   useIpcListener(APP_EVENTS_RESPONSE.STUDIO, (res) => {
     if (!res?.data) return;
+    for (const overlay of res.data) sent.current.delete(overlay.id);
     setOverlays(res.data);
     if (adding && res.data.some((overlay) => overlay.id === adding)) {
       setAdding(null);
@@ -50,29 +54,37 @@ export function Studio() {
     }
   });
 
+  const taken = () => [
+    ...(overlays ?? []),
+    ...Array.from(sent.current.values(), (name) => ({ name })),
+  ];
+
+  const send = (id: string, name: string, copy?: string) => {
+    sent.current.set(id, name);
+    window.api.emit(APP_EVENTS.ADD_STUDIO_OVERLAY, { id, name, copy });
+  };
+
   const add = () => {
     const id = crypto.randomUUID();
     setAdding(id);
-    window.api.emit(APP_EVENTS.ADD_STUDIO_OVERLAY, {
+    send(
       id,
-      name: newOverlayName(overlays ?? [], (number) =>
-        t("studio.newName", { number }),
-      ),
-    });
+      newOverlayName(taken(), (number) => t("studio.newName", { number })),
+    );
   };
 
   // Stays on the list, unlike New overlay (the user's call). The rows show
   // only once the list has loaded
   const duplicate = (overlay: StudioOverlay, name: string) =>
-    window.api.emit(APP_EVENTS.ADD_STUDIO_OVERLAY, {
-      id: crypto.randomUUID(),
-      name: copyName(overlays ?? [], name, (name, number) =>
+    send(
+      crypto.randomUUID(),
+      copyName(taken(), name, (name, number) =>
         number === 1
           ? t("studio.copyName", { name })
           : t("studio.copyNameNumber", { name, number }),
       ),
-      copy: overlay.id,
-    });
+      overlay.id,
+    );
 
   let content;
   if (!overlays) {

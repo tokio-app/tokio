@@ -130,6 +130,25 @@ describe("Studio", () => {
     ).toBeVisible();
   });
 
+  it("names a second copy apart from one main hasn't listed yet", async () => {
+    const { user } = await renderApp("/tools/studio");
+    await studio(MAIN);
+    const duplicate = () =>
+      user.click(
+        row("Main scene").getByRole("button", { name: "Duplicate overlay" }),
+      );
+
+    await duplicate();
+    await duplicate();
+    const [first] = sent(APP_EVENTS.ADD_STUDIO_OVERLAY);
+    await studio(MAIN, { ...MAIN, id: first.id, name: first.name });
+    await duplicate();
+
+    expect(sent(APP_EVENTS.ADD_STUDIO_OVERLAY).map(({ name }) => name)).toEqual(
+      ["Main scene copy", "Main scene copy 2", "Main scene copy 3"],
+    );
+  });
+
   it("opens nothing when the add fails", async () => {
     const { user, router } = await renderApp("/tools/studio");
     await studio(MAIN);

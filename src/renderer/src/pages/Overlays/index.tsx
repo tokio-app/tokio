@@ -8,7 +8,7 @@ import {
 import { OverlayModal, Page, RemoveOverlayModal } from "@/components";
 import { PlatformsContext } from "@/context/platforms";
 import { useIpcListener, useIpcRequest, useProfilePlatforms } from "@/hooks";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { postToOverlay, postToPreviews } from "./helper";
 import { GallerySection } from "./sections/GallerySection";
 
@@ -19,6 +19,8 @@ export function Overlays() {
   const [configId, setConfigId] = useState<string | null>(null);
   const [config, setConfig] = useState<OverlayConfig | null>(null);
   const [saving, setSaving] = useState(false);
+  // The tests asked for, in order, and whether the settings sent them
+  const tests = useRef<{ id: string; fromSettings: boolean }[]>([]);
   // Overlay waiting for the user to confirm its removal
   const [removing, setRemoving] = useState<OverlayApp | null>(null);
   const editing = overlays.find((overlay) => overlay.id === configId);
@@ -57,17 +59,25 @@ export function Overlays() {
     if (res.success) {
       postToPreviews(res.id, { type: "tokio:config", data: res.data! });
     }
-    // A late reply still updates its overlay, but not the settings open now.
-    if (res.id !== configId) return;
+    // A late reply still updates its overlay, but not the settings open now,
+    // and MCP's saves reach this page too: only its own closes the settings.
+    if (res.id !== configId || !saving) return;
     setSaving(false);
     if (res.success) closeModal();
   });
 
+  const test = (id: string, fromSettings: boolean) => {
+    tests.current.push({ id, fromSettings });
+    window.api.emit(APP_EVENTS.TEST_OVERLAY, { id });
+  };
+
   // Tests from the settings stay in the previews, which show the unsaved
-  // settings, so they never reach the stream.
+  // settings, so they never reach the stream, even once the settings close.
   useIpcListener(APP_EVENTS_RESPONSE.TEST_OVERLAY, (res) => {
     if (!res) return;
-    const post = configId === null ? postToOverlay : postToPreviews;
+    const index = tests.current.findIndex((t) => t.id === res.id);
+    const [sent] = index < 0 ? [] : tests.current.splice(index, 1);
+    const post = sent && !sent.fromSettings ? postToOverlay : postToPreviews;
     for (const payload of res.payloads) post(res.id, payload);
   });
 
@@ -84,9 +94,7 @@ export function Overlays() {
           config={config}
           saving={saving}
           onRequestClose={closeModal}
-          onTest={() =>
-            window.api.emit(APP_EVENTS.TEST_OVERLAY, { id: editing.id })
-          }
+          onTest={() => test(editing.id, true)}
           onSave={(saved) => {
             setSaving(true);
             window.api.emit(APP_EVENTS.SAVE_OVERLAY_CONFIG, {
@@ -101,7 +109,7 @@ export function Overlays() {
         <PlatformsContext value={platforms}>
           <GallerySection
             overlays={overlays}
-            onTest={(id) => window.api.emit(APP_EVENTS.TEST_OVERLAY, { id })}
+            onTest={(id) => test(id, false)}
             onCustomize={(id) => {
               window.api.emit(APP_EVENTS.GET_OVERLAY_CONFIG, { id });
               setConfigId(id);

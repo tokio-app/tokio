@@ -547,7 +547,7 @@ describe("newStudioElement", () => {
     expect(StudioElementSchema.parse(a)).toEqual(a);
   });
 
-  it("starts on the profile's platforms: their event, and a list their gifters", () => {
+  it("starts on the profile's platforms: their event, and a list their first one's gifters", () => {
     expect(newStudioElement("text", "portrait")).toMatchObject({
       trigger: { type: TOKIO_EVENTS.FOLLOW },
     });
@@ -557,6 +557,10 @@ describe("newStudioElement", () => {
     expect(
       newStudioElement("list", "portrait", ["twitch", "kick"]),
     ).toMatchObject({ platform: "twitch" });
+    // The profile's first, in its order
+    expect(
+      newStudioElement("list", "portrait", ["kick", "tiktok"]),
+    ).toMatchObject({ platform: "kick" });
     expect(newStudioElement("list", "portrait")).toMatchObject({
       platform: "tiktok",
     });

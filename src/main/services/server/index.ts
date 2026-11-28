@@ -86,7 +86,6 @@ export class ServerService extends Service {
   // load their streams again. Never saved or logged.
   private _cameraKey = randomUUID();
   private _cameras = new CameraFeeds();
-  private _cameraListeners: ((captures: CameraCapture[]) => void)[] = [];
 
   // NOTE: Overlays connect to SERVER_PORT, other ports are for tests.
   constructor(port: number = SERVER_PORT) {
@@ -96,7 +95,6 @@ export class ServerService extends Service {
     this._app.set("env", "production");
     this._dynamicRouter = express.Router();
     this._port = port;
-    this._cameras.onChange(() => this._camerasChanged());
 
     // Each alert's overlay, the same page: it reads the alert's id from its
     // path. Their media is mounted at /alerts/media/, a path one level deeper.
@@ -374,7 +372,7 @@ export class ServerService extends Service {
 
   /** Calls the listener with the captures whenever they change. */
   public onCameras(listener: (captures: CameraCapture[]) => void) {
-    this._cameraListeners.push(listener);
+    this._cameras.onChange(() => listener(this.cameraCaptures()));
   }
 
   /**
@@ -383,11 +381,6 @@ export class ServerService extends Service {
    */
   public onCameraKeyframe(listener: (id: string) => void) {
     this._cameras.onKeyframe(listener);
-  }
-
-  private _camerasChanged() {
-    const captures = this.cameraCaptures();
-    for (const listener of this._cameraListeners) listener(captures);
   }
 
   /** Calls the listener with each overlay's id as it connects. */

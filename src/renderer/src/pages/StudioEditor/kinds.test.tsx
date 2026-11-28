@@ -517,6 +517,33 @@ describe("StudioEditor", () => {
       expect(row(/^Top Bits this LIVE/)).toBeVisible();
     });
 
+    it("moves gifted subs to the profile's first platform that gifts them", async () => {
+      const list = elementOf("list");
+      const { user } = await open(holding(list));
+      await send(
+        APP_EVENTS_RESPONSE.GET_PROFILE,
+        profileReply((p) => {
+          p.platforms = ["tiktok", "kick", "twitch"];
+        }),
+      );
+      await user.click(row(/^Top gifters/));
+
+      await user.click(field("Shows").getByText("Top gifters this LIVE"));
+      await user.click(
+        inList(
+          page().getByRole("group", { name: "Shows" }),
+          "Top gifted subs this LIVE",
+        )!,
+      );
+
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          source: "giftsubs",
+          platform: "kick",
+        }),
+      );
+    });
+
     it("lists another source, with its own rows and fields", async () => {
       const list = elementOf("list");
       const { user } = await open(holding(list));
