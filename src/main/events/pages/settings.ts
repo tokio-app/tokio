@@ -9,7 +9,7 @@ import {
 import { SERVER_PORT, TRANSLATION_LANGUAGES } from "@/common/util";
 import { showOpenDialog, showSaveDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
-import { AppFailure, saveFailure } from "@/helper/feedback";
+import { AppFailure, logsPlace, saveFailure } from "@/helper/feedback";
 import { writeFileAtomic } from "@/helper/fs";
 import { sendGamesOverlay } from "@/helper/games";
 import { refreshTikTokGifts, usesTikTok } from "@/helper/gifts";
@@ -341,9 +341,26 @@ const deleteProfile = async (
     throw saveFailure();
   }
   if (!res) throw new Error(`Deleting the profile ${file} failed.`);
+  // Not thrown: it's unlisted, so the delete happened
+  const leftovers = res === "leftovers";
 
-  e.reply(APP_EVENTS_RESPONSE.DELETE_PROFILE, { success: true, file });
+  e.reply(APP_EVENTS_RESPONSE.DELETE_PROFILE, {
+    success: true,
+    file,
+    ...(leftovers && { leftovers }),
+  });
   replySettings(e, store);
+  if (leftovers) {
+    notifier.warn(
+      "system",
+      FEEDBACK_CODES.PROFILE_FILES_DELETE_FAILED,
+      t("main.settings.profileFilesLeft", {
+        name: listed.name,
+        ...logsPlace(),
+      }),
+    );
+    return;
+  }
   notifier.success(
     "system",
     FEEDBACK_CODES.PROFILE_DELETED,

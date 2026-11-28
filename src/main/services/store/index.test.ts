@@ -1478,7 +1478,7 @@ describe("StoreManagerService", () => {
           Promise.reject(Object.assign(new Error("EBUSY"), { code: "EBUSY" })),
         );
 
-        expect(await store.deleteProfile("stream.json")).toBe("deleted");
+        expect(await store.deleteProfile("stream.json")).toBe("leftovers");
 
         expect(store.getProfiles()).toEqual(defaultStoreData.profiles);
         expect(await exists(fans)).toBe(true);
@@ -1486,6 +1486,26 @@ describe("StoreManagerService", () => {
           await exists(join(paths.folders.profilesFolder, "stream.json")),
         ).toBe(true);
         expect(await fileOf(store, "Stream")).toBe("stream-2.json");
+      });
+
+      it("says so when the profile's own file can't be deleted", async () => {
+        const store = await withData();
+        vi.spyOn(Logger, "warn");
+        const fs = await import("fs/promises");
+        const rm = fs.rm;
+        const profile = join(paths.folders.profilesFolder, "stream.json");
+        vi.spyOn(fs, "rm").mockImplementation((path, options) =>
+          path === profile
+            ? Promise.reject(
+                Object.assign(new Error("EBUSY"), { code: "EBUSY" }),
+              )
+            : rm(path, options),
+        );
+
+        expect(await store.deleteProfile("stream.json")).toBe("leftovers");
+
+        expect(store.getProfiles()).toEqual(defaultStoreData.profiles);
+        expect(await exists(profile)).toBe(true);
       });
     });
 

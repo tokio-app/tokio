@@ -1287,11 +1287,12 @@ export class StoreManagerService extends Service {
    * (fans/<file>) and its LIVE history (history/<file without .json>/). null
    * when it isn't listed or it's the active one, which the only profile always
    * is. "unsaved" when the store couldn't be saved: it stays listed and
-   * nothing is deleted.
+   * nothing is deleted. "leftovers" when it's unlisted but some of its files
+   * couldn't be deleted (logged).
    */
   public async deleteProfile(
     file: string,
-  ): Promise<"deleted" | "unsaved" | null> {
+  ): Promise<"deleted" | "leftovers" | "unsaved" | null> {
     this._ensureInitialized();
     const profiles = this._storeData!.profiles;
     const index = profiles.findIndex((p) => p.file === file);
@@ -1325,15 +1326,13 @@ export class StoreManagerService extends Service {
     );
     // While the profile's file is there, its name's file stays taken, so a
     // new profile can't get the fans and LIVEs left behind.
-    if (gone.every(Boolean)) {
-      const path = join(profilesFolder, file);
-      // shortcut: an update queued on the file after this wait could write it
-      // again; only a sweep that read it before the unlisting can, and the
-      // file then sits unlisted until a store rebuild lists it.
-      await this._jsonManagerService.whenWritten(path);
-      await this._remove(path);
-    }
-    return "deleted";
+    if (!gone.every(Boolean)) return "leftovers";
+    const path = join(profilesFolder, file);
+    // shortcut: an update queued on the file after this wait could write it
+    // again; only a sweep that read it before the unlisting can, and the
+    // file then sits unlisted until a store rebuild lists it.
+    await this._jsonManagerService.whenWritten(path);
+    return (await this._remove(path)) ? "deleted" : "leftovers";
   }
 
   private _remove(path: string): Promise<boolean> {

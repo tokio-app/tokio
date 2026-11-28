@@ -1534,6 +1534,7 @@
   "main.settings.profileCloned": "Profile \"{name}\" cloned.",
   "main.settings.profileRenamed": "Profile renamed to \"{name}\".",
   "main.settings.profileDeleted": "Profile \"{name}\" deleted.",
+  "main.settings.profileFilesLeft": "Profile \"{name}\" deleted, but some of its files are still on disk. To report it, export the logs in {settings} → {section}.",
   "main.settings.deleteActive": "Switch to another profile before deleting this one.",
   "main.settings.profileLocked": "Disconnect from the LIVE before switching profiles.",
   "main.settings.twitchSignedIn": "Signed in to Twitch as @{login}.",

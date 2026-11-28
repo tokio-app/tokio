@@ -150,13 +150,18 @@ export const kinds: Kinds = {
     remove: async (handler, id) => {
       const target = findProfile(handler, id);
       if (!target) return fail(`There's no profile ${id}.`);
-      const { error } = await invokeOk(
+      const { error, data } = await invokeOk(
         handler,
         APP_EVENTS.DELETE_PROFILE,
         { file: target.file },
         APP_EVENTS_RESPONSE.DELETE_PROFILE,
       );
-      return error ?? ok("Removed.");
+      if (error) return error;
+      return ok(
+        data.leftovers
+          ? "Removed, but some of its files are still on disk. Tokio's logs say which."
+          : "Removed.",
+      );
     },
   }),
 };

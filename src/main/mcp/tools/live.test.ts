@@ -820,13 +820,15 @@ describe("live MCP tools", () => {
           profiles[index] = { file, name };
           return "renamed" as const;
         }),
-        deleteProfile: vi.fn(async (file: string) => {
-          profiles.splice(
-            profiles.findIndex((p) => p.file === file),
-            1,
-          );
-          return "deleted" as const;
-        }),
+        deleteProfile: vi.fn(
+          async (file: string): Promise<"deleted" | "leftovers"> => {
+            profiles.splice(
+              profiles.findIndex((p) => p.file === file),
+              1,
+            );
+            return "deleted";
+          },
+        ),
       };
       const h = createHandler(
         {
@@ -904,6 +906,19 @@ describe("live MCP tools", () => {
         "game-night.json",
       );
       expect(h.pushed(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
+    });
+
+    it("says so when some of the profile's files stayed", async () => {
+      const { h, store } = setup();
+      store.deleteProfile.mockResolvedValueOnce("leftovers");
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("remove", { kind: "profiles", id: "Game night" });
+
+      expect(res).toMatchObject({
+        isError: false,
+        text: "Removed, but some of its files are still on disk. Tokio's logs say which.",
+      });
     });
 
     it("gives the handler's refusal for the active profile, and one it doesn't list", async () => {

@@ -566,14 +566,16 @@ describe("settings events", () => {
   });
 
   describe("DELETE_PROFILE", () => {
-    const deleting = (res: "deleted" | "unsaved" | null = "deleted") => {
+    const deleting = (
+      res: "deleted" | "leftovers" | "unsaved" | null = "deleted",
+    ) => {
       const store = profileStore();
       const profiles = [defaultProfile, streamProfile];
       return {
         ...store,
         getProfiles: () => [...profiles],
         deleteProfile: vi.fn(async (file: string) => {
-          if (res === "deleted") {
+          if (res === "deleted" || res === "leftovers") {
             profiles.splice(
               profiles.findIndex((p) => p.file === file),
               1,
@@ -611,6 +613,32 @@ describe("settings events", () => {
           level: "success",
           code: FEEDBACK_CODES.PROFILE_DELETED,
           message: 'Profile "Stream" deleted.',
+        }),
+      ]);
+    });
+
+    it("warns in place of the notice when some of its files stayed", async () => {
+      const h = createHandler({ storeManagerService: deleting("leftovers") });
+
+      await h.invoke(settings, APP_EVENTS.DELETE_PROFILE, {
+        file: "stream.json",
+      });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.DELETE_PROFILE)).toEqual([
+        { success: true, file: "stream.json", leftovers: true },
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([
+        {
+          success: true,
+          data: { settings: appSettings, profiles: [defaultProfile] },
+        },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          code: FEEDBACK_CODES.PROFILE_FILES_DELETE_FAILED,
+          message:
+            'Profile "Stream" deleted, but some of its files are still on disk. To report it, export the logs in Settings → Logs.',
         }),
       ]);
     });
