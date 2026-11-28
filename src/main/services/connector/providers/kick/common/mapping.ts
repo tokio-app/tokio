@@ -7,7 +7,7 @@ import {
   TokioEventMap,
   UserData,
 } from "@/common/types";
-import { rolesOf } from "../../../common";
+import { emoteOnly, rolesOf } from "../../../common";
 import { slugOf } from "./api";
 
 type Sender = {
@@ -98,7 +98,7 @@ function named(username: string): UserData {
 function toChat(e: ChatMessage): ChatEvent {
   // TikTok's shape: content without the emotes, each at its place in it
   let content = "";
-  let emotes: Emotes[] = [];
+  const emotes: Emotes[] = [];
   let last = 0;
   for (const match of e.content.matchAll(EMOTE)) {
     content += e.content.slice(last, match.index);
@@ -110,11 +110,6 @@ function toChat(e: ChatMessage): ChatEvent {
     last = match.index + match[0].length;
   }
   content += e.content.slice(last);
-  // Only emotes, as TikTok sends an emote-only comment
-  if (!content.trim()) {
-    content = "";
-    emotes = emotes.map((emote) => ({ ...emote, index: 0 }));
-  }
   const list = e.sender.identity?.badges ?? [];
   const badges = new Set(list.map((b) => b.type));
   const months = Number(
@@ -130,7 +125,7 @@ function toChat(e: ChatMessage): ChatEvent {
       platform: "kick",
       ...rolesOf(badges, months),
     },
-    comment: { content, emotes, lang: "" },
+    comment: { ...emoteOnly(content, emotes), lang: "" },
   };
 }
 

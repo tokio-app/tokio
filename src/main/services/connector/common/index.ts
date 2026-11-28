@@ -1,5 +1,6 @@
 import {
   ChatEvent,
+  Emotes,
   Gift,
   TOKIO_EVENTS,
   TokioEventMap,
@@ -7,6 +8,7 @@ import {
 } from "@/common/types";
 import { formatError } from "@/common/util";
 import Logger from "@/logger";
+import type WebSocket from "ws";
 import { TokioEmitter } from "../../shared/emitter";
 
 // What stopped a connect, so the page can say what to do about it.
@@ -78,6 +80,32 @@ export interface AccountProvider {
   signOut(): Promise<void>;
 }
 
+// TikTok's shape for a comment of emotes alone: no content, each emote at 0
+export const emoteOnly = (content: string, emotes: Emotes[]) =>
+  content.trim()
+    ? { content, emotes }
+    : { content: "", emotes: emotes.map((emote) => ({ ...emote, index: 0 })) };
+
+// Closes a socket nothing listens to anymore; its late errors are dropped
+export function discard(socket: WebSocket | null) {
+  if (!socket) return;
+  socket.removeAllListeners();
+  socket.on("error", () => {});
+  socket.terminate();
+}
+
+// Sets key's value as the newest, the oldest out past max
+export function keepNewest<K, V>(
+  map: Map<K, V>,
+  key: K,
+  value: V,
+  max: number,
+) {
+  map.delete(key);
+  map.set(key, value);
+  if (map.size > max) map.delete(map.keys().next().value!);
+}
+
 export const connectFailure = (
   kind: ConnectErrorKind,
   message: string,
@@ -113,11 +141,16 @@ export abstract class ConnectorProvider extends TokioEmitter {
   protected _onReconnect?: (state: ReconnectState) => void;
   protected _logFile = "";
   private _chatStage?: ChatStage;
-  public abstract setKey(key: string): void;
   public abstract connect(username: string): Promise<ConnectorResponse>;
   public abstract disconnect(): Promise<void>;
   public abstract isConnected(): boolean;
-  public abstract fetchGifts(): Promise<GiftResponse>;
+
+  // Only TikTok's connection takes a key and has a gift list
+  public setKey(_key: string) {}
+
+  public async fetchGifts(): Promise<GiftResponse> {
+    return { success: true, data: [] };
+  }
 
   // The service's log file, for what the connection reports while it's up.
   public setLogFile(logFile: string) {

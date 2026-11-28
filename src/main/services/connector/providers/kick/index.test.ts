@@ -4,7 +4,7 @@ import { once } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocket, WebSocketServer } from "ws";
 import type { ReconnectState } from "../../common";
-import type { FetchInit } from "./config";
+import type { FetchInit, KickConfig } from "./config";
 import { KickConnector } from "./index";
 
 const json = (status: number, body: unknown) =>
@@ -40,6 +40,7 @@ describe("KickConnector", () => {
   let port: number;
   let connector: KickConnector;
   let states: ReconnectState[];
+  let options: Partial<KickConfig>;
 
   const capture = (event: TOKIO_EVENTS) => {
     const listener = vi.fn();
@@ -113,7 +114,7 @@ describe("KickConnector", () => {
       return json(404, {});
     });
 
-    connector = new KickConnector({
+    options = {
       fetch,
       USER_AGENT: "Tokio/test",
       CONNECT_RETRY_MS: 10,
@@ -122,7 +123,8 @@ describe("KickConnector", () => {
       TERMINAL_MIN_MS: 60,
       TERMINAL_MAX_MS: 120,
       VIEWERS_MS: 50,
-    });
+    };
+    connector = new KickConnector(options);
     states = [];
     connector.onReconnect((state) => states.push(state));
   });
@@ -372,6 +374,44 @@ describe("KickConnector", () => {
       ).toHaveLength(1);
     });
 
+    it("keeps the ids of the last IDS_KEPT names used", async () => {
+      await connector.disconnect();
+      connector = new KickConnector({ ...options, IDS_KEPT: 2 });
+      const onGiftSub = capture(TOKIO_EVENTS.GIFT_SUB);
+      await connector.connect("streamer");
+      const chat = (id: number, username: string) =>
+        publish("chatrooms.20.v2", "App\\Events\\ChatMessageEvent", {
+          content: "hi",
+          sender: { id, username, slug: username },
+        });
+      const gifted = (gifter_username: string) =>
+        publish("chatroom_20", "App\\Events\\GiftedSubscriptionsEvent", {
+          gifter_username,
+          gifted_usernames: ["a"],
+        });
+
+      chat(5, "ana");
+      chat(6, "ben");
+      // Used, so it's the newest
+      gifted("ana");
+      await vi.waitFor(() => expect(onGiftSub).toHaveBeenCalledTimes(1));
+      // Ben is the oldest and goes out
+      chat(7, "cy");
+      gifted("ana");
+      gifted("ben");
+      await vi.waitFor(() => expect(onGiftSub).toHaveBeenCalledTimes(3));
+
+      expect(onGiftSub.mock.calls.map(([e]) => e.user.userId)).toEqual([
+        "kick:5",
+        "kick:5",
+        undefined,
+      ]);
+      expect(kick.urls.filter((u) => u.endsWith("/channels/ana"))).toEqual([]);
+      expect(kick.urls.filter((u) => u.endsWith("/channels/ben"))).toHaveLength(
+        1,
+      );
+    });
+
     it("sends a sub under the viewer's id, from chat or a lookup", async () => {
       const onSub = capture(TOKIO_EVENTS.SUBSCRIBE);
       kick.override = (url) => {
@@ -411,6 +451,41 @@ describe("KickConnector", () => {
         ["gone", undefined],
       ]);
       expect(onSub.mock.calls[1][0].months).toBe(4);
+    });
+
+    it("sends a sub still waiting for its id when the stream ends, without it, before DISCONNECTED", async () => {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      kick.override = (url) =>
+        url.endsWith("/channels/new-gifter")
+          ? held.then(() =>
+              json(200, { id: 70, user_id: 71, slug: "new-gifter" }),
+            )
+          : undefined;
+      const order: string[] = [];
+      const onGiftSub = capture(TOKIO_EVENTS.GIFT_SUB);
+      onGiftSub.mockImplementation(() => order.push("GIFT_SUB"));
+      connector.on(TOKIO_EVENTS.DISCONNECTED, () => order.push("DISCONNECTED"));
+      await connector.connect("streamer");
+
+      publish("chatroom_20", "App\\Events\\GiftedSubscriptionsEvent", {
+        gifter_username: "New_Gifter",
+        gifted_usernames: ["a", "b", "c"],
+      });
+      await vi.waitFor(() =>
+        expect(kick.urls.some((u) => u.endsWith("/channels/new-gifter"))).toBe(
+          true,
+        ),
+      );
+      publish("channel.10", "App\\Events\\StreamerIsLive", {});
+      publish("channel.10", "App\\Events\\StopStreamBroadcast", {});
+      await vi.waitFor(() => expect(order).toContain("DISCONNECTED"));
+      release();
+      await new Promise((r) => setTimeout(r, 20));
+
+      expect(order).toEqual(["GIFT_SUB", "DISCONNECTED"]);
+      expect(onGiftSub.mock.calls[0][0]).toMatchObject({ count: 3 });
+      expect(onGiftSub.mock.calls[0][0].user.userId).toBeUndefined();
     });
 
     it("drops an event whose shape changed and keeps reading", async () => {
@@ -539,11 +614,5 @@ describe("KickConnector", () => {
         expect(onDisconnected).toHaveBeenCalledWith({ reason: "ended" }),
       );
     });
-  });
-
-  it("has no gifts and ignores keys", async () => {
-    connector.setKey();
-    expect(await connector.fetchGifts()).toEqual({ success: true, data: [] });
-    expect(connector.isWaiting()).toBe(false);
   });
 });

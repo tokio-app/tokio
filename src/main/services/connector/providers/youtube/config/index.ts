@@ -29,6 +29,8 @@ const config = {
   RECONNECT_MIN_MS: 2000,
   RECONNECT_MAX_MS: 15_000,
 
+  // Viewers whose ids are kept, the last ones seen: about 1.5 MB
+  IDS_KEPT: 10_000,
   // A repeating error is logged at most this often
   LOG_REPEAT_MS: 30_000,
 

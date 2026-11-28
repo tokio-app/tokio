@@ -71,10 +71,8 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
   private _endedBy?: Platform;
   private _channels: Partial<Record<Platform, string>> = {};
   private _username = "";
-  private _chatStage?: ChatStage;
   private _onReconnect?: (state: ReconnectState, platform: Platform) => void;
   private _onPlatform?: (platform: Platform, change: PlatformChange) => void;
-  private _onAccount?: (account: PlatformAccount) => Promise<boolean>;
   // Converts a Super Chat's amount to US dollars
   private _rates?: Pick<RatesService, "usdOf">;
 
@@ -108,7 +106,6 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
   }
 
   public setChatStage(stage: ChatStage): void {
-    this._chatStage = stage;
     this._providers().forEach((provider) => provider.setChatStage(stage));
   }
 
@@ -281,7 +278,6 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
   public onTwitchAccount(
     listener: (account: PlatformAccount) => Promise<boolean>,
   ) {
-    this._onAccount = listener;
     this._twitch()?.onAccount(listener);
   }
 
@@ -298,19 +294,11 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
 
   // -- Private API --
 
-  // Another platform's provider, outside the pool
+  // Another platform's provider, outside the pool. Only the constructor
+  // adds them, before the log file, chat stage and account listener are set.
   protected _addPlatform(platform: Platform, provider: ConnectorProvider) {
     this._platforms.set(platform, provider);
     this._wire(platform, provider, () => true);
-    if (this._logFile) provider.setLogFile(this._logFile);
-    if (this._chatStage) provider.setChatStage(this._chatStage);
-    if (
-      this._onAccount &&
-      platform === "twitch" &&
-      isAccountProvider(provider)
-    ) {
-      provider.onAccount(this._onAccount);
-    }
   }
 
   // The pool's backends, the other platforms' and the made-up ones

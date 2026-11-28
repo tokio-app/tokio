@@ -307,6 +307,53 @@ describe("YouTubeConnector", () => {
       expect(onGift.mock.calls[0][0].gift.coins).toBe(0);
     });
 
+    it("keeps the channel ids of the last IDS_KEPT handles used", async () => {
+      connector = new YouTubeConnector({
+        fetch: youtube.fetch,
+        POLL_MS: 5,
+        IDS_KEPT: 2,
+      });
+      const onGift = capture(TOKIO_EVENTS.GIFT);
+      const star = (handle: string) =>
+        giftAction(handle, "sent Star", "silver_star_v2_320x320");
+      youtube.state.polls = [
+        { actions: [giftCard("Ana", "UCana"), giftCard("Ben", "UCben")] },
+        // Ana's used, so Ben is the oldest when Cy comes
+        { actions: [star("Ana")] },
+        { actions: [giftCard("Cy", "UCcy"), star("Ana"), star("Ben")] },
+      ];
+      await connector.connect("madeup");
+
+      await vi.waitFor(() => expect(onGift).toHaveBeenCalledTimes(3));
+      expect(onGift.mock.calls.map(([e]) => e.user.userId)).toEqual([
+        "youtube:UCana",
+        "youtube:UCana",
+        "youtube:@Ben",
+      ]);
+    });
+
+    it("logs a listener's throw and goes on with the poll and the chat", async () => {
+      const warn = vi.spyOn(Logger, "warn");
+      const onChat = capture(TOKIO_EVENTS.CHAT);
+      onChat.mockImplementation(({ comment }) => {
+        if (comment.content === "boom") throw new Error("a listener's bug");
+      });
+      youtube.state.polls = [
+        { actions: [] },
+        { actions: [chatAction("boom"), chatAction("same poll")] },
+        { actions: [chatAction("next poll")] },
+      ];
+      await connector.connect("madeup");
+
+      await vi.waitFor(() => expect(chats(onChat)).toContain("next poll"));
+      expect(chats(onChat)).toEqual(["boom", "same poll", "next poll"]);
+      expect(states).toEqual([]);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("a listener's bug"),
+        expect.anything(),
+      );
+    });
+
     it("sends chat through the chat stage", async () => {
       connector.setChatStage((chat) =>
         Promise.resolve({
@@ -417,11 +464,5 @@ describe("YouTubeConnector", () => {
     await new Promise((r) => setTimeout(r, 30));
     // One in flight at most
     expect(youtube.state.continuations.length).toBeLessThanOrEqual(polls + 1);
-  });
-
-  it("has no gifts and ignores keys", async () => {
-    connector.setKey();
-    expect(await connector.fetchGifts()).toEqual({ success: true, data: [] });
-    expect(connector.isWaiting()).toBe(false);
   });
 });

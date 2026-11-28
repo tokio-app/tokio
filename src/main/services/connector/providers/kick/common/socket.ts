@@ -3,7 +3,7 @@
 // object per line, several to a frame.
 import { formatError } from "@/common/util";
 import WebSocket from "ws";
-import { connectFailure, ConnectorFailure } from "../../../common";
+import { connectFailure, ConnectorFailure, discard } from "../../../common";
 import type { KickConfig } from "../config";
 import { decode } from "./mapping";
 
@@ -302,12 +302,4 @@ export class KickSocket {
       this._handlers.drop(why, terminal);
     }
   }
-}
-
-// Closes a socket nothing listens to anymore; its late errors are dropped
-function discard(socket: WebSocket | null) {
-  if (!socket) return;
-  socket.removeAllListeners();
-  socket.on("error", () => {});
-  socket.terminate();
 }

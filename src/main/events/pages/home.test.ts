@@ -177,14 +177,40 @@ describe("home events", () => {
     });
 
     it("answers once when the connected event comes before connect resolves", async () => {
-      const { h, live } = setup({ success: true }, () => {
-        live.emit(TOKIO_EVENTS.CONNECTED, undefined);
+      const s = setup({ success: true }, () => {
+        s.connectorService.status.mockReturnValue({ tiktok: "connected" });
+        s.live.emit(TOKIO_EVENTS.CONNECTED, undefined);
+        // Answered already, before connect resolves
+        expect(s.h.notices).toHaveLength(1);
       });
 
-      await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
+      await s.h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
 
-      expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toHaveLength(1);
-      expect(h.notices).toHaveLength(1);
+      expect(s.h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toHaveLength(1);
+      expect(s.h.notices).toHaveLength(1);
+    });
+
+    it("waits for its own platform when another one starts the LIVE first", async () => {
+      const error = connectFailure("notFound", "");
+      const s = setup({ success: false, error }, () => {
+        // TikTok's look finds its LIVE while Kick is still connecting
+        s.connectorService.status.mockReturnValue({
+          tiktok: "connected",
+          kick: "connecting",
+        });
+        s.live.emit(TOKIO_EVENTS.CONNECTED, undefined);
+      });
+      s.profile.platforms = ["tiktok", "kick"];
+
+      await s.h.invoke(home, APP_EVENTS.CONNECT, {
+        username: "streamer",
+        channels: { kick: "westcol" },
+        platforms: ["kick"],
+      });
+
+      expect(s.h.notices.map((n) => n.message)).toEqual([
+        "Couldn't find @westcol on Kick. Check the username.",
+      ]);
     });
 
     it("stops listening for the connected event once it's done", async () => {
@@ -568,6 +594,23 @@ describe("home events", () => {
         success: true,
         platforms: { tiktok: "connected" },
       });
+    });
+
+    it("says a quick retry that works connected, right after its failure", async () => {
+      const results: Parameters<typeof both>[0] = {
+        twitch: { success: false, error: connectFailure("network", "") },
+      };
+      const { h } = both(results);
+      await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
+
+      results.twitch = { success: true };
+      await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
+
+      expect(h.notices.map((n) => n.message)).toEqual([
+        "Connected to @streamer on TikTok.",
+        "Unable to reach Twitch. Check your internet connection.",
+        "Connected to @mia on Twitch.",
+      ]);
     });
 
     it("tells nothing about a platform a Disconnect canceled", async () => {

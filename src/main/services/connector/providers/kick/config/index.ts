@@ -43,6 +43,8 @@ const config = {
   TERMINAL_MIN_MS: 5 * 60_000,
   TERMINAL_MAX_MS: 30 * 60_000,
 
+  // Viewers whose ids are kept, the last ones seen: about 1.5 MB
+  IDS_KEPT: 10_000,
   // A repeating error is logged at most this often
   LOG_REPEAT_MS: 30_000,
 

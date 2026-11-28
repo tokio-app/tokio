@@ -1795,6 +1795,30 @@ describe("init events", () => {
       expect(likes()).toEqual({ likes: 50 });
     });
 
+    it("counts the likes from 0 when TikTok comes back in a new room while the LIVE goes on", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      const [changed] = s.connectorService.onPlatform.mock.calls[0];
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(50_000));
+
+      // Kick keeps the LIVE while TikTok's room ends and a new one starts
+      changed("tiktok", "lost");
+      changed("tiktok", "up");
+      expect(s.storeManagerService.updateLiveStats).toHaveBeenLastCalledWith({
+        likes: 0,
+      });
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(120));
+      vi.advanceTimersByTime(250);
+
+      expect(s.storeManagerService.updateLiveStats).toHaveBeenLastCalledWith({
+        likes: 120,
+      });
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.LIKES).at(-1)).toEqual({
+        likes: 120,
+      });
+    });
+
     it("doesn't push throttled views or likes to a closed window", async () => {
       vi.useFakeTimers();
       const s = await live();

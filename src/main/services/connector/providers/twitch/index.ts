@@ -8,7 +8,7 @@ import {
   ConnectorResponse,
   DeviceCode,
   fail,
-  GiftResponse,
+  keepNewest,
   kindOf,
   PlatformAccount,
   toFailure,
@@ -64,6 +64,8 @@ type Connection = {
   wake?: () => void;
   // Events waiting for their picture, which a stop sends without it
   held: Set<Mapped>;
+  // What came before CONNECTED, sent right after it so it's in the LIVE
+  early: [type: string, event: any][];
 };
 
 /**
@@ -123,9 +125,6 @@ export class TwitchConnector
 
   // --- CONNECTION ---
 
-  // Twitch connects with the account, not a key
-  public setKey() {}
-
   // The channel is the account's own, whatever the profile names
   public connect(_channel?: string): Promise<ConnectorResponse> {
     // A connect a Disconnect stopped can still be finishing its requests: a
@@ -148,10 +147,6 @@ export class TwitchConnector
 
   public override isReconnecting(): boolean {
     return this._conn?.reconnecting ?? false;
-  }
-
-  public async fetchGifts(): Promise<GiftResponse> {
-    return { success: true, data: [] };
   }
 
   // --- PRIVATE ---
@@ -226,6 +221,9 @@ export class TwitchConnector
       this._logFile,
     );
     this.emit(TOKIO_EVENTS.CONNECTED);
+    for (const [type, event] of conn.early.splice(0)) {
+      this._notify(conn, type, event);
+    }
     if (viewers === undefined) this._recheck(conn);
     else if (viewers !== null) this._goLive(conn, viewers);
     return { success: true };
@@ -239,6 +237,7 @@ export class TwitchConnector
       live: false,
       wasLive: false,
       held: new Set(),
+      early: [],
       eventsub: new EventSub(
         this._config.EVENTSUB_URL,
         this._config.KEEPALIVE_GRACE_MS,
@@ -399,8 +398,27 @@ export class TwitchConnector
     if (conn.wasLive) this._stop(conn, "ended");
   }
 
+  // A listener's throw would stall the socket until its watchdog, with an
+  // error box: dropped and logged instead, as Kick's socket does
   private _notify(conn: Connection, type: string, event: any) {
+    try {
+      this._handle(conn, type, event);
+    } catch (err) {
+      this._logOnce(
+        `notify:${type}`,
+        `Couldn't send a ${type} -- ${formatError(err)}`,
+      );
+    }
+  }
+
+  private _handle(conn: Connection, type: string, event: any) {
     if (this._conn !== conn) return;
+    // Chat comes once its subscription exists, before the live check ends
+    const stream = type === "stream.online" || type === "stream.offline";
+    if (!conn.up && !stream) {
+      conn.early.push([type, event]);
+      return;
+    }
     switch (type) {
       case CHAT: {
         const chat = toChat(event, conn.userId);
@@ -455,12 +473,7 @@ export class TwitchConnector
         return;
       }
     }
-    // The last used goes to the end, and the oldest out
-    this._pictures.delete(id);
-    this._pictures.set(id, url);
-    if (this._pictures.size > this._config.PICTURES_KEPT) {
-      this._pictures.delete(this._pictures.keys().next().value!);
-    }
+    keepNewest(this._pictures, id, url, this._config.PICTURES_KEPT);
     if (url) user.profilePictures = [url];
   }
 

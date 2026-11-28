@@ -7,7 +7,7 @@ import {
   ConnectorProvider,
   ConnectorResponse,
   fail,
-  GiftResponse,
+  keepNewest,
   kindOf,
   toFailure,
 } from "../../common";
@@ -18,8 +18,6 @@ import defaults, { type KickConfig } from "./config";
 
 type Connection = {
   slug: string;
-  channelId: number;
-  chatroomId: number;
   // The realtime client Kick knows this connection by; a new one after a
   // terminal close
   clientId: string;
@@ -38,8 +36,11 @@ type Connection = {
   retry?: NodeJS.Timeout;
   wake?: () => void;
   // Each username's viewer id (kick:<id>) in this LIVE, by its lowercase,
-  // from chat and Kicks or a lookup; undefined after a failed lookup
+  // from chat and Kicks or a lookup; undefined after a failed lookup. The
+  // last IDS_KEPT names used.
   ids: Map<string, Promise<string | undefined>>;
+  // Subs waiting for their viewer's id, which a stop sends without it
+  held: Set<Mapped>;
 };
 
 /**
@@ -60,9 +61,6 @@ export class KickConnector extends ConnectorProvider {
     super();
     this._config = { ...defaults, ...options };
   }
-
-  // Kick's chat needs no key
-  public setKey() {}
 
   public connect(channel: string): Promise<ConnectorResponse> {
     // A connect a Disconnect stopped can still be finishing its requests: a
@@ -91,10 +89,6 @@ export class KickConnector extends ConnectorProvider {
 
   public override channel(): string {
     return this._conn?.slug ?? "";
-  }
-
-  public async fetchGifts(): Promise<GiftResponse> {
-    return { success: true, data: [] };
   }
 
   // --- PRIVATE ---
@@ -156,8 +150,6 @@ export class KickConnector extends ConnectorProvider {
   private _connection(slug: string): Connection {
     const conn: Connection = {
       slug,
-      channelId: 0,
-      chatroomId: 0,
       clientId: randomUUID(),
       up: false,
       reconnecting: false,
@@ -165,6 +157,7 @@ export class KickConnector extends ConnectorProvider {
       wasLive: false,
       offline: 0,
       ids: new Map(),
+      held: new Set(),
       socket: new KickSocket(this._config, {
         publication: (_feed, event, data) => this._notify(conn, event, data),
         drop: (why, terminal) => this._drop(conn, why, terminal),
@@ -184,8 +177,6 @@ export class KickConnector extends ConnectorProvider {
   private async _start(conn: Connection): Promise<number | null> {
     const channel = await lookup(this._config, conn.slug);
     conn.slug = channel.slug;
-    conn.channelId = channel.channelId;
-    conn.chatroomId = channel.chatroomId;
     const url = await realtime(this._config, conn.clientId);
     const token = await guestToken(this._config, conn.clientId);
     // A stop meanwhile already closed the socket: opening it would leak it
@@ -269,7 +260,15 @@ export class KickConnector extends ConnectorProvider {
       mapped.event === TOKIO_EVENTS.KICKS
     ) {
       const { username, userId } = mapped.data.user;
-      if (userId) conn.ids.set(username.toLowerCase(), Promise.resolve(userId));
+      if (userId) {
+        const name = username.toLowerCase();
+        keepNewest(
+          conn.ids,
+          name,
+          Promise.resolve(userId),
+          this._config.IDS_KEPT,
+        );
+      }
     }
     if (mapped.event === TOKIO_EVENTS.CHAT) {
       this.emitChat(mapped.data, () => this._conn === conn);
@@ -294,8 +293,10 @@ export class KickConnector extends ConnectorProvider {
     >,
   ) {
     const { user } = mapped.data;
+    conn.held.add(mapped);
     const userId = await this._userId(conn, user.username);
-    if (this._conn !== conn) return;
+    // A stop meanwhile sent it already
+    if (!conn.held.delete(mapped) || this._conn !== conn) return;
     if (userId) mapped.data.user = { ...user, userId };
     this.emit(mapped.event, mapped.data);
   }
@@ -304,9 +305,9 @@ export class KickConnector extends ConnectorProvider {
   // a failure logged and kept too
   private _userId(conn: Connection, username: string) {
     const name = username.toLowerCase();
-    let id = conn.ids.get(name);
-    if (!id) {
-      id = name
+    const id =
+      conn.ids.get(name) ??
+      (name
         ? lookup(this._config, slugOf(name))
             .then(({ userId }) => {
               if (userId === null) throw new Error("It came without its id.");
@@ -319,9 +320,8 @@ export class KickConnector extends ConnectorProvider {
               );
               return undefined;
             })
-        : Promise.resolve(undefined);
-      conn.ids.set(name, id);
-    }
+        : Promise.resolve(undefined));
+    keepNewest(conn.ids, name, id, this._config.IDS_KEPT);
     return id;
   }
 
@@ -400,6 +400,9 @@ export class KickConnector extends ConnectorProvider {
     clearTimeout(conn.retry);
     conn.wake?.();
     if (!conn.up) return;
+    // Before DISCONNECTED, as they came before the stop
+    for (const mapped of conn.held) this.emit(mapped.event, mapped.data);
+    conn.held.clear();
     Logger.info(
       `<Kick> Disconnected${reason ? " -- the stream ended" : ""}.`,
       this._logFile,

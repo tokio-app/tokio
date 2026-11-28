@@ -183,8 +183,12 @@ events.push(
         t("main.home.connected", { handle: handleOf(platforms[0]) }),
       );
     };
+    // The session's CONNECTED can be another platform's, like TikTok's look
+    const onConnected = () => {
+      if (several || isUp(connectorService.status()[platforms[0]])) answer();
+    };
     // Answers this connect only, so connects don't pile up listeners.
-    connectorService.on(TOKIO_EVENTS.CONNECTED, answer);
+    connectorService.on(TOKIO_EVENTS.CONNECTED, onConnected);
 
     try {
       if (!several) {
@@ -210,7 +214,6 @@ events.push(
       // Each platform's result is its own notice, and the state goes again.
       // All of them failing throws nothing, which would add a notice.
       await connectorService.connect(targets, (platform, res) => {
-        const key = `connect:${platform}`;
         if (res.error?.kind === "canceled") {
           // The user's own Disconnect stopped it: nothing to tell
         } else if (!res.success) {
@@ -218,7 +221,8 @@ events.push(
             "connector",
             FEEDBACK_CODES.CONNECT_FAILED,
             connectMessage(platform, handleOf(platform), res.error, true),
-            { key },
+            // Its success isn't keyed, so a quick retry that works says so
+            { key: `connect:${platform}` },
           );
         } else if (!isUp(on[platform])) {
           notifier.success(
@@ -228,13 +232,12 @@ events.push(
               handle: handleOf(platform),
               platform: PLATFORM_LABELS[platform],
             }),
-            { key },
           );
         }
         replyState();
       });
     } finally {
-      connectorService.off(TOKIO_EVENTS.CONNECTED, answer);
+      connectorService.off(TOKIO_EVENTS.CONNECTED, onConnected);
     }
   },
   {

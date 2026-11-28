@@ -713,14 +713,14 @@ describe("ConnectorService", () => {
 
     it("gives other platforms its log file and chat stage", () => {
       const service = new TestService();
-      service.setLogFile("connector.log");
-      const stage = vi.fn(() => null);
-      service.setChatStage(stage);
       const twitch = new FakeAccountConnector();
       const setLogFile = vi.spyOn(twitch, "setLogFile");
       const setChatStage = vi.spyOn(twitch, "setChatStage");
-
       service.add("twitch", twitch);
+      const stage = vi.fn(() => null);
+
+      service.setLogFile("connector.log");
+      service.setChatStage(stage);
       service.setLogFile("other.log");
 
       expect(setLogFile.mock.calls).toEqual([["connector.log"], ["other.log"]]);
@@ -733,10 +733,10 @@ describe("ConnectorService", () => {
   describe("the Twitch account", () => {
     it("is kept and used by Twitch's provider", async () => {
       const service = new TestService();
-      const onAccount = vi.fn(async () => true);
-      service.onTwitchAccount(onAccount);
       const twitch = new FakeAccountConnector();
       service.add("twitch", twitch);
+      const onAccount = vi.fn(async () => true);
+      service.onTwitchAccount(onAccount);
       const onCode = vi.fn();
       const { signal } = new AbortController();
 

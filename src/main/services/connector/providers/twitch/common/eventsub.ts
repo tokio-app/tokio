@@ -2,7 +2,7 @@
 // keepalives, the reconnect Twitch asks for, and its notifications.
 import { formatError } from "@/common/util";
 import WebSocket from "ws";
-import { connectFailure } from "../../../common";
+import { connectFailure, discard } from "../../../common";
 
 type Envelope = {
   metadata?: {
@@ -217,12 +217,4 @@ export class EventSub {
       this._handlers.drop(`no message for ${this._keepaliveMs / 1000} s`);
     }, this._keepaliveMs + this._graceMs);
   }
-}
-
-// Closes a socket nothing listens to anymore; its late errors are dropped
-function discard(socket: WebSocket | null) {
-  if (!socket) return;
-  socket.removeAllListeners();
-  socket.on("error", () => {});
-  socket.terminate();
 }

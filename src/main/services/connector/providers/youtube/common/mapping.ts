@@ -7,6 +7,7 @@ import {
   TokioEventMap,
   UserData,
 } from "@/common/types";
+import { emoteOnly } from "../../../common";
 
 type Thumbnail = { url: string; width?: number; height?: number };
 type Thumbnails = { thumbnails?: Thumbnail[] };
@@ -149,7 +150,7 @@ function youtubeUser(author: Author): UserData {
 function toChat(e: TextMessage): ChatEvent {
   // TikTok's shape: content without the custom emoji, each at its place in it
   let content = "";
-  let emotes: Emotes[] = [];
+  const emotes: Emotes[] = [];
   for (const run of e.message?.runs ?? []) {
     if (run.emoji?.isCustomEmoji) {
       emotes.push({
@@ -161,12 +162,10 @@ function toChat(e: TextMessage): ChatEvent {
       content += run.text ?? run.emoji?.emojiId ?? "";
     }
   }
-  // Only custom emoji, as TikTok sends an emote-only comment
-  if (!content.trim()) {
-    content = "";
-    emotes = emotes.map((emote) => ({ ...emote, index: 0 }));
-  }
-  return { user: youtubeUser(e), comment: { content, emotes, lang: "" } };
+  return {
+    user: youtubeUser(e),
+    comment: { ...emoteOnly(content, emotes), lang: "" },
+  };
 }
 
 const fromPaidMessage = (e: PaidMessage): Mapped => ({
