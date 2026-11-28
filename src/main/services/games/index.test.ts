@@ -189,6 +189,21 @@ describe("GamesService", () => {
       expect(minecraft.sent).toEqual(["say Thanks Bad e"]);
     });
 
+    it("runs whatever minimum or roles an older MCP save left on its trigger", async () => {
+      const minecraft = fakeMinecraft();
+      await service(minecraft).handle(TOKIO_EVENTS.GIFT, gift(1, true), {
+        actions: [
+          action({
+            trigger: trigger(TOKIO_EVENTS.GIFT, {
+              min_coins: 500,
+              roles: ["moderator"],
+            }),
+          }),
+        ],
+      });
+      expect(minecraft.sent).toEqual(["say Thanks Viewer"]);
+    });
+
     it("skips everything while Minecraft is off or can't listen", async () => {
       for (const state of ["off", "error"] as const) {
         const minecraft = fakeMinecraft(state);
