@@ -40,6 +40,7 @@ import {
   chatCommands,
   findOverlays,
   hasSetupBlock,
+  overlayEntry,
   processHTML,
   processOverlay,
 } from "./common";
@@ -159,6 +160,12 @@ export class OverlayService extends Service {
     if (this._store.wasRebuilt()) {
       for (const overlay of await findOverlays(this._folder, this._yaml)) {
         await this._store.addOverlayInfo(overlay);
+      }
+      // findOverlays can't see one only in its old folder: listed from there,
+      // the next start puts it back instead of deleting it as unknown
+      for (const [id, path] of left) {
+        const overlay = await overlayEntry(path, id, this._yaml);
+        if (overlay) await this._store.addOverlayInfo(overlay);
       }
     }
 
@@ -923,10 +930,10 @@ export class OverlayService extends Service {
   /**
    * Deletes the folders an install, update or remove cut short left behind,
    * except an installed version a crash left out of place, which goes back.
-   * Returns the ids it couldn't put back.
+   * Returns the ids it couldn't put back, with the folder each is left in.
    */
-  private async _removeStaging(): Promise<Set<string>> {
-    const left = new Set<string>();
+  private async _removeStaging(): Promise<Map<string, string>> {
+    const left = new Map<string, string>();
     const entries = await readdir(this._folder, { withFileTypes: true }).catch(
       () => [],
     );
@@ -947,7 +954,7 @@ export class OverlayService extends Service {
             this._logFile,
           );
         } catch (error) {
-          left.add(id);
+          left.set(id, path);
           Logger.error(
             `<Overlays> Unable to put back overlay ${id}, it's left in ${path} -- ${formatError(error)}`,
             this._logFile,

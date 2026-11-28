@@ -64,16 +64,29 @@ export async function findOverlays(
   );
   const overlays: (OverlayMetadata & { id: string })[] = [];
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    const external = IMPORTED_ID.test(entry.name);
     const named =
-      external || CatalogOverlaySchema.shape.id.safeParse(entry.name).success;
+      IMPORTED_ID.test(entry.name) ||
+      CatalogOverlaySchema.shape.id.safeParse(entry.name).success;
     if (!entry.isDirectory() || !named) continue;
-    const res = await processOverlay(join(folder, entry.name), yaml);
-    if (res.success && res.data) {
-      overlays.push({ ...res.data.info, id: entry.name, external });
-    }
+    const overlay = await overlayEntry(
+      join(folder, entry.name),
+      entry.name,
+      yaml,
+    );
+    if (overlay) overlays.push(overlay);
   }
   return overlays;
+}
+
+/** The store's entry for the overlay in `path` under `id`, or null. */
+export async function overlayEntry(
+  path: string,
+  id: string,
+  yaml: YAMLManagerService,
+): Promise<(OverlayMetadata & { id: string }) | null> {
+  const res = await processOverlay(path, yaml);
+  if (!res.success || !res.data) return null;
+  return { ...res.data.info, id, external: IMPORTED_ID.test(id) };
 }
 
 /**
