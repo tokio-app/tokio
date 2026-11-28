@@ -1,5 +1,5 @@
 import { RemoteSettings } from "@/common/schemas";
-import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import { APP_EVENTS } from "@/common/types";
 import { getRemoteURL } from "@/common/util";
 import {
   Btn,
@@ -11,7 +11,6 @@ import {
   Section,
   Select,
 } from "@/components";
-import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiRefreshCw } from "react-icons/fi";
@@ -22,22 +21,23 @@ interface Props {
   remote: RemoteSettings;
   // The phone reaches Tokio through the overlay server
   serverEnabled: boolean;
+  // This PC's addresses, once main answers
+  addresses: string[] | null;
   onChange: (enabled: boolean) => void;
 }
 
-export function RemoteSection({ remote, serverEnabled, onChange }: Props) {
+export function RemoteSection({
+  remote,
+  serverEnabled,
+  addresses,
+  onChange,
+}: Props) {
   const t = useT();
-  const [addresses, setAddresses] = useState<string[] | null>(null);
   const [picked, setPicked] = useState("");
   // Hidden until asked, as OBS hides stream keys: streamers show their screen
   const [shown, setShown] = useState(false);
   // A new key cuts off every phone, Stream Deck and assistant, so it asks
   const [asking, setAsking] = useState(false);
-
-  useIpcRequest(APP_EVENTS.GET_NETWORK_ADDRESSES);
-  useIpcListener(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, (res) => {
-    if (res) setAddresses(res.addresses);
-  });
 
   const host = addresses?.includes(picked) ? picked : addresses?.[0];
   const link = host ? getRemoteURL(host, remote.key) : "";

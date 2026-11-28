@@ -32,11 +32,13 @@ async function setup(reply = profiles) {
 }
 
 describe("Settings", () => {
-  it("asks main for the settings and the connection", () => {
+  it("asks main for the settings, the connection and the addresses", () => {
     renderWithProviders(<Settings />);
 
     expect(sent(APP_EVENTS.GET_SETTINGS)).toHaveLength(1);
     expect(sent(APP_EVENTS.IS_CONNECTED)).toHaveLength(1);
+    // Once, for the server's section and the remote's
+    expect(sent(APP_EVENTS.GET_NETWORK_ADDRESSES)).toHaveLength(1);
   });
 
   describe("Platforms", () => {

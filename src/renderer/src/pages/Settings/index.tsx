@@ -48,6 +48,8 @@ export function Settings() {
   const [connected, setConnected] = useState(false);
   // The shortcuts another app holds, from main's last answer
   const [taken, setTaken] = useState<ControlAction[]>([]);
+  // This PC's addresses, once main answers: the server's and the remote's
+  const [addresses, setAddresses] = useState<string[] | null>(null);
   // The active profile's platforms: a platform's sections show only with it
   const platforms = useProfilePlatforms();
 
@@ -64,6 +66,11 @@ export function Settings() {
 
   useIpcRequest(APP_EVENTS.GET_SETTINGS);
   useIpcRequest(APP_EVENTS.IS_CONNECTED);
+  useIpcRequest(APP_EVENTS.GET_NETWORK_ADDRESSES);
+
+  useIpcListener(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, (res) => {
+    if (res) setAddresses(res.addresses);
+  });
 
   useIpcListener(APP_EVENTS_RESPONSE.CONNECTED, (res) => {
     if (res) setConnected(res.success);
@@ -183,12 +190,14 @@ export function Settings() {
 
         <ServerSection
           enabled={store.settings.server.enabled}
+          addresses={addresses}
           onChange={server.toggle}
         />
 
         <RemoteSection
           remote={store.settings.remote}
           serverEnabled={store.settings.server.enabled}
+          addresses={addresses}
           onChange={(enabled) => {
             updateStore((s) => {
               s.settings.remote.enabled = enabled;
