@@ -14,6 +14,7 @@ import { writeFileAtomic } from "@/helper/fs";
 import { sendGamesOverlay } from "@/helper/games";
 import { refreshTikTokGifts, usesTikTok } from "@/helper/gifts";
 import { language, setLanguage, t } from "@/helper/i18n";
+import { takenShortcuts } from "@/helper/shortcuts";
 import Logger, { localTime } from "@/logger";
 import { profileSlug, StoreManagerService } from "@/services/store";
 import { chatCommands } from "@/services/translation/commands";
@@ -79,8 +80,13 @@ export const profileReply = (
 
 events.push(
   APP_EVENTS.GET_SETTINGS,
-  ({ storeManagerService }, e) => {
-    replySettings(e, storeManagerService);
+  ({ storeManagerService: store }, e) => {
+    // Only its own reply carries them: the page keeps its mark otherwise
+    e.reply(APP_EVENTS_RESPONSE.GET_SETTINGS, {
+      data: { settings: store.getSettings(), profiles: store.getProfiles() },
+      success: true,
+      taken: takenShortcuts(),
+    });
   },
   {
     failure: {
@@ -732,9 +738,15 @@ events.push(
 
 events.push(
   APP_EVENTS.SET_TRAY,
-  async ({ storeManagerService, trayService, notifier }, e, { enabled }) => {
+  async (
+    { storeManagerService, trayService, notifier, win },
+    e,
+    { enabled },
+  ) => {
     const saved = await storeManagerService.updateTraySettings(enabled);
     trayService.setEnabled(enabled);
+    // Hidden in the tray (an AI can turn it off), it would have no way back
+    if (!enabled && !win.isVisible()) win.show();
     replySettings(e, storeManagerService);
     if (!saved) throw saveFailure();
     e.reply(APP_EVENTS_RESPONSE.SET_TRAY, {

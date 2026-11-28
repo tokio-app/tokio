@@ -9,6 +9,7 @@ import { FiChevronDown } from "react-icons/fi";
 import elements from "../Elements/elements.module.css";
 import { GiftPicker } from "./GiftPicker";
 import styles from "./giftselect.module.css";
+import { samePicks } from "./Selection";
 
 type CommonProps = {
   gifts: CustomGift[];
@@ -58,11 +59,7 @@ export function GiftMultiSelect({
       placeholder={placeholder ?? t("components.gifts.placeholderMultiple")}
       selected={value}
       onApply={(gifts) => {
-        // Done without a change saves nothing.
-        const same =
-          gifts.length === value.length &&
-          gifts.every((gift, i) => gift === value[i]);
-        if (!same) onChange(gifts);
+        if (!samePicks(gifts, value)) onChange(gifts);
       }}
     />
   );

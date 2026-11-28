@@ -1,25 +1,17 @@
-import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { Check, CopyField, Field, FormGrid, Section } from "@/components";
-import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useT } from "@/ui/i18n";
-import { useState } from "react";
 import { FiMonitor } from "react-icons/fi";
 import styles from "../settings.module.css";
 
 interface Props {
   enabled: boolean;
+  // This PC's addresses, once main answers
+  addresses: string[] | null;
   onChange: (enabled: boolean) => void;
 }
 
-export function ServerSection({ enabled, onChange }: Props) {
+export function ServerSection({ enabled, addresses, onChange }: Props) {
   const t = useT();
-  // This PC's addresses, once main answers
-  const [addresses, setAddresses] = useState<string[] | null>(null);
-
-  useIpcRequest(APP_EVENTS.GET_NETWORK_ADDRESSES);
-  useIpcListener(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, (res) => {
-    if (res) setAddresses(res.addresses);
-  });
 
   return (
     <Section

@@ -1,4 +1,5 @@
 import { cx } from "@/helper/cx";
+import { capitalize } from "@/helper/format";
 import { usePopover } from "@/hooks/usePopover";
 import { useLanguage, useT } from "@/ui/i18n";
 import {
@@ -199,7 +200,7 @@ function Panel({ value, withTime, onChange, onDone }: PanelProps) {
   const month = fromIso(focused).getMonth();
   // Sentence case: Spanish writes months in lowercase
   const titleText = formats.title.format(fromIso(focused));
-  const title = titleText[0].toLocaleUpperCase(language) + titleText.slice(1);
+  const title = capitalize(titleText, language);
 
   const pick = (date: string) => {
     setFocused(date);

@@ -23,6 +23,7 @@ import {
 } from "@/common/util";
 import { usePlatforms } from "@/context/platforms";
 import { cx } from "@/helper/cx";
+import { capitalize } from "@/helper/format";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useLanguage, useOptions, useT } from "@/ui/i18n";
 import { FiEdit2, FiMessageSquare, FiMusic, FiTrash2 } from "react-icons/fi";
@@ -189,9 +190,6 @@ const NAMED = 3;
 // Between the triggers' conditions: each can hold commas and "or" already,
 // so another "or" would blur which goes with which
 const ROWS = " · ";
-
-const capitalize = (text: string, language: string) =>
-  text.charAt(0).toLocaleUpperCase(language) + text.slice(1);
 
 // The gifts or emotes picked, as the summary names them, null while the
 // lists don't have any of them

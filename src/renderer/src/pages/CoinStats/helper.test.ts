@@ -2,7 +2,6 @@ import { liveSummary } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
   allTime,
-  capitalize,
   DateFilter,
   dateRange,
   historyPlatforms,
@@ -112,6 +111,24 @@ describe("periodText", () => {
         NOW,
       ),
     ).toMatch(/^Oct 1, 2026 to Oct 20, 2026, 6:00\sPM$/);
+    // The whole day without a time, though the other end has one
+    expect(
+      periodText(
+        custom({ from: at("2026-11-10", "20:00"), to: at("2026-11-10") }),
+        "en",
+        NOW,
+      ),
+    ).toBe("Nov 10, 2026 to Nov 10, 2026");
+    expect(
+      periodText(
+        custom({
+          from: at("2026-11-09", "08:00"),
+          to: at("2026-11-10", "20:00"),
+        }),
+        "en",
+        NOW,
+      ),
+    ).toMatch(/^Nov 9, 2026, 8:00\sAM to Nov 10, 2026, 8:00\sPM$/);
     expect(
       periodText(
         custom({ operator: "before", from: at("2026-10-30") }),
@@ -262,14 +279,5 @@ describe("keepSelection", () => {
 
   it("goes to All time when no LIVE is left", () => {
     expect(keepSelection(3, lives, [])).toBeNull();
-  });
-});
-
-describe("capitalize", () => {
-  it("capitalizes a date that starts in lowercase", () => {
-    expect(capitalize("sábado, 31 de octubre de 2026", "es-419")).toBe(
-      "Sábado, 31 de octubre de 2026",
-    );
-    expect(capitalize("Saturday", "en")).toBe("Saturday");
   });
 });

@@ -7,7 +7,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { describe, expect, it, vi } from "vitest";
 import { Modal } from ".";
@@ -290,6 +290,28 @@ describe("Modal", () => {
 
     rerender(page(false));
     expect(behind).not.toHaveAttribute("inert");
+  });
+
+  it("leaves the page live before the layout effects of what closed it", () => {
+    // What a layout effect saw inert once the dialog closed
+    const seen: Element[][] = [];
+    function Page({ open }: { open: boolean }) {
+      useLayoutEffect(() => {
+        if (!open) seen.push([...document.querySelectorAll("[inert]")]);
+      }, [open]);
+      return (
+        <>
+          <button>Next row</button>
+          {open && <Modal title="Delete alert?" onClose={vi.fn()} />}
+        </>
+      );
+    }
+    const { rerender } = render(<Page open />);
+
+    rerender(<Page open={false} />);
+
+    // So useFocusAfterDelete can focus the next row
+    expect(seen).toEqual([[]]);
   });
 
   it("makes a lower dialog inert while one is open over it", () => {

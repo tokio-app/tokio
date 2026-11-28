@@ -32,7 +32,7 @@ Skip song, stop TTS, replay the last alert and pause everything (`CONTROL_ACTION
 
 ## Shortcuts
 
-- `settings.shortcuts` holds an Electron accelerator per action, all empty by default: a global shortcut takes its keys from every app. `applyShortcuts` registers them at the first `LOAD_APP` and on `SET_SHORTCUTS`. One another app holds warns (`SHORTCUT_TAKEN`) and shows under its row.
+- `settings.shortcuts` holds an Electron accelerator per action, all empty by default: a global shortcut takes its keys from every app. `applyShortcuts` registers them at the first `LOAD_APP` and on `SET_SHORTCUTS`. One another app holds warns (`SHORTCUT_TAKEN`) and shows under its row: `SET_SHORTCUTS` replies them, and `helper/shortcuts.ts` keeps the last ones applied for `GET_SETTINGS`'s own reply (`taken`), so the row shows the ones taken at startup. The other `replySettings` calls leave `taken` out, and the page keeps its mark then.
 - The recorder suspends them (`SUSPEND_SHORTCUTS`), or a combination already set would fire its action instead of reaching the field. Registrations fail while suspended, so `SET_SHORTCUTS` resumes first. Every `LOAD_APP` resumes too, so a window that died mid-recording can't leave them off. `will-quit` unregisters before its settle wait.
 - `toAccelerator` takes a letter from the character its key types on the user's layout (`navigator.keyboard.getLayoutMap()`), never from where it sits on a US keyboard (`.claude/rules/app-lifecycle.md`), and a digit from the number row's key.
 - What a shortcut may be:

@@ -32,11 +32,13 @@ async function setup(reply = profiles) {
 }
 
 describe("Settings", () => {
-  it("asks main for the settings and the connection", () => {
+  it("asks main for the settings, the connection and the addresses", () => {
     renderWithProviders(<Settings />);
 
     expect(sent(APP_EVENTS.GET_SETTINGS)).toHaveLength(1);
     expect(sent(APP_EVENTS.IS_CONNECTED)).toHaveLength(1);
+    // Once, for the server's section and the remote's
+    expect(sent(APP_EVENTS.GET_NETWORK_ADDRESSES)).toHaveLength(1);
   });
 
   describe("Platforms", () => {
@@ -704,6 +706,25 @@ describe("Settings", () => {
         row("Pause everything").queryByText("In use by another app"),
       ).not.toBeInTheDocument();
       expect(sent(APP_EVENTS.SET_SHORTCUTS).at(-1)!.shortcuts.pause).toBe("");
+    });
+
+    it("marks one another app took at startup, which other saves keep", async () => {
+      await setup(withShortcuts);
+      // The answer to the page's own request
+      await send(APP_EVENTS_RESPONSE.GET_SETTINGS, {
+        ...withShortcuts,
+        taken: ["pause"],
+      });
+      expect(
+        row("Pause everything").getByText("In use by another app"),
+      ).toBeVisible();
+
+      // Another setting's save sends the settings without them
+      await send(APP_EVENTS_RESPONSE.GET_SETTINGS, withShortcuts);
+
+      expect(
+        row("Pause everything").getByText("In use by another app"),
+      ).toBeVisible();
     });
   });
   describe("Remote control", () => {

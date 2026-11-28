@@ -61,7 +61,7 @@ import {
   useServerEnabled,
 } from "@/hooks";
 import { useTriggerChoices } from "@/pages/Alerts/useTriggerChoices";
-import { capitalize } from "@/pages/CoinStats/helper";
+import { capitalize } from "@/helper/format";
 import { useTimerPush } from "@/pages/CountdownTimer/helper";
 import { newOverlayName, sizeText } from "@/pages/Studio/helper";
 import toolsStyles from "@/pages/Tools/tools.module.css";

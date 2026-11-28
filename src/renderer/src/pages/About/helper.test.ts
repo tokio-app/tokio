@@ -78,12 +78,15 @@ describe("updateDetail", () => {
     expect(updateDetail({ state: "checking" }, "en")).toBeUndefined();
   });
 
-  it("says when Tokio last checked", () => {
+  it("says the day and time Tokio last checked", () => {
     const checkedAt = new Date(2026, 10, 11, 14, 5).getTime();
 
     // Intl puts a narrow no-break space before PM
     expect(updateDetail({ state: "none", checkedAt }, "en")).toMatch(
-      /^Last checked at 2:05\sPM$/,
+      /^Last checked Nov 11, 2026, 2:05\sPM$/,
+    );
+    expect(updateDetail({ state: "none", checkedAt }, "es-419")).toMatch(
+      /^Última búsqueda: 11 nov 2026, 2:05\sp\.m\.$/,
     );
   });
 

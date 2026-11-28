@@ -20,6 +20,7 @@ paths:
 
 - While **Settings → Tray** is on (the default, `settings.tray`), closing the main window only hides it: `AppHandler` (`src/main/handler/app.ts`) hides it on `close` until a quit.
 - `TrayService` shows the icon once `LOAD_APP` has run.
+- Turning the tray off (`SET_TRAY`, MCP included) while the window is hidden in it shows the window, which would have no way back.
 - On Linux, the first time each run that closing hides it, a system notification says Tokio is still running, and clicking it shows the window: desktops without a tray host (vanilla GNOME) show no icon.
 
 ## Quitting

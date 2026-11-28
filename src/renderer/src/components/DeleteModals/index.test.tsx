@@ -2,7 +2,8 @@ import { APP_EVENTS } from "@/common/types";
 import { mediaFile } from "@test/fixtures";
 import { sent } from "@test/ipc";
 import { renderWithProviders } from "@test/render";
-import { screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
+import { useEffect, useRef, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
   ClearHistoryModal,
@@ -10,7 +11,7 @@ import {
   DeletePictureModal,
   DeleteStudioOverlayModal,
 } from ".";
-import { DeleteActionModal, DeleteAlertModal } from ".";
+import { DeleteActionModal, DeleteAlertModal, useFocusAfterDelete } from ".";
 
 describe("DeleteStudioOverlayModal", () => {
   const item = { id: "1b4e28ba-2fa1-41d2-883f-0016d3cca427", name: "Main" };
@@ -165,5 +166,61 @@ describe("DeleteActionModal", () => {
     );
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(onDelete).toHaveBeenCalledOnce();
+  });
+});
+
+describe("useFocusAfterDelete", () => {
+  // Like Modal's cleanup: with the focus lost, as a deleted row's button
+  // leaves it in Chromium, it moves it to the page
+  function Dialog() {
+    useEffect(
+      () => () => {
+        const active = document.activeElement;
+        if (!active || active === document.body || !active.isConnected) {
+          document.querySelector<HTMLElement>("main")?.focus();
+        }
+      },
+      [],
+    );
+    return null;
+  }
+
+  function List() {
+    const [ids, setIds] = useState(["a", "b", "c"]);
+    const [open, setOpen] = useState(true);
+    const list = useRef<HTMLDivElement>(null);
+    const fallback = useRef<HTMLButtonElement>(null);
+    const deleted = useFocusAfterDelete(ids, list, fallback);
+    return (
+      <main tabIndex={-1}>
+        <button ref={fallback}>Add</button>
+        <div ref={list}>
+          {ids.map((id, at) => (
+            <div key={id}>
+              <button
+                onClick={() => {
+                  deleted(id, at);
+                  setIds((all) => all.filter((other) => other !== id));
+                  setOpen(false);
+                }}
+              >
+                {`Delete ${id}`}
+              </button>
+            </div>
+          ))}
+        </div>
+        {open && <Dialog />}
+      </main>
+    );
+  }
+
+  it("focuses the row in the deleted one's place before a closing dialog moves the focus", () => {
+    render(<List />);
+    const trash = screen.getByRole("button", { name: "Delete b" });
+    trash.focus();
+
+    act(() => trash.click());
+
+    expect(screen.getByRole("button", { name: "Delete c" })).toHaveFocus();
   });
 });

@@ -211,7 +211,7 @@ export function updateDetail(
   switch (status.state) {
     case "none":
       return translate(language, "about.update.checkedAt", {
-        time: formatDate(status.checkedAt, language, "time"),
+        time: formatDate(status.checkedAt, language, "shortTime"),
       });
     case "available":
       return status.manual

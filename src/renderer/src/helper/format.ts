@@ -12,6 +12,10 @@ export function formatList(items: string[]): string {
   return items.join(", ");
 }
 
+// Spanish dates start with the weekday in lowercase, "sábado, 31 de octubre"
+export const capitalize = (text: string, language: string) =>
+  text.charAt(0).toLocaleUpperCase(language) + text.slice(1);
+
 // A font named by the streamer, with the app's (and the overlays') as the
 // fallback. One CSSOM property, so a name can't add any other style.
 export const fontFamily = (font: string) =>

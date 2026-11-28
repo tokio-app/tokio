@@ -4,7 +4,13 @@ import { Notifier } from "@/helper/feedback";
 import { setLanguage } from "@/helper/i18n";
 import { globalShortcut } from "@test/electron";
 import { describe, expect, it, vi } from "vitest";
-import { applyShortcuts, warnTaken } from "./shortcuts";
+import { createHandler } from "@test/handler";
+import {
+  applyShortcuts,
+  applyStoredShortcuts,
+  takenShortcuts,
+  warnTaken,
+} from "./shortcuts";
 
 const shortcuts = (
   set: Partial<typeof defaultStoreData.settings.shortcuts>,
@@ -53,6 +59,23 @@ describe("applyShortcuts", () => {
 
     expect(taken).toEqual(["skipSong", "stopTts"]);
     expect(globalShortcut.isRegistered("F11")).toBe(true);
+  });
+});
+
+describe("applyStoredShortcuts", () => {
+  it("keeps what it returns for Settings, until the next apply", () => {
+    globalShortcut.take("F9");
+    let stored = shortcuts({ pause: "F9" });
+    const { handler } = createHandler({
+      storeManagerService: { getSettings: () => ({ shortcuts: stored }) },
+    });
+
+    expect(applyStoredShortcuts(handler)).toEqual(["pause"]);
+    expect(takenShortcuts()).toEqual(["pause"]);
+
+    stored = shortcuts({ pause: "F10" });
+    applyStoredShortcuts(handler);
+    expect(takenShortcuts()).toEqual([]);
   });
 });
 

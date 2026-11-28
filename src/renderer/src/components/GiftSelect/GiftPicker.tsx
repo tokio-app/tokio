@@ -11,9 +11,10 @@ import {
 } from "@/helper/gifts";
 import { useLanguage, useOptions, useT } from "@/ui/i18n";
 import { FocusEvent, useMemo, useState } from "react";
-import { Btn, Check, Input, NumberInput, Select } from "../Elements";
+import { Btn, Input, NumberInput, Select } from "../Elements";
 import { Modal } from "../Modal";
 import styles from "./giftselect.module.css";
+import { CheckRow, SelectionBar, togglePick } from "./Selection";
 
 type Props = {
   gifts: CustomGift[];
@@ -34,6 +35,7 @@ export function GiftPicker({
   onClose,
 }: Props) {
   const t = useT();
+  const language = useLanguage();
   const sorts = useOptions(GIFT_SORTS);
   const [filter, setFilter] = useState<GiftFilter>({
     search: "",
@@ -92,8 +94,16 @@ export function GiftPicker({
 
       {multiple && (
         <SelectionBar
-          shown={shown}
-          total={gifts.length}
+          items={
+            shown.length === gifts.length
+              ? giftsLabel(gifts.length, language)
+              : t("components.gifts.shownOf", {
+                  shown: shown.length,
+                  gifts: giftsLabel(gifts.length, language),
+                })
+          }
+          selectAll={t("components.gifts.selectAll")}
+          shown={shown.map((gift) => gift.value)}
           picked={picked}
           onChange={setPicked}
         />
@@ -173,52 +183,6 @@ function CoinFilter({ filter, onChange }: FilterProps) {
   );
 }
 
-type SelectionProps = {
-  shown: CustomGift[];
-  // Gifts in the list, shown or not
-  total: number;
-  picked: number[];
-  onChange: (picked: number[]) => void;
-};
-
-// How many gifts are shown and checked, and the actions on them
-function SelectionBar({ shown, total, picked, onChange }: SelectionProps) {
-  const t = useT();
-  const language = useLanguage();
-  const checked = new Set(picked);
-  const unchecked = shown
-    .filter((gift) => !checked.has(gift.value))
-    .map((gift) => gift.value);
-
-  return (
-    <div className={styles.toolbar}>
-      <span className={styles.count}>
-        {t("components.picker.selected", {
-          items:
-            shown.length === total
-              ? giftsLabel(total, language)
-              : t("components.gifts.shownOf", {
-                  shown: shown.length,
-                  gifts: giftsLabel(total, language),
-                }),
-          count: picked.length,
-        })}
-      </span>
-      <div className={styles.actions}>
-        <Btn
-          disabled={unchecked.length === 0}
-          onClick={() => onChange([...picked, ...unchecked])}
-        >
-          {t("components.gifts.selectAll")}
-        </Btn>
-        <Btn disabled={picked.length === 0} onClick={() => onChange([])}>
-          {t("common.clear")}
-        </Btn>
-      </div>
-    </div>
-  );
-}
-
 type ListProps = {
   shown: CustomGift[];
   // Said when no gift is shown
@@ -233,31 +197,18 @@ function GiftList({ shown, empty, multiple, picked, onChange }: ListProps) {
   const checked = new Set(picked);
   const current = multiple ? undefined : picked[0];
 
-  const toggle = (id: number) =>
-    onChange(
-      checked.has(id)
-        ? picked.filter((value) => value !== id)
-        : [...picked, id],
-    );
-
   return (
     <div className={styles.list}>
       {shown.map((gift) =>
         multiple ? (
-          <label
+          <CheckRow
             key={gift.value}
-            className={cx(
-              styles.row,
-              checked.has(gift.value) && styles.current,
-            )}
             title={gift.label}
+            checked={checked.has(gift.value)}
+            onToggle={() => onChange(togglePick(picked, gift.value))}
           >
-            <Check
-              checked={checked.has(gift.value)}
-              onChange={() => toggle(gift.value)}
-            />
             <GiftInfo gift={gift} />
-          </label>
+          </CheckRow>
         ) : (
           <button
             key={gift.value}
