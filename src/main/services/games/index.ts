@@ -212,9 +212,10 @@ export class GamesService extends Service {
     const runs: Promise<void>[] = [];
     for (const action of games.actions) {
       if (!action.enabled || action.steps.length === 0) continue;
-      if (!matchesTrigger(action.trigger, type, payload, added, total)) {
-        continue;
-      }
+      // The Games page has no minimum or roles: ones MCP saved before it
+      // refused them would skip events for a reason no one can see
+      const trigger = { ...action.trigger, min_coins: 0, roles: [] };
+      if (!matchesTrigger(trigger, type, payload, added, total)) continue;
 
       const times = this._times(action, payload, added);
       if (times === 0) continue;
