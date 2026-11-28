@@ -321,7 +321,7 @@ describe("MCP registry", () => {
           username: "host",
         },
         liveService: {
-          getSession: () => ({
+          getNumbers: () => ({
             startedAt: 0,
             totals: {
               followers: 1,
@@ -334,8 +334,6 @@ describe("MCP registry", () => {
               giftSubs: 7,
             },
             usd: 12.345,
-            activity: [],
-            viewers: [],
           }),
         },
         controlsService: { isPaused: () => true },

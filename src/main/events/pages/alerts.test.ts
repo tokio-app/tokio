@@ -1070,10 +1070,9 @@ describe("alerts events", () => {
           getOverlays: () => [],
         },
         liveService: {
-          getSession: () => ({
+          getNumbers: () => ({
             startedAt: null,
             totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
-            activity: [],
           }),
         },
         studioService: { kept: () => null },

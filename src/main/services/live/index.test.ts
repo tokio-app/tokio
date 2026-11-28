@@ -527,6 +527,24 @@ describe("LiveService", () => {
     expect(live.getSession().activity[0].id).toBe(2);
   });
 
+  it("gives the numbers without copying the feed or the chart", () => {
+    live.setRates({ toUsd: () => 4.99 });
+    live.start(1000);
+    live.record(TOKIO_EVENTS.FOLLOW, { user: viewer("sora") });
+    const numbers = live.getNumbers();
+
+    live.record(TOKIO_EVENTS.SHARE, { user: viewer("ren"), shareCount: 1 });
+
+    expect(numbers).toEqual({
+      startedAt: 1000,
+      totals: { ...noTotals, followers: 1, shares: 1 },
+      usd: 4.99,
+    });
+    // The live totals themselves, read as they change
+    expect(live.getNumbers().totals).toBe(numbers.totals);
+    expect(numbers).not.toHaveProperty("activity");
+  });
+
   it("gives a copy that later events don't change", () => {
     join(live, "kai");
     live.record(TOKIO_EVENTS.SHARE, { user: viewer("ren"), shareCount: 1 });

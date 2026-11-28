@@ -311,6 +311,20 @@ export class LiveService extends Service {
     return this._startedAt;
   }
 
+  /**
+   * When the LIVE started, its totals and their dollars, without
+   * getSession's copy, for what reads them often: read only.
+   */
+  public getNumbers(): Pick<LiveSession, "startedAt" | "usd"> & {
+    totals: Readonly<LiveTotals>;
+  } {
+    return {
+      startedAt: this._startedAt,
+      totals: this._totals,
+      usd: this._rates.toUsd(this._superChats),
+    };
+  }
+
   /** A copy, so later events don't change what was sent. */
   public getSession(): LiveSession {
     return {

@@ -94,8 +94,7 @@ export function liveNumbers(
   now = Date.now(),
 ): StudioNumbers {
   const { likes, viewers } = storeManagerService.getLiveStats();
-  const session = liveService.getSession();
-  const { startedAt, totals } = session;
+  const { startedAt, totals, usd } = liveService.getNumbers();
   const live = startedAt !== null;
   return {
     likes,
@@ -105,7 +104,7 @@ export function liveNumbers(
     coins: live ? totals.coins : 0,
     kicks: live ? totals.kicks : 0,
     bits: live ? totals.bits : 0,
-    superchats: live ? session.usd : 0,
+    superchats: live ? usd : 0,
     gifts: live ? totals.gifts : 0,
     giftsubs: live ? totals.giftSubs : 0,
     uptime: live ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0,

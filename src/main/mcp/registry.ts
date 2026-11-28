@@ -82,7 +82,7 @@ const getStatus = (handler: Handler): CallToolResult => {
     updaterService,
   } = handler;
   const settings = storeManagerService.getSettings();
-  const { startedAt, totals, usd } = liveService.getSession();
+  const { startedAt, totals, usd } = liveService.getNumbers();
   const stats = storeManagerService.getLiveStats();
   const minecraft = gamesService.status().minecraft;
   const timer = timerService.get().state;
