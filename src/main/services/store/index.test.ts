@@ -111,6 +111,12 @@ describe("StoreManagerService", () => {
   const readJSON = async (file: string) =>
     JSON.parse(await readFile(file, "utf-8"));
 
+  // The file a new profile of that name gets
+  const fileOf = async (store: StoreManagerService, name: string) => {
+    const made = await store.createNewProfile(name);
+    return typeof made === "object" ? made?.file : made;
+  };
+
   it("refuses to work before initialize", () => {
     expect(() => new StoreManagerService().getSettings()).toThrow(
       "not initialized",
@@ -504,7 +510,7 @@ describe("StoreManagerService", () => {
         },
         alerts: { ...defaultProfile.alerts, items: [alert] },
       });
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await store.updateActiveProfile("stream.json");
       await store.updateProfileData({
         tts: { ...defaultProfile.tts, voice: eleven },
@@ -523,6 +529,30 @@ describe("StoreManagerService", () => {
         { handle: "mod", voice: edge },
       ]);
       expect(other.alerts.items[0].tts.voice).toEqual(fallback);
+    });
+
+    it("sweeps every profile when one is deleted during the sweep", async () => {
+      const store = await init();
+      for (const name of ["Alpha", "Bravo", "Charlie"]) {
+        await store.createNewProfile(name);
+      }
+      const update = store.updateProfileData.bind(store);
+      vi.spyOn(store, "updateProfileData").mockImplementation(
+        async (updates, file) => {
+          const saved = await update(updates, file);
+          if (file === "alpha.json") await store.deleteProfile("alpha.json");
+          return saved;
+        },
+      );
+
+      expect(await store.removeVoices("Default")).toBe(true);
+
+      for (const file of ["bravo.json", "charlie.json"]) {
+        const profile = await readJSON(
+          join(paths.folders.profilesFolder, file),
+        );
+        expect(profile.tts.voice.id).toBe("");
+      }
     });
 
     it("keeps one entry, with the last key, for two keys saved at once", async () => {
@@ -573,12 +603,8 @@ describe("StoreManagerService", () => {
       await mkdir(`${storeFile}.tmp`);
 
       expect(await store.updateServerSettings(true)).toBe(false);
-      expect(await store.createNewProfile("stream.json", "Stream")).toBe(
-        "unsaved",
-      );
-      expect(
-        await store.cloneProfile("default.json", "copy.json", "Copy"),
-      ).toBe("unsaved");
+      expect(await store.createNewProfile("Stream")).toBe("unsaved");
+      expect(await store.cloneProfile("default.json", "Copy")).toBe("unsaved");
       expect(store.getProfiles()).toEqual(defaultStoreData.profiles);
       // Their files go too, so a new try can have the same file name.
       expect(await readdir(paths.folders.profilesFolder)).toEqual([
@@ -658,10 +684,31 @@ describe("StoreManagerService", () => {
       vi.spyOn(safeStorage, "decryptStringAsync").mockRejectedValue(
         new Error("Decryption failed"),
       );
+      const warn = vi.spyOn(Logger, "warn");
 
       const store = await init();
 
       expect(store.getSettings().activeConnProvider.key).toBe("");
+      expect(warn.mock.calls.map(([line]) => line)).toEqual([
+        expect.stringContaining("couldn't be decrypted -- Decryption failed"),
+      ]);
+    });
+
+    it("saves a key it can't encrypt as it is, and logs it without the key", async () => {
+      const store = await init();
+      vi.spyOn(safeStorage, "encryptStringAsync").mockRejectedValue(
+        new Error("Keychain denied"),
+      );
+      const warn = vi.spyOn(Logger, "warn");
+
+      expect(await store.updateProvider("Default", "euler-key")).toBe(true);
+
+      expect((await readJSON(storeFile)).settings.activeConnProvider.key).toBe(
+        "euler-key",
+      );
+      expect(warn.mock.calls.map(([line]) => line)).toEqual([
+        "<System> Saving the Default key unencrypted: Keychain denied",
+      ]);
     });
 
     it("reads keys saved without encryption as they are", async () => {
@@ -684,10 +731,14 @@ describe("StoreManagerService", () => {
       vi.spyOn(safeStorage, "isAsyncEncryptionAvailable").mockResolvedValue(
         false,
       );
+      const warn = vi.spyOn(Logger, "warn");
 
       const store = await init();
 
       expect(store.getSettings().activeConnProvider.key).toBe("");
+      expect(warn.mock.calls.map(([line]) => line)).toEqual([
+        expect.stringContaining("read as empty: encryption is unavailable"),
+      ]);
     });
 
     // On macOS it can ask for the Keychain
@@ -1129,7 +1180,7 @@ describe("StoreManagerService", () => {
     it("creates a profile once", async () => {
       const store = await init();
 
-      const created = await store.createNewProfile("stream.json", "Stream");
+      const created = await store.createNewProfile("Stream");
       await store.addProfile({ file: "stream.json", name: "Stream" });
 
       expect(created).toEqual({ file: "stream.json", name: "Stream" });
@@ -1145,9 +1196,10 @@ describe("StoreManagerService", () => {
       const store = await init();
       await store.updateProfileData({ connector: { username: "streamer" } });
 
-      expect(
-        await store.createNewProfile("default.json", "Default"),
-      ).toBeNull();
+      expect(await store.createNewProfile("Default")).toEqual({
+        file: "default-2.json",
+        name: "Default",
+      });
 
       expect((await readJSON(defaultProfileFile)).connector.username).toBe(
         "streamer",
@@ -1156,13 +1208,14 @@ describe("StoreManagerService", () => {
 
     it("never clones over an existing file", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await store.updateActiveProfile("stream.json");
       await store.updateProfileData({ connector: { username: "streamer" } });
 
-      expect(
-        await store.cloneProfile("default.json", "stream.json", "Stream"),
-      ).toBeNull();
+      expect(await store.cloneProfile("default.json", "Stream")).toEqual({
+        file: "stream-2.json",
+        name: "Stream",
+      });
 
       const stream = join(paths.folders.profilesFolder, "stream.json");
       expect((await readJSON(stream)).connector.username).toBe("streamer");
@@ -1171,9 +1224,10 @@ describe("StoreManagerService", () => {
     it("keeps profile files inside the profiles folder", async () => {
       const store = await init();
 
-      expect(
-        await store.createNewProfile("../outside.json", "Outside"),
-      ).toBeNull();
+      expect(await store.createNewProfile("../outside")).toEqual({
+        file: "outside.json",
+        name: "../outside",
+      });
 
       await expect(
         readFile(join(paths.folders.profilesFolder, "..", "outside.json")),
@@ -1183,20 +1237,37 @@ describe("StoreManagerService", () => {
     it("names a profile's file after it, in safe characters", async () => {
       const store = await init();
 
-      expect(await store.profileFileFor("Chill Stream")).toBe(
-        "chill-stream.json",
-      );
-      expect(await store.profileFileFor("Café Ñandú!")).toBe("cafe-nandu.json");
-      expect(await store.profileFileFor("../../outside")).toBe("outside.json");
-      expect(await store.profileFileFor("🎮🎮")).toBe("profile.json");
+      expect(await fileOf(store, "Chill Stream")).toBe("chill-stream.json");
+      expect(await fileOf(store, "Café Ñandú!")).toBe("cafe-nandu.json");
+      expect(await fileOf(store, "../../outside")).toBe("outside.json");
+      expect(await fileOf(store, "🎮🎮🎮")).toBe("profile.json");
     });
 
     it("adds a number to a file another profile has, listed or on disk", async () => {
       const store = await init();
       await writeFile(join(paths.folders.profilesFolder, "stream.json"), "{}");
 
-      expect(await store.profileFileFor("Default")).toBe("default-2.json");
-      expect(await store.profileFileFor("Stream")).toBe("stream-2.json");
+      expect(await fileOf(store, "Default")).toBe("default-2.json");
+      expect(await fileOf(store, "Stream")).toBe("stream-2.json");
+    });
+
+    it("gives two profiles created at once a file each", async () => {
+      const store = await init();
+
+      const made = await Promise.all([
+        store.createNewProfile("My Stream"),
+        store.cloneProfile("default.json", "my-stream"),
+        store.importProfile(defaultProfileFile),
+      ]);
+
+      expect(made).toEqual([
+        { file: "my-stream.json", name: "My Stream" },
+        { file: "my-stream-2.json", name: "my-stream" },
+        { file: "default-2.json", name: "Default 2" },
+      ]);
+      const stream = join(paths.folders.profilesFolder, "my-stream.json");
+      expect((await readJSON(stream)).name).toBe("My Stream");
+      expect(store.getProfiles()).toHaveLength(4);
     });
 
     it("counts a listed file as taken in any case", async () => {
@@ -1216,14 +1287,14 @@ describe("StoreManagerService", () => {
         expect.objectContaining({ file: "Stream.json" }),
       );
 
-      expect(await store.profileFileFor("stream")).toBe("stream-2.json");
+      expect(await fileOf(store, "stream")).toBe("stream-2.json");
     });
 
     it("clones a profile under a new name", async () => {
       const store = await init();
       await store.updateProfileData({ connector: { username: "streamer" } });
 
-      await store.cloneProfile("default.json", "copy.json", "Copy");
+      await store.cloneProfile("default.json", "Copy");
 
       const copy = await json.loadFile(
         join(paths.folders.profilesFolder, "copy.json"),
@@ -1235,13 +1306,13 @@ describe("StoreManagerService", () => {
 
     it("clones a profile with the update still writing to it", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
 
       const saving = store.updateProfileData(
         { connector: { username: "streamer" } },
         "stream.json",
       );
-      await store.cloneProfile("stream.json", "copy.json", "Copy");
+      await store.cloneProfile("stream.json", "Copy");
       expect(await saving).toBe(true);
 
       const copy = await readJSON(
@@ -1252,7 +1323,7 @@ describe("StoreManagerService", () => {
 
     it("renames a profile, keeping its file", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       const files = await readdir(paths.folders.profilesFolder);
 
       expect(await store.renameProfile("stream.json", "Night stream")).toBe(
@@ -1306,7 +1377,7 @@ describe("StoreManagerService", () => {
 
     it("renames nothing it doesn't list, or can't write", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await rm(join(paths.folders.profilesFolder, "stream.json"));
       vi.spyOn(Logger, "error");
 
@@ -1335,7 +1406,7 @@ describe("StoreManagerService", () => {
       // and the active profile's own
       const withData = async () => {
         const store = await init();
-        await store.createNewProfile("stream.json", "Stream");
+        await store.createNewProfile("Stream");
         for (const name of ["stream", "default"]) {
           await mkdir(fansFolder, { recursive: true });
           await writeFile(join(fansFolder, `${name}.json`), "{}");
@@ -1407,20 +1478,40 @@ describe("StoreManagerService", () => {
           Promise.reject(Object.assign(new Error("EBUSY"), { code: "EBUSY" })),
         );
 
-        expect(await store.deleteProfile("stream.json")).toBe("deleted");
+        expect(await store.deleteProfile("stream.json")).toBe("leftovers");
 
         expect(store.getProfiles()).toEqual(defaultStoreData.profiles);
         expect(await exists(fans)).toBe(true);
         expect(
           await exists(join(paths.folders.profilesFolder, "stream.json")),
         ).toBe(true);
-        expect(await store.profileFileFor("Stream")).toBe("stream-2.json");
+        expect(await fileOf(store, "Stream")).toBe("stream-2.json");
+      });
+
+      it("says so when the profile's own file can't be deleted", async () => {
+        const store = await withData();
+        vi.spyOn(Logger, "warn");
+        const fs = await import("fs/promises");
+        const rm = fs.rm;
+        const profile = join(paths.folders.profilesFolder, "stream.json");
+        vi.spyOn(fs, "rm").mockImplementation((path, options) =>
+          path === profile
+            ? Promise.reject(
+                Object.assign(new Error("EBUSY"), { code: "EBUSY" }),
+              )
+            : rm(path, options),
+        );
+
+        expect(await store.deleteProfile("stream.json")).toBe("leftovers");
+
+        expect(store.getProfiles()).toEqual(defaultStoreData.profiles);
+        expect(await exists(profile)).toBe(true);
       });
     });
 
     it("refuses to switch to a profile that isn't listed", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await store.updateActiveProfile("stream.json");
 
       expect(await store.updateActiveProfile("missing.json")).toBe("missing");
@@ -1430,8 +1521,8 @@ describe("StoreManagerService", () => {
 
     it("keeps the active profile when the new one's file is gone or damaged", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
-      await store.createNewProfile("night.json", "Night");
+      await store.createNewProfile("Stream");
+      await store.createNewProfile("Night");
       await writeFile(join(paths.folders.profilesFolder, "stream.json"), "{");
       await rm(join(paths.folders.profilesFolder, "night.json"));
       vi.spyOn(Logger, "error");
@@ -1450,7 +1541,7 @@ describe("StoreManagerService", () => {
 
     it("stays on the active profile when the switch can't be saved", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await mkdir(`${storeFile}.tmp`);
 
       expect(await store.updateActiveProfile("stream.json")).toBe("unsaved");
@@ -1463,7 +1554,7 @@ describe("StoreManagerService", () => {
 
     it("switches the profile that updates go to", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
 
       expect(await store.updateActiveProfile("stream.json")).toBe("switched");
       await store.updateProfileData({ connector: { username: "streamer" } });
@@ -1479,7 +1570,7 @@ describe("StoreManagerService", () => {
     // An autosave can still be writing when the user switches profiles
     it("keeps the profile switched to when a save of the old one ends after the switch", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       let release!: () => void;
       const released = new Promise<void>((resolve) => (release = resolve));
       const updateFile = json.updateFile.bind(json);
@@ -1515,9 +1606,41 @@ describe("StoreManagerService", () => {
       return () => release();
     };
 
+    it("switches to a profile with an update still writing to it", async () => {
+      const store = await init();
+      await store.createNewProfile("Stream");
+      const load = json.loadFile.bind(json);
+      let reading!: () => void;
+      const started = new Promise<void>((resolve) => (reading = resolve));
+      const loadFile = vi
+        .spyOn(json, "loadFile")
+        .mockImplementationOnce((path, schema) => {
+          reading();
+          return load(path, schema);
+        });
+      const saving = store.updateProfileData(
+        { connector: { username: "streamer" } },
+        "stream.json",
+      );
+      // The update is reading. The switch's read ends after the update wrote,
+      // as when a sweep writes the profile meanwhile.
+      await started;
+      loadFile.mockImplementationOnce(async (path, schema) => {
+        const data = await load(path, schema);
+        await saving;
+        return data;
+      });
+
+      expect(await store.updateActiveProfile("stream.json")).toBe("switched");
+
+      expect((await store.getProfileData())?.connector.username).toBe(
+        "streamer",
+      );
+    });
+
     it("holds the new profile in memory while the switch is saving", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await store.getProfileData();
       const release = holdStoreSave();
 
@@ -1533,7 +1656,7 @@ describe("StoreManagerService", () => {
 
     it("keeps an update made while the switch is saving", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await store.getProfileData();
       const release = holdStoreSave();
 
@@ -1553,7 +1676,7 @@ describe("StoreManagerService", () => {
 
     it("holds the old profile in memory again when the switch can't be saved", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await store.getProfileData();
       const release = holdStoreSave(false);
 
@@ -1570,7 +1693,7 @@ describe("StoreManagerService", () => {
 
     it("holds an update the old profile got while the switch was saving when it can't be saved", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await store.getProfileData();
       const release = holdStoreSave(false);
 
@@ -1592,7 +1715,7 @@ describe("StoreManagerService", () => {
 
     it("saves the undone switch over an earlier save that wrote it", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       const release = holdStoreSave();
       const earlier = store.updateServerSettings(true);
       vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
@@ -1630,7 +1753,7 @@ describe("StoreManagerService", () => {
 
     it("updates a profile other than the active one when given its file", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await store.updateActiveProfile("stream.json");
 
       expect(
@@ -1780,7 +1903,7 @@ describe("StoreManagerService", () => {
 
     it("exports a profile with the update still writing to it", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       const dest = join(elsewhere, "backup.json");
 
       const saving = store.updateProfileData(
@@ -1795,7 +1918,7 @@ describe("StoreManagerService", () => {
 
     it("refuses to export into the profiles folder", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       const stream = join(paths.folders.profilesFolder, "stream.json");
       const before = await readFile(stream, "utf-8");
 
@@ -2004,7 +2127,7 @@ describe("StoreManagerService", () => {
 
     it("tries a failed save again only after a while, for that profile", async () => {
       const store = await init();
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await store.getProfileData();
       await rm(defaultProfileFile);
       vi.spyOn(Logger, "error");
@@ -2246,7 +2369,7 @@ describe("StoreManagerService", () => {
         alerts: { ...defaultProfile.alerts, items },
       });
       await store.updateProfileData(withAlerts(alert("a")));
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await store.updateActiveProfile("stream.json");
       await store.updateProfileData(
         withAlerts(alert("b"), alert("c", { sound: null })),
@@ -2366,8 +2489,8 @@ describe("StoreManagerService", () => {
     it("adds a picture once and removes it", async () => {
       const store = await init();
 
-      await store.addMinecraftPicture(tnt);
-      await store.addMinecraftPicture({ ...tnt, name: "Other name" });
+      await store.addMinecraftPictures([tnt]);
+      await store.addMinecraftPictures([{ ...tnt, name: "Other name" }, tnt]);
       expect((await init()).getMinecraftPictures()).toEqual([tnt]);
 
       await store.removeMinecraftPicture("tnt.png");
@@ -2401,7 +2524,7 @@ describe("StoreManagerService", () => {
       await store.updateProfileData(
         withActions(gameAction("a", tnt), gameAction("b", creeper)),
       );
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await store.updateActiveProfile("stream.json");
       await store.updateProfileData(withActions(gameAction("c", tnt)));
       const stream = join(paths.folders.profilesFolder, "stream.json");
@@ -2420,7 +2543,7 @@ describe("StoreManagerService", () => {
     it("takes it off the profile it read when a switch lands mid-sweep", async () => {
       const store = await init();
       await store.updateProfileData(withActions(gameAction("a", tnt)));
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await store.updateProfileData(
         withActions(gameAction("b", tnt)),
         "stream.json",
@@ -2458,7 +2581,7 @@ describe("StoreManagerService", () => {
       vi.spyOn(Logger, "error");
       const store = await init();
       const stream = join(paths.folders.profilesFolder, "stream.json");
-      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("Stream");
       await store.updateProfileData(
         withActions(gameAction("a", tnt)),
         "stream.json",
@@ -2490,7 +2613,7 @@ describe("StoreManagerService", () => {
     it("still cleans the other profiles after one it can't read", async () => {
       vi.spyOn(Logger, "error");
       const first = await init();
-      await first.createNewProfile("stream.json", "Stream");
+      await first.createNewProfile("Stream");
       await first.updateProfileData(
         withActions(gameAction("a", tnt)),
         "stream.json",

@@ -64,8 +64,8 @@ function setup(items: Alert[] = [alert()]) {
       sounds.push(s);
       return true;
     },
-    addMinecraftPicture: async (p: (typeof pictures)[number]) => {
-      pictures.push(p);
+    addMinecraftPictures: async (added: typeof pictures) => {
+      pictures.push(...added);
       return true;
     },
     removeSound: vi.fn(async (file: string) => {

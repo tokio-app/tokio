@@ -273,6 +273,18 @@ describe("FansService", () => {
     ]);
   });
 
+  it("doesn't scan the fans for one it already has", async () => {
+    const fans = await loaded();
+    for (let i = 0; i < MAX_FANS; i++) fans.record(viewer(String(i)));
+    fans.record(sub("twitch", "1"), TOKIO_EVENTS.CHAT);
+    // The trim walks them all
+    const scan = vi.spyOn(Map.prototype, "values");
+
+    fans.record(viewer("0"));
+
+    expect(scan).not.toHaveBeenCalled();
+  });
+
   it(`keeps ${MAX_FANS} per platform, dropping that platform's one not seen for the longest`, async () => {
     const fans = await loaded();
     fans.record(sub("twitch", "old"), TOKIO_EVENTS.CHAT);

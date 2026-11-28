@@ -801,32 +801,34 @@ describe("live MCP tools", () => {
         { name: "Game night", file: "game-night.json" },
       ];
       let active = profiles[0];
-      const add = async (file: string, name: string) => {
-        const made = { file, name };
+      // Named as the store names a new profile's file
+      const add = async (name: string) => {
+        const made = {
+          file: `${name.toLowerCase().replaceAll(" ", "-")}.json`,
+          name,
+        };
         profiles.push(made);
         return made;
       };
       const store = {
         getProfiles: () => profiles,
         getSettings: () => ({ activeProfile: active }),
-        profileFileFor: async (name: string) =>
-          `${name.toLowerCase().replaceAll(" ", "-")}.json`,
         createNewProfile: vi.fn(add),
-        cloneProfile: vi.fn(async (_ref: string, file: string, name: string) =>
-          add(file, name),
-        ),
+        cloneProfile: vi.fn(async (_ref: string, name: string) => add(name)),
         renameProfile: vi.fn(async (file: string, name: string) => {
           const index = profiles.findIndex((p) => p.file === file);
           profiles[index] = { file, name };
           return "renamed" as const;
         }),
-        deleteProfile: vi.fn(async (file: string) => {
-          profiles.splice(
-            profiles.findIndex((p) => p.file === file),
-            1,
-          );
-          return "deleted" as const;
-        }),
+        deleteProfile: vi.fn(
+          async (file: string): Promise<"deleted" | "leftovers"> => {
+            profiles.splice(
+              profiles.findIndex((p) => p.file === file),
+              1,
+            );
+            return "deleted";
+          },
+        ),
       };
       const h = createHandler(
         {
@@ -906,6 +908,19 @@ describe("live MCP tools", () => {
       expect(h.pushed(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
     });
 
+    it("says so when some of the profile's files stayed", async () => {
+      const { h, store } = setup();
+      store.deleteProfile.mockResolvedValueOnce("leftovers");
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("remove", { kind: "profiles", id: "Game night" });
+
+      expect(res).toMatchObject({
+        isError: false,
+        text: "Removed, but some of its files are still on disk. Tokio's logs say which.",
+      });
+    });
+
     it("gives the handler's refusal for the active profile, and one it doesn't list", async () => {
       const { h, store } = setup();
       const { call } = await mcpClient(h.handler);
@@ -930,10 +945,7 @@ describe("live MCP tools", () => {
       const res = await call("profile", { action: "create", name: " Chill " });
 
       expect(res.value).toEqual({ id: "chill.json", name: "Chill" });
-      expect(store.createNewProfile).toHaveBeenCalledWith(
-        "chill.json",
-        "Chill",
-      );
+      expect(store.createNewProfile).toHaveBeenCalledWith("Chill");
       expect(h.pushed(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
     });
 
@@ -950,7 +962,6 @@ describe("live MCP tools", () => {
       expect(res.value).toEqual({ id: "chill.json", name: "Chill" });
       expect(store.cloneProfile).toHaveBeenCalledWith(
         "game-night.json",
-        "chill.json",
         "Chill",
       );
       const outside = await call("profile", {

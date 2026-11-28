@@ -35,18 +35,19 @@ import {
 } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
-import { isMissing, writeFileAtomic } from "@/helper/fs";
+import { isMissing, removeWithRetry, writeFileAtomic } from "@/helper/fs";
 import { t } from "@/helper/i18n";
 import { isInside } from "@/helper/path";
 import { track } from "@/helper/quit";
 import Logger from "@/logger";
 import { ConnectorService } from "@/services/connector";
+import { isCleared } from "@/services/history";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
 import { TranslationService } from "@/services/translation";
 import { TTSService } from "@/services/tts";
 import { safeStorage } from "electron";
-import { access, readdir, readFile, rm, unlink } from "fs/promises";
+import { access, readdir, readFile, unlink } from "fs/promises";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, extname, join, parse, resolve } from "path";
 import { z } from "zod";
@@ -103,6 +104,8 @@ export class StoreManagerService extends Service {
   private _keys = new Map<string, string>();
   // The active profile's last update, which memory holds once it's written
   private _profileWrite: Promise<unknown> = Promise.resolve();
+  // New profiles' files, from their pick until they're listed
+  private _reservedFiles = new Set<string>();
   // The active file's last failed load, so live events don't read it each time
   private _failedLoad: { file: string; at: number } | null = null;
   // The last failed emote save, so chats don't write a broken file each time
@@ -637,7 +640,7 @@ export class StoreManagerService extends Service {
   }
 
   public addSound(sound: AlertSound): Promise<boolean> {
-    return this._addFile("sounds", sound);
+    return this._addFiles("sounds", [sound]);
   }
 
   /** Adds the sounds not listed yet, with one save. */
@@ -655,7 +658,7 @@ export class StoreManagerService extends Service {
   }
 
   public addMedia(media: MediaFile): Promise<boolean> {
-    return this._addFile("media", media);
+    return this._addFiles("media", [media]);
   }
 
   /** Adds the media files not listed yet, with one save. */
@@ -672,8 +675,9 @@ export class StoreManagerService extends Service {
     return this._storeData!.settings.minecraftPictures;
   }
 
-  public addMinecraftPicture(picture: MediaFile): Promise<boolean> {
-    return this._addFile("minecraftPictures", picture);
+  /** Adds the pictures not listed yet, with one save. */
+  public addMinecraftPictures(pictures: MediaFile[]): Promise<boolean> {
+    return this._addFiles("minecraftPictures", pictures);
   }
 
   public removeMinecraftPicture(file: string): Promise<boolean> {
@@ -744,7 +748,8 @@ export class StoreManagerService extends Service {
   ): Promise<boolean> {
     this._ensureInitialized();
     let saved = true;
-    for (const { file: profileFile } of this.getProfiles()) {
+    // A copy: a profile deleted meanwhile would shift the list and skip one
+    for (const { file: profileFile } of [...this.getProfiles()]) {
       const active = profileFile === this._activeProfileFile();
       const path = join(
         this._pathManagerService.folders.profilesFolder,
@@ -780,13 +785,6 @@ export class StoreManagerService extends Service {
       saved = (await this.updateProfileData(updates, profileFile)) && saved;
     }
     return saved;
-  }
-
-  private _addFile(
-    library: "sounds" | "media" | "minecraftPictures",
-    entry: AlertSound,
-  ): Promise<boolean> {
-    return this._addFiles(library, [entry]);
   }
 
   private async _addFiles(
@@ -975,8 +973,11 @@ export class StoreManagerService extends Service {
     this._ensureInitialized();
     const entity = this._storeData!.profiles.find((p) => p.file === file);
     if (!entity) return "missing";
+    const path = join(this._pathManagerService.folders.profilesFolder, file);
+    // A sweep's update still writing would otherwise come back on autosave
+    await this._jsonManagerService.whenWritten(path);
     const profile = await this._jsonManagerService.loadFile(
-      join(this._pathManagerService.folders.profilesFolder, file),
+      path,
       ProfileSchema,
     );
     if (!profile) return "missing";
@@ -1051,105 +1052,39 @@ export class StoreManagerService extends Service {
   }
 
   /**
-   * Writes a new profile's file and lists it. "unsaved" when only the store
-   * couldn't be saved, null for any other failure.
+   * Writes a new profile's file, named after it, and lists it. "unsaved" when
+   * only the store couldn't be saved, null for any other failure.
    */
   public async createNewProfile(
-    fileName: string,
-    profileName: string,
+    name: string,
   ): Promise<EntityMetadata | "unsaved" | null> {
     this._ensureInitialized();
-    if (!fileName || !profileName) return null;
-
-    if (!(await this._isFreeProfileFile(fileName))) {
-      Logger.error(
-        `<System> Refused to create the profile file ${fileName}, it isn't a free file name.`,
-        this._logFile,
-      );
-      return null;
-    }
-
-    const newPath = join(
-      this._pathManagerService.folders.profilesFolder,
-      fileName,
-    );
-    const newProfileData = { ...defaultProfile, name: profileName };
-
-    const saved = await this._jsonManagerService.saveFile(
-      newPath,
-      ProfileSchema,
-      newProfileData,
-    );
-
-    if (!saved) {
-      Logger.error(
-        `<System> Failed to write new profile file: ${fileName}`,
-        this._logFile,
-      );
-      return null;
-    }
-
-    return this._listNewProfile({ file: fileName, name: profileName });
+    if (!name) return null;
+    return this._writeNewProfile(name, { ...defaultProfile, name });
   }
 
   // As createNewProfile, with a copy of another profile's file.
   public async cloneProfile(
-    referenceFileName: string,
-    newFileName: string,
-    newProfileName: string,
+    ref: string,
+    name: string,
   ): Promise<EntityMetadata | "unsaved" | null> {
     this._ensureInitialized();
-    if (!referenceFileName || !newFileName || !newProfileName) return null;
-    if (!(await this._isFreeProfileFile(newFileName))) {
-      Logger.error(
-        `<System> Refused to clone into the profile file ${newFileName}, it isn't a free file name.`,
-        this._logFile,
-      );
-      return null;
-    }
-
-    const refPath = join(
-      this._pathManagerService.folders.profilesFolder,
-      referenceFileName,
-    );
-    const newPath = join(
-      this._pathManagerService.folders.profilesFolder,
-      newFileName,
-    );
-
+    if (!ref || !name) return null;
+    const refPath = join(this._pathManagerService.folders.profilesFolder, ref);
     // Any profile can have updates queued, like the timer's or a sweep's
     await this._jsonManagerService.whenWritten(refPath);
-    const existingData = await this._jsonManagerService.loadFile(
+    const data = await this._jsonManagerService.loadFile(
       refPath,
       ProfileSchema,
     );
-    if (!existingData) {
+    if (!data) {
       Logger.error(
-        `<System> Clone failed: Reference profile ${referenceFileName} not found.`,
+        `<System> Clone failed: Reference profile ${ref} not found.`,
         this._logFile,
       );
       return null;
     }
-
-    const clonedData = {
-      ...structuredClone(existingData),
-      name: newProfileName,
-    };
-    const saved = await this._jsonManagerService.saveFile(
-      newPath,
-      ProfileSchema,
-      clonedData,
-    );
-
-    if (!saved) {
-      Logger.error(
-        `<System> Failed to write cloned profile file: ${newFileName}`,
-        this._logFile,
-      );
-      return null;
-    }
-
-    return this._listNewProfile({ file: newFileName, name: newProfileName });
+    return this._writeNewProfile(name, { ...structuredClone(data), name });
   }
 
   public async exportProfile(ref: string, path: string): Promise<boolean> {
@@ -1193,17 +1128,14 @@ export class StoreManagerService extends Service {
     return true;
   }
 
-  // Copied to a file named after its file as profileFileFor names a new one's,
-  // and listed under its own name, numbered when another profile has it.
+  // Copied to a file named after its file, as a new profile's is named after
+  // it, and listed under its own name, numbered when another profile has it.
   // Fails as createNewProfile.
   public async importProfile(
     ref: string,
   ): Promise<EntityMetadata | "unsaved" | null> {
     this._ensureInitialized();
     if (!ref) return null;
-    const file = await this.profileFileFor(basename(ref, extname(ref)));
-    const newPath = join(this._pathManagerService.folders.profilesFolder, file);
-
     const data = await this._jsonManagerService.loadFile(
       resolve(ref),
       ProfileSchema,
@@ -1223,20 +1155,35 @@ export class StoreManagerService extends Service {
         ? t("main.store.importedProfile")
         : trimmed,
     );
-    const saved = await this._jsonManagerService.saveFile(
-      newPath,
-      ProfileSchema,
-      { ...data, name },
-    );
-    if (!saved) {
-      Logger.error(
-        `<System> Failed to write imported profile file: ${newPath}`,
-        this._logFile,
-      );
-      return null;
-    }
+    return this._writeNewProfile(basename(ref, extname(ref)), {
+      ...data,
+      name,
+    });
+  }
 
-    return this._listNewProfile({ file, name });
+  // Writes the profile to a free file named after `name` and lists it. The
+  // file stays reserved until then, so two new profiles at once never get
+  // the same one.
+  private async _writeNewProfile(
+    name: string,
+    data: Profile,
+  ): Promise<EntityMetadata | "unsaved" | null> {
+    const file = await this._freeProfileFile(profileSlug(name));
+    try {
+      const path = join(this._pathManagerService.folders.profilesFolder, file);
+      if (
+        !(await this._jsonManagerService.saveFile(path, ProfileSchema, data))
+      ) {
+        Logger.error(
+          `<System> Failed to write the new profile file ${file}`,
+          this._logFile,
+        );
+        return null;
+      }
+      return await this._listNewProfile({ file, name: data.name });
+    } finally {
+      this._reservedFiles.delete(file);
+    }
   }
 
   // A profile whose file the store can't list is deleted, so it doesn't take
@@ -1258,20 +1205,16 @@ export class StoreManagerService extends Service {
     return "unsaved";
   }
 
-  /**
-   * A free file for a new profile, named after it in lowercase ASCII letters,
-   * digits, "-" and "_", with a number added when another profile has it.
-   */
-  public async profileFileFor(name: string): Promise<string> {
-    this._ensureInitialized();
-    return this._freeProfileFile(profileSlug(name));
-  }
-
   // `base`.json, or `base`-2.json and on when it's taken
+  // Reserved before its check, so another pick can't take it meanwhile; the
+  // caller frees it once the profile is written and listed.
   private async _freeProfileFile(base: string): Promise<string> {
     for (let n = 1; n <= 1000; n++) {
       const file = n === 1 ? `${base}.json` : `${base}-${n}.json`;
+      if (this._reservedFiles.has(file)) continue;
+      this._reservedFiles.add(file);
       if (await this._isFreeProfileFile(file)) return file;
+      this._reservedFiles.delete(file);
     }
     return `${randomUUID()}.json`;
   }
@@ -1344,11 +1287,12 @@ export class StoreManagerService extends Service {
    * (fans/<file>) and its LIVE history (history/<file without .json>/). null
    * when it isn't listed or it's the active one, which the only profile always
    * is. "unsaved" when the store couldn't be saved: it stays listed and
-   * nothing is deleted.
+   * nothing is deleted. "leftovers" when it's unlisted but some of its files
+   * couldn't be deleted (logged).
    */
   public async deleteProfile(
     file: string,
-  ): Promise<"deleted" | "unsaved" | null> {
+  ): Promise<"deleted" | "leftovers" | "unsaved" | null> {
     this._ensureInitialized();
     const profiles = this._storeData!.profiles;
     const index = profiles.findIndex((p) => p.file === file);
@@ -1371,13 +1315,9 @@ export class StoreManagerService extends Service {
     const { fansFolder, historyFolder, profilesFolder } =
       this._pathManagerService.folders;
     const { name } = parse(file);
-    // clear()'s leftovers too: <name>.cleared-<digits>
-    const prefix = `${name}.cleared-`;
+    // clear()'s leftovers too
     const cleared = (await readdir(historyFolder).catch(() => []))
-      .filter(
-        (entry) =>
-          entry.startsWith(prefix) && /^\d+$/.test(entry.slice(prefix.length)),
-      )
+      .filter((entry) => isCleared(name, entry))
       .map((entry) => join(historyFolder, entry));
     const gone = await Promise.all(
       [join(fansFolder, file), join(historyFolder, name), ...cleared].map(
@@ -1386,30 +1326,17 @@ export class StoreManagerService extends Service {
     );
     // While the profile's file is there, its name's file stays taken, so a
     // new profile can't get the fans and LIVEs left behind.
-    if (gone.every(Boolean)) {
-      const path = join(profilesFolder, file);
-      // shortcut: an update queued on the file after this wait could write it
-      // again; only a sweep that read it before the unlisting can, and the
-      // file then sits unlisted until a store rebuild lists it.
-      await this._jsonManagerService.whenWritten(path);
-      await this._remove(path);
-    }
-    return "deleted";
+    if (!gone.every(Boolean)) return "leftovers";
+    const path = join(profilesFolder, file);
+    // shortcut: an update queued on the file after this wait could write it
+    // again; only a sweep that read it before the unlisting can, and the
+    // file then sits unlisted until a store rebuild lists it.
+    await this._jsonManagerService.whenWritten(path);
+    return (await this._remove(path)) ? "deleted" : "leftovers";
   }
 
-  // A file or folder, with a few tries for one Windows holds a moment. False
-  // when it's still there.
   private _remove(path: string): Promise<boolean> {
-    return rm(path, { recursive: true, force: true, maxRetries: 3 }).then(
-      () => true,
-      (error: unknown) => {
-        Logger.warn(
-          `<System> Unable to delete ${path} -- ${formatError(error)}`,
-          this._logFile,
-        );
-        return false;
-      },
-    );
+    return removeWithRetry(path, "<System>", this._logFile);
   }
 
   public async addProfile(
@@ -1512,16 +1439,25 @@ export class StoreManagerService extends Service {
   private async _encryptProviderKey(
     provider: AppProvider,
   ): Promise<AppProvider> {
-    if (!provider.key || !(await safeStorage?.isAsyncEncryptionAvailable())) {
+    if (!provider.key) return provider;
+    // Never the key itself in the logs
+    const plain = (why: string) => {
+      Logger.warn(
+        `<System> Saving the ${provider.name} key unencrypted: ${why}`,
+        this._logFile,
+      );
       return provider;
+    };
+    if (!(await safeStorage?.isAsyncEncryptionAvailable())) {
+      return plain("encryption is unavailable");
     }
     try {
       const encrypted = await safeStorage.encryptStringAsync(provider.key);
       const key = encrypted.toString("base64");
       this._keys.set(key, provider.key);
       return { ...provider, key };
-    } catch {
-      return provider;
+    } catch (error) {
+      return plain(formatError(error));
     }
   }
 
@@ -1542,7 +1478,12 @@ export class StoreManagerService extends Service {
         .map((p) => p.key)
         .filter(isEncrypted),
     );
-    if (!encrypted.size || !(await safeStorage?.isAsyncEncryptionAvailable())) {
+    if (!encrypted.size) return;
+    if (!(await safeStorage?.isAsyncEncryptionAvailable())) {
+      Logger.warn(
+        `<System> ${encrypted.size} saved keys read as empty: encryption is unavailable`,
+        this._logFile,
+      );
       return;
     }
     await Promise.all(
@@ -1552,8 +1493,12 @@ export class StoreManagerService extends Service {
             Buffer.from(key, "base64"),
           );
           this._keys.set(key, result);
-        } catch {
+        } catch (error) {
           // Left out, so _withKey reads it as ""
+          Logger.warn(
+            `<System> A saved key reads as empty, it couldn't be decrypted -- ${formatError(error)}`,
+            this._logFile,
+          );
         }
       }),
     );

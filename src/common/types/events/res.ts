@@ -275,7 +275,11 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.RENAME_PROFILE]: Reply<{ file: string }>;
 
   // The profile's file, failures included
-  [APP_EVENTS_RESPONSE.DELETE_PROFILE]: Reply<{ file: string }>;
+  // leftovers: deleted, but some of its files are still on disk
+  [APP_EVENTS_RESPONSE.DELETE_PROFILE]: Reply<{
+    file: string;
+    leftovers?: boolean;
+  }>;
 
   [APP_EVENTS_RESPONSE.IMPORT_ENTITY]: Reply<{
     type: "profile";

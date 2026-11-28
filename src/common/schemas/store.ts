@@ -74,7 +74,7 @@ export const perPlatform = <T extends z.ZodType>(schema: T) =>
 // Each platform's kinds (the user's call). A feed saved before they had their
 // own applies to every platform. A platform a newer Tokio saved that this one
 // doesn't know is dropped, and one missing shows everything.
-export const ActivityFeedSchema = z.preprocess(
+const ActivityFeedSchema = z.preprocess(
   (value) =>
     value &&
     typeof value === "object" &&

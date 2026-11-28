@@ -811,6 +811,22 @@ describe("HistoryService", () => {
     ]);
   });
 
+  it("writes each platform's part as it was when the save began", async () => {
+    const history = await loaded();
+    history.start("kai", 0);
+    gifts(history, [1000, gift(viewer("1"), 5)]);
+    const saving = history.save();
+    // Lands while the save waits for the one before
+    gifts(history, [2000, gift(viewer("1"), 5)]);
+    await saving;
+
+    const saved = await read<LiveRecord>("0.json");
+    expect(saved.coins).toBe(5);
+    expect(saved.platforms).toEqual({
+      tiktok: { amount: 5, gifts: 1, giftSubs: 0 },
+    });
+  });
+
   it("counts only the gifts in the dates of a LIVE they cut", async () => {
     const history = await loaded();
     // From 10:30 to 12:30 into the clock's minutes, then from 20 to 21
