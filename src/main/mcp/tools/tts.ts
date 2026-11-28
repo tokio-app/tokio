@@ -72,7 +72,7 @@ export const sections: Sections = {
       "voice: the voice chat is read in, { engine, name, lang, id } exactly as list_voices gives it. It's replaced whole, so send all four.",
       "filters: speed and pitch 0.5-2 (1 is normal), volume 0-100.",
       permissionsNote("who is read", "are never read"),
-      "format.template: what's read, with the variables {username}, {handle}, {comment} and {translation}. format.trigger: mode any reads every message; dot, slash and custom read only messages starting with value ('.', '/', or a custom command such as '!tts'), which is cut off. remove_emojis leaves emojis out. translate reads the chat translation in {comment}'s place, when chat translation is on (app section).",
+      "format.template: what's read, with the variables {username}, {handle}, {comment} and {translation}. format.trigger: mode any reads every message, dot only messages starting with '.', slash only those starting with '/', and custom only those starting with value (a command such as '!tts'). The start is cut off, and dot and slash ignore value. remove_emojis leaves emojis out. translate reads the chat translation in {comment}'s place, when chat translation is on (app section).",
       "protection: cooldown seconds between messages, queue_length messages waiting at most, comment_length characters at most in a message and in its translation (a longer one isn't read), banned words that stop a message.",
       "replacements: whole words replaced before reading ({ old, new }).",
       "user_voices: special users, { handle, voice } each: chat from that handle is read in that voice.",

@@ -902,6 +902,21 @@ describe("MusicService", () => {
         expect(played()).toEqual(["A", "B", "A"]);
       });
 
+      it("is refused while the song queue is full", async () => {
+        const { service, request, provider } = setup();
+        const music = settings((m) => {
+          m.protection.queue_length = 1;
+          m.protection.one_per_viewer = false;
+        });
+        await request("!play A", music);
+        await request("!play B", music);
+        provider.searchSong.mockClear();
+
+        expect(service.request("C", "host")).toBe(false);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(provider.searchSong).not.toHaveBeenCalled();
+      });
+
       it("does nothing while not connected", () => {
         const { service, provider } = setup();
         provider.isActive.mockReturnValue(false);

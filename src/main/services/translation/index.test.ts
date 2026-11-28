@@ -138,6 +138,17 @@ describe("TranslationService", () => {
       expect(queries(fetch)).toEqual(["hello there"]);
     });
 
+    it("cuts the TTS trigger where TTS does, after letters that lowercase longer", async () => {
+      const fetch = stub();
+      const commands = { ...none, trigger: "!i\u0307" };
+
+      expect(
+        (await translated("!\u0130 hello there", { commands }))?.translation
+          ?.text,
+      ).toBe("!\u0130 es:hello there");
+      expect(queries(fetch)).toEqual(["hello there"]);
+    });
+
     it("puts the mentions at the ends back around the translation", async () => {
       const fetch = stub();
 

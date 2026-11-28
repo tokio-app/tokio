@@ -1,4 +1,5 @@
 import { Profile } from "@/common/schemas";
+import { MODE_VALUES } from "@/common/util/tts";
 import {
   Check,
   Field,
@@ -16,15 +17,6 @@ import { useRef } from "react";
 import styles from "../tts.module.css";
 
 type Format = Profile["tts"]["format"];
-type Mode = Format["trigger"]["mode"];
-
-// Prefix each mode starts with
-const MODE_VALUES: Record<Mode, string> = {
-  any: "",
-  dot: ".",
-  slash: "/",
-  custom: "!tts",
-};
 
 // The ones TTSService fills in the template, see _parseText
 const TEMPLATE_VARIABLES = ["username", "handle", "comment", "translation"];

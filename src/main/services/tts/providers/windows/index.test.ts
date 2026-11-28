@@ -66,6 +66,16 @@ describe("WindowsTTS", () => {
     expect(types()).toEqual(["voices", "voices"]);
   });
 
+  it("asks once for pickers and messages at the same time", async () => {
+    await Promise.all([
+      tts.getVoices(),
+      tts.getVoices(),
+      tts.generateBuffer("hola", "es-MX", "Microsoft Aria"),
+    ]);
+
+    expect(types()).toEqual(["voices", "speak"]);
+  });
+
   it("asks again after an empty list", async () => {
     host.request.mockResolvedValueOnce([]);
     await expect(tts.getVoices()).resolves.toEqual([]);

@@ -3,7 +3,11 @@ import {
   APP_EVENTS_RESPONSE,
   FEEDBACK_CODES,
 } from "@/common/types";
-import { defaultProfile, VOICE_SAMPLE_MAX_BYTES } from "@/common/util";
+import {
+  defaultProfile,
+  VOICE_SAMPLE_MAX_BYTES,
+  VOICE_SAMPLES_MAX,
+} from "@/common/util";
 import Logger from "@/logger";
 import { TTSRequestError } from "@/services/tts/common";
 import { dialog, systemPreferences } from "@test/electron";
@@ -374,6 +378,26 @@ describe("tts events", () => {
       // A Buffer is a Uint8Array too, so check it was converted
       expect(Buffer.isBuffer(reply.samples?.[0].data)).toBe(false);
       expect(h.notices).toEqual([]);
+    });
+
+    it("reads only as many files as the window keeps", async () => {
+      const dir = await folder();
+      const files = Array.from({ length: VOICE_SAMPLES_MAX + 2 }, (_, i) =>
+        join(dir, `${i}.mp3`),
+      );
+      for (const file of files) await writeFile(file, Buffer.from([1]));
+      dialog.showOpenDialog.mockResolvedValue({
+        canceled: false,
+        filePaths: files,
+      });
+      const h = createHandler();
+
+      await h.invoke(tts, APP_EVENTS.PICK_VOICE_SAMPLES);
+
+      const [reply] = h.replies(APP_EVENTS_RESPONSE.PICK_VOICE_SAMPLES);
+      expect(reply.samples?.map((s) => s.name)).toEqual(
+        files.slice(0, VOICE_SAMPLES_MAX).map((_, i) => `${i}.mp3`),
+      );
     });
 
     it("leaves out empty, oversized and unreadable files, with one warning", async () => {

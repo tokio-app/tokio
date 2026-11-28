@@ -1,5 +1,6 @@
 import { TOKIO_EVENTS } from "@/common/types";
 import { reactsToEvents, triggersOf } from "@/common/util";
+import { triggerPrefix } from "@/common/util/tts";
 import type { AppServices } from "@/types";
 import type { ChatCommands } from ".";
 
@@ -47,7 +48,7 @@ export async function chatCommands({
   const timerKeyword =
     timer && timer.seconds.chat > 0 ? timer.chat.keyword : "";
   return {
-    trigger: trigger && trigger.mode !== "any" ? trigger.value : "",
+    trigger: trigger ? triggerPrefix(trigger) : "",
     commands: [
       ...Object.values(profile?.music.controls ?? {})
         .filter((control) => control.enabled)

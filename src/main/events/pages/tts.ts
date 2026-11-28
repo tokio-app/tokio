@@ -184,7 +184,8 @@ events.push(
 
     const samples: VoiceSample[] = [];
     const skipped: string[] = [];
-    for (const path of res.filePaths) {
+    // The window keeps that many, so no more are read
+    for (const path of res.filePaths.slice(0, VOICE_SAMPLES_MAX)) {
       const name = basename(path);
       try {
         const { size } = await stat(path);

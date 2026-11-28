@@ -107,6 +107,32 @@ describe("EdgeTTS", () => {
       expect(list).toHaveBeenCalledTimes(2);
     });
 
+    it("lists the voices once for pickers asking at the same time", async () => {
+      const [a, b] = await Promise.all([tts.getVoices(), tts.getVoices()]);
+
+      expect(a).toBe(b);
+      expect(list).toHaveBeenCalledOnce();
+    });
+
+    it("waits a day again after a failed refresh", async () => {
+      const first = await tts.getVoices();
+      list.mockRejectedValue(new EdgeTTSError("network", "offline"));
+      vi.advanceTimersByTime(tts.config.VOICES_TTL_MS);
+      await tts.getVoices();
+
+      vi.advanceTimersByTime(tts.config.VOICES_TTL_MS - 1);
+      expect(await tts.getVoices()).toBe(first);
+      expect(list).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps the list when the clock is set forward", async () => {
+      await tts.getVoices();
+      vi.setSystemTime(Date.now() + 2 * tts.config.VOICES_TTL_MS);
+
+      await tts.getVoices();
+      expect(list).toHaveBeenCalledOnce();
+    });
+
     it("fails when there's no list to fall back on", async () => {
       const error = new EdgeTTSError("network", "offline");
       list.mockRejectedValue(error);

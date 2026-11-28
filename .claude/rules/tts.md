@@ -21,7 +21,7 @@ paths:
 - `windows` drives SAPI and OneCore voices through a long-lived 32-bit PowerShell helper, so 32-bit-only voices such as Loquendo show. Its script (`common/script.ts`) must not contain backticks.
 - The helper starts on the first request and exits `IDLE_TIMEOUT_MS` after the last, so it doesn't hold memory between uses. `getVoices` lists the voices once a run; a failed or empty list isn't kept, and a voice installed meanwhile shows after a restart.
 - `common/script.test.ts` runs that script in a real PowerShell on Windows (CI's Windows job) with whatever voices are installed, with a raised `START_TIMEOUT_MS`, since a busy runner is slow to start the host.
-- `edge` uses Microsoft's unofficial Read Aloud protocol. Read `providers/edge/README.md` before changing it. Volatile values live in its `config/index.ts`. It fetches the voice list before its first message (one shared fetch), so the default-voice fallback for a retired voice works without the TTS page.
+- `edge` uses Microsoft's unofficial Read Aloud protocol. Read `providers/edge/README.md` before changing it. Volatile values live in its `config/index.ts`. It fetches the voice list before its first message, so the default-voice fallback for a retired voice works without the TTS page. The list is kept `VOICES_TTL_MS` on `performance.now()`, a failed refresh keeps the old list as long again, and pickers and messages asking at once share one fetch. Windows shares its listing the same way.
 
 ## Keyed engines
 
@@ -37,7 +37,7 @@ paths:
   - Older ElevenLabs errors send an empty quota as a 401, and an ElevenLabs key without a permission gets a 401 "unauthorized" that only its message tells apart from a wrong key, so the provider makes that code `missing_permissions`.
   - Cartesia's free plan gets a 402 that only its message tells apart from no credits, so the provider makes that code `plan_required` (`notAllowed`).
   - The other engines' codes are their HTTP statuses, and a clone they refuse after a 200 (Fish Audio's failed training, Inworld's reply without a voice) is a 422, so it reads as unusable samples.
-- `GET_VOICES` warns when an engine with a saved key fails to list (`tts:voices:<engine>`), so a wrong key shows. Engines without a key fail quietly.
+- `GET_VOICES` warns when an engine with a saved key fails to list (`tts:voices:<engine>`), so a wrong key shows. Engines without a key fail quietly. `logVoicesFailure` logs each engine's failure once per `REPEAT_NOTICE_MS`, since every picker lists.
 
 ## Voice cloning
 
@@ -51,7 +51,8 @@ paths:
 ## Chat TTS
 
 - `TTSService.talk` makes a chat message's audio on a `TaskQueue` (the TTS page's cooldown and queue length), and doesn't check a message a full queue would drop (`TaskQueue.full()`).
-- With a trigger other than "any", the comment must start with it, in any case (phones capitalize the first letter), and it's cut off and not read. A blank command reads nothing, since it would match every message.
+- With a trigger other than "any", the comment must start with its prefix (`triggerPrefix`, `src/common/util/tts.ts`), in any case (phones capitalize the first letter), and it's cut off and not read. Dot and slash take their own prefix whatever `value` holds, so a mode saved alone (MCP) still reads; custom takes `value`. A blank command reads nothing, since it would match every message.
+  - `startsWithTrigger` (`src/main/helper/chat.ts`) matches it and says where to cut, for TTS and chat translation alike. Cut there, never at the prefix's length: a lowercased Turkish dotted I is two characters.
 - A message that's empty once the trigger is cut, or only invisible characters (`isBlank`, `src/main/helper/chat.ts`), is skipped. So is one whose filled text has no letter, number or emoji, since Edge sends no audio for punctuation alone; `prepareText` refuses it, so the page's tester warns.
 - Replacements match whole words in any case, as keywords do (`wholeWord`, `.claude/rules/triggers.md`).
 - Banned words are checked in the comment, the name and the handle, not in the template's own words.
